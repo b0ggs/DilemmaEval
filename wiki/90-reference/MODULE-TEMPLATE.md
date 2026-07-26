@@ -34,5 +34,5 @@ Use this only when adding a genuinely required guide module. Keep it bounded and
 - Next link and minimum context
 
 ## Source and canon
-- Exact decision-sheet section links
+- Exact decision-sheet and/or approved-replacement section links
 ```

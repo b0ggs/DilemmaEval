@@ -11,6 +11,7 @@
 
 - [ ] [M00](M00-PROJECT-CANON.md) handoff is `Passed`.
 - [ ] Read decision sheet [§2.4 and §2.7–§2.9](../../prisoners-daolemma-tournament-decisions-v1_0.md#24-model) and all six [§3 open items](../../prisoners-daolemma-tournament-decisions-v1_0.md#3-open-items-still-to-decide).
+- [ ] Read replacement [§§4–7](../../prisoners-daolemma-discord-replacement.md#4-team-message-logs), [§9](../../prisoners-daolemma-discord-replacement.md#9-restart-and-duplicate-handling), and [§10](../../prisoners-daolemma-discord-replacement.md#10-observer-and-evidence).
 - [ ] Prepare a secret-free copy of the [run record](../90-reference/RUN-EVIDENCE-RECORD.md).
 
 ## Inputs and prerequisites
@@ -37,7 +38,11 @@ The six rows marked **OPEN** are exactly the decision sheet's unresolved items. 
 | `CFG-ROUND-CEILING` | LOCKED planning guidance / LIVE-VERIFY | Select modest windows so a slow agent fits; target roughly 200 seconds at the ceiling and usually less |
 | `CFG-PLAYER-CONFIG` | LOCKED target / LIVE-VERIFY | Existing deployment supports the intended ten-player configuration |
 | `CFG-SEATS` | RUN-FROZEN | Five stable OpenClaw and five stable Hermes seat mappings |
-| `CFG-DISCORD` | RUN-FROZEN | Two team channel/webhook environment references; optional global channel choice |
+| `CFG-CHAT-PATHS` | LOCKED | `runtime/chat/<game-id>/openclaw.jsonl` and `runtime/chat/<game-id>/hermes.jsonl` |
+| `CFG-CHAT-LIMITS` | RUN-FROZEN fairness control | Identical per-message/total character limits and history selection for both teams; recommended start is latest 20 eligible messages |
+| `CFG-CHAT-ORDER` | RUN-FROZEN fairness control | Deterministic or recorded poke ordering, serialized acceptance sequence, same opportunities/timeouts/retries for both teams |
+| `CFG-CHAT-DISPLAY` | RUN-FROZEN | Live, end-of-round, or end-of-game public display; choose a delay that prevents strategy leakage and does not alter agent inputs |
+| `CFG-CHAT-SCHEMA` | LOCKED | Message, poke, response, accepted/rejected, request-log, and recovery records use the replacement schemas/fields |
 | `CFG-RPC` | LIVE-VERIFY | Approved Base Sepolia RPC environment reference; no credential value |
 | `CFG-EVIDENCE` | RUN-FROZEN | Approved evidence location and retention owner |
 
@@ -49,6 +54,7 @@ The six rows marked **OPEN** are exactly the decision sheet's unresolved items. 
 - [ ] `M01-04` Freeze the exact route/settings and operational mappings before each fairness/run gate.
 - [ ] `M01-05` Confirm all secret-bearing entries are environment/resource references or placeholders only.
 - [ ] `M01-06` Mark unresolved, stale, contradictory, or unreviewed required rows `Blocked`.
+- [ ] `M01-07` Freeze identical chat limits/order/transport/retry/display settings before a game and record that external chat configuration is absent.
 
 ## Acceptance and evidence
 
@@ -60,6 +66,7 @@ The six rows marked **OPEN** are exactly the decision sheet's unresolved items. 
 | M01-04 | Both harness/run consumers reference one frozen value | Config digests or reviewed snapshots |
 | M01-05 | No secret value appears | Secret-scan/reviewer result |
 | M01-06 | No dependency consumes a blocked row | Dependency review |
+| M01-07 | Both harnesses reference one communication configuration and the run starts without external chat credentials | Config digest and redacted startup inventory |
 
 ## Stop and escalate
 
@@ -78,3 +85,6 @@ Provide only relevant row IDs and evidence references, not the entire record or 
 - [§2.8 Timing](../../prisoners-daolemma-tournament-decisions-v1_0.md#28-timing)
 - [§2.9 Observer](../../prisoners-daolemma-tournament-decisions-v1_0.md#29-observer)
 - [§3 Open items](../../prisoners-daolemma-tournament-decisions-v1_0.md#3-open-items-still-to-decide)
+- [Replacement §4 Team message logs](../../prisoners-daolemma-discord-replacement.md#4-team-message-logs)
+- [Replacement §7 Fairness rules](../../prisoners-daolemma-discord-replacement.md#7-fairness-rules)
+- [Replacement §10 Observer and evidence](../../prisoners-daolemma-discord-replacement.md#10-observer-and-evidence)

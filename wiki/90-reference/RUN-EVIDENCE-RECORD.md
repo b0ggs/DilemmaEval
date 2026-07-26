@@ -13,6 +13,7 @@ Create one copy per spike, pilot, game, or series in the team's approved artifac
 - Reviewer:
 - Started/completed UTC:
 - Decision-sheet revision:
+- Approved-replacement revision:
 - Implementation/contract source revision(s), if available:
 
 ## Configuration snapshot
@@ -23,7 +24,7 @@ Create one copy per spike, pilot, game, or series in the team's approved artifac
 
 ## Seat and resource mapping
 
-| Seat | Team/harness | Agent identity | Public wallet | Discord channel reference | Secret/environment reference (no value) | Status |
+| Seat | Team/harness | Agent identity | Public wallet | Team-log path | Secret/environment reference (no value) | Status |
 |---|---|---|---|---|---|---|
 |  |  |  |  |  |  |  |
 
@@ -35,7 +36,7 @@ Create one copy per spike, pilot, game, or series in the team's approved artifac
 
 ## Timeline and chain reconciliation
 
-| Event/phase | Chain state/block | Orchestrator observation | Agent action/receipt | Discord/evidence reference | Notes |
+| Event/phase | Chain state/block | Orchestrator observation | Agent action/receipt | Request/response/log/evidence reference | Notes |
 |---|---|---|---|---|---|
 |  |  |  |  |  |  |
 
@@ -46,6 +47,25 @@ Create one copy per spike, pilot, game, or series in the team's approved artifac
 - Derived team result and derivation:
 - Draw, if applicable:
 - Replay label and source package, if applicable:
+
+## Team communication evidence
+
+- Team log paths and hashes:
+- Chat schema/config/limits digest:
+- Transport proof/reference (proposed Maritime CLI syntax remains LIVE-VERIFY until confirmed):
+- Poke ordering policy:
+- Request/response log paths and hashes:
+- Accepted/rejected record paths and hashes:
+- Public display delay/release point:
+
+| Request ID | Seat/team | Round/phase | Through sequence | Response record | Accepted/rejected record | Team-log sequence, if accepted |
+|---|---|---|---|---|---|---|
+|  |  |  |  |  |  |  |
+
+- Restart/idempotency test or incident:
+- Partial-line recovery record, if any:
+- Snapshot reconstruction verdict:
+- Team-isolation verdict:
 
 ## Deviations, blockers, and escalation
 

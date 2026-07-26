@@ -5,7 +5,7 @@
 - **Accountable owner:** Wallet/funding coordinator — unassigned
 - **Evidence reviewer:** Security/chain reviewer — unassigned
 - **Classification:** LOCKED / LIVE-VERIFY
-- **Navigation:** Previous: [M06](M06-MARITIME-FLEET.md) · [Wiki home](../README.md) · [MASTER](../MASTER-IMPLEMENTATION-GUIDE.md) · Next: [M08](M08-DISCORD-CHAT.md)
+- **Navigation:** Previous: [M06](M06-MARITIME-FLEET.md) · [Wiki home](../README.md) · [MASTER](../MASTER-IMPLEMENTATION-GUIDE.md) · Next: [M08](M08-TEAM-CHAT-LOGS.md)
 
 ## Read first
 
@@ -61,7 +61,7 @@
 
 ## Handoff and next
 
-At the pilot checkpoint, record the public two-seat map, calculations, receipts/readbacks, and balances—never keys; M08 pilot may run in parallel. After M10 and [M06 full](M06-MARITIME-FLEET.md#full-fleet-checkpoint), return to the [M07 full-fleet checkpoint](#full-fleet-checkpoint), which may run beside [M08 full](M08-DISCORD-CHAT.md#full-fleet-checkpoint). If M08 full is already passed, continue to [M11](../30-execute/M11-TEN-AGENT-TOURNAMENT.md); otherwise hand off to M08 full. Minimum context: MASTER, active M06 map, M03, relevant M01 rows, and the M10 verdict when scaling.
+At the pilot checkpoint, record the public two-seat map, calculations, receipts/readbacks, and balances—never keys; M08 pilot may run in parallel. After M10 and [M06 full](M06-MARITIME-FLEET.md#full-fleet-checkpoint), return to the [M07 full-fleet checkpoint](#full-fleet-checkpoint), which may run beside [M08 full](M08-TEAM-CHAT-LOGS.md#full-fleet-checkpoint). If M08 full is already passed, continue to [M11](../30-execute/M11-TEN-AGENT-TOURNAMENT.md); otherwise hand off to M08 full. Minimum context: MASTER, active M06 map, M03, relevant M01 rows, and the M10 verdict when scaling.
 
 ## Source and canon
 

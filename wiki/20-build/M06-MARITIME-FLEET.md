@@ -29,14 +29,14 @@
 
 - [ ] `M06-02` Provision one selected OpenClaw seat and one selected Hermes seat with the accepted adapters.
 - [ ] `M06-03` Attach isolated environment/resource placeholders to the pilot pair and verify wake, label, and persistence.
-- [ ] `M06-04` Freeze the reviewed two-seat pilot mapping for M07/M08/M10; do not provision the remaining eight before M10 passes.
+- [ ] `M06-04` Freeze the reviewed two-seat pilot mapping for M07/M08/M10; include immutable team assignment and do not provision the remaining eight before M10 passes.
 
 ### Full-fleet checkpoint
 
 - [ ] `M06-05` After M10 passes, provision the remaining four OpenClaw and four Hermes agents.
 - [ ] `M06-06` Attach isolated references and verify every one of the ten seats responds to its own poke and label.
 - [ ] `M06-07` Restart or pause/return representative agents and confirm identity/session persistence without cross-seat contamination.
-- [ ] `M06-08` Freeze the reviewed ten-seat fleet/adapter mapping for M07/M08 full checkpoints and M11.
+- [ ] `M06-08` Freeze the reviewed ten-seat fleet/adapter/team mapping for M07/M08 full checkpoints and M11.
 
 ## Acceptance and evidence
 
@@ -55,7 +55,7 @@
 
 ## Handoff and next
 
-At the pilot checkpoint, record the two-seat map/digest; [M07 pilot](M07-WALLETS-IDENTITY-FUNDING.md#pilot-checkpoint) and [M08 pilot](M08-DISCORD-CHAT.md#pilot-checkpoint) may then proceed in parallel. After M10, return to the [full-fleet checkpoint](#full-fleet-checkpoint); once it passes, [M07 full](M07-WALLETS-IDENTITY-FUNDING.md#full-fleet-checkpoint) and [M08 full](M08-DISCORD-CHAT.md#full-fleet-checkpoint) may proceed in parallel before M11. Minimum context: MASTER, the active checkpoint, relevant M01 rows, M03, and the M10 verdict when scaling.
+At the pilot checkpoint, record the two-seat map/digest; [M07 pilot](M07-WALLETS-IDENTITY-FUNDING.md#pilot-checkpoint) and [M08 pilot](M08-TEAM-CHAT-LOGS.md#pilot-checkpoint) may then proceed in parallel. After M10, return to the [full-fleet checkpoint](#full-fleet-checkpoint); once it passes, [M07 full](M07-WALLETS-IDENTITY-FUNDING.md#full-fleet-checkpoint) and [M08 full](M08-TEAM-CHAT-LOGS.md#full-fleet-checkpoint) may proceed in parallel before M11. Minimum context: MASTER, the active checkpoint, relevant M01 rows, M03, and the M10 verdict when scaling.
 
 ## Source and canon
 

@@ -1,6 +1,8 @@
 # DilemmaEval implementation wiki
 
-This wiki turns the [decision sheet](../prisoners-daolemma-tournament-decisions-v1_0.md) into bounded runbooks. The decision sheet controls demo scope; verified contract behavior and live chain state control gameplay and deployed-state facts.
+This wiki turns the historical [decision sheet](../prisoners-daolemma-tournament-decisions-v1_0.md) and approved [Discord replacement](../prisoners-daolemma-discord-replacement.md) into bounded runbooks. The replacement has higher authority and supersedes every Discord-specific decision or instruction in the decision sheet for team chat, observer, replay, and evidence. All unrelated locked decisions remain in force; verified contract behavior and live chain state control gameplay and deployed-state facts.
+
+The hackathon critical path uses two local append-only team logs and the existing orchestrator poke/response cycle. It requires no external chat account, bot, webhook, token, channel, API, or service-rate-limit setup, and its protocol can be tested deterministically from local fixtures before a live game.
 
 ## Context-loading rule
 
@@ -17,7 +19,7 @@ Do not preload the whole wiki. Finish the active page's handoff before moving on
 
 | Label | Meaning |
 |---|---|
-| **LOCKED** | Decided by the decision sheet. Change only by an explicit new decision. |
+| **LOCKED** | Decided by the decision sheet as modified by the approved replacement. Change only by an explicit new decision. |
 | **OPEN** | The sheet requires a human answer; no answer is implied here. |
 | **LIVE-VERIFY** | A source value or candidate must be checked against the current system before use. |
 | **RUN-FROZEN** | An operational input selected for one run to satisfy locked requirements; it is not a new canon decision. |
@@ -38,6 +40,7 @@ Module execution status is `Not started`, `In progress`, `Blocked`, `Passed`, `F
 
 Compact references:
 
+- [Approved communication replacement](../prisoners-daolemma-discord-replacement.md)
 - [Decision coverage](90-reference/DECISION-COVERAGE.md)
 - [Glossary](90-reference/GLOSSARY.md)
 - [Module template](90-reference/MODULE-TEMPLATE.md)

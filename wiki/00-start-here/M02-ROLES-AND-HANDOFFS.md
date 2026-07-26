@@ -11,6 +11,7 @@
 
 - [ ] [M00](M00-PROJECT-CANON.md) handoff and required [M01](M01-RUN-CONFIGURATION.md) ownership rows.
 - [ ] [Module template](../90-reference/MODULE-TEMPLATE.md) and [run record](../90-reference/RUN-EVIDENCE-RECORD.md).
+- [ ] Replacement [§11 implementation checklist](../../prisoners-daolemma-discord-replacement.md#11-implementation-checklist).
 
 ## Inputs and prerequisites
 
@@ -24,7 +25,7 @@
 ## Execution checklist
 
 - [ ] `M02-01` Assign an accountable owner and evidence reviewer to M00–M14 and S01–S05.
-- [ ] `M02-02` Assign tournament, fairness, security, contract/chain, fleet, wallet/funding, Discord, VM/orchestrator, scoring, evidence, and observer responsibilities.
+- [ ] `M02-02` Assign tournament, fairness, security, contract/chain, fleet, wallet/funding, team-log/orchestrator, recovery, scoring, evidence, and observer responsibilities.
 - [ ] `M02-03` Record who may authorize each external write, funded action, agent invocation, and platform change.
 - [ ] `M02-04` Require every module handoff to list status, completed IDs, evidence, decisions, deviations, blockers, next page, and minimum context.
 - [ ] `M02-05` Cold-review a sample handoff using only its stated minimum context.
@@ -52,4 +53,5 @@ Record role matrix location, unresolved assignments, and reviewed handoff exampl
 
 - [§2.5 Orchestrator role boundary](../../prisoners-daolemma-tournament-decisions-v1_0.md#25-orchestrator)
 - [§3.4 VM location and ownership open item](../../prisoners-daolemma-tournament-decisions-v1_0.md#3-open-items-still-to-decide)
+- [Replacement §11 Implementation roles](../../prisoners-daolemma-discord-replacement.md#11-implementation-checklist)
 - Ownership/review mechanics on this page are implementation controls, not locked tournament decisions.

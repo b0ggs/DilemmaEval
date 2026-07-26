@@ -2,7 +2,7 @@
 
 Use this page to sequence work and record project gates. Execute details in the linked module, and attach evidence in a copy of the [run record](90-reference/RUN-EVIDENCE-RECORD.md).
 
-**Canon:** [decision sheet sections 1–6](../prisoners-daolemma-tournament-decisions-v1_0.md)
+**Canon:** historical [decision sheet sections 1–6](../prisoners-daolemma-tournament-decisions-v1_0.md), modified by the higher-authority approved [communication replacement](../prisoners-daolemma-discord-replacement.md) for team chat, observer, replay, and evidence.
 
 **Navigation:** [Wiki home](README.md) · [Decision coverage](90-reference/DECISION-COVERAGE.md)
 
@@ -16,12 +16,15 @@ Also:
 
 - **CONTRACT-AUTHORITY:** verified game-contract behavior and live chain state control gameplay facts. The scoring layer derives team results; it never changes contract truth.
 - Base Sepolia and disposable testnet wallets only. No mainnet assets.
-- The orchestrator may wake, observe, advance phases, relay recent chat, and write observer state. It may not choose moves, write agent messages, or transact for players.
+- Team chat is off-chain, informational, and not a separate wake trigger. The orchestrator may wake, observe, construct bounded same-team snapshots, validate responses, append agent-authored text verbatim, advance phases from chain truth, and write observer state. It may not choose moves/messages, rewrite text, or sign/send player transactions.
+- Both harnesses receive identical message opportunities, fields, bounds, timeouts, retries, and recorded/deterministic ordering. Team logs are strictly isolated.
 - A missing commit/reveal is contract-scored as Share, but observers must label it `defaulted`, not voluntary Share.
 - Do not rewrite contracts. Redeploy is a human-selected fallback only.
 - Do not build the optional stats page—or any fancy dashboard—before one real game and its evidence export succeed.
 
 ## Critical path and parallel work
+
+The chat path is local and deterministic: no external chat credentials, bots, channels, APIs, pricing checks, or service provisioning. M08 can be fixture-tested as soon as the pilot seat/team map exists; live service setup is gone.
 
 ```text
 M00 → M01 → M02 → M03 → S01
@@ -61,7 +64,7 @@ Preparation-only work may overlap where it does not claim completion or consume 
 - [ ] `MASTER-10` — [M05 Harness adapters](20-build/M05-HARNESS-ADAPTERS.md) accepted for OpenClaw and Hermes.
 - [ ] `MASTER-11` — [M06 Maritime fleet pilot checkpoint](20-build/M06-MARITIME-FLEET.md#pilot-checkpoint) has one persistent OpenClaw seat and one persistent Hermes seat.
 - [ ] `MASTER-12` — [M07 wallet/identity/funding pilot checkpoint](20-build/M07-WALLETS-IDENTITY-FUNDING.md#pilot-checkpoint) has the two pilot seats registered and funded.
-- [ ] `MASTER-13` — [M08 Discord pilot checkpoint](20-build/M08-DISCORD-CHAT.md#pilot-checkpoint) has both team paths; M07 pilot and M08 pilot may complete in parallel after M06 pilot.
+- [ ] `MASTER-13` — [M08 team-log pilot checkpoint](20-build/M08-TEAM-CHAT-LOGS.md#pilot-checkpoint) passes local schema, isolation, idempotency, ordering, restart, and recovery fixtures; M07 pilot and M08 pilot may complete in parallel after M06 pilot.
 - [ ] `MASTER-14` — [M09 Orchestrator and VM](20-build/M09-ORCHESTRATOR-VM.md) started only after M08 pilot and passed restart and boundary review.
 
 **Gate 2:** the shared system and one seat per harness require reviewable evidence before the pilot. Do not provision the remaining eight as a substitute for passing M10.
@@ -76,7 +79,7 @@ Preparation-only work may overlap where it does not claim completion or consume 
 
 - [ ] `MASTER-16` — after M10, [M06 full-fleet checkpoint](20-build/M06-MARITIME-FLEET.md#full-fleet-checkpoint) has ten persistent, stable seat identities.
 - [ ] `MASTER-17` — after M06 full, [M07 full-fleet checkpoint](20-build/M07-WALLETS-IDENTITY-FUNDING.md#full-fleet-checkpoint) has all ten seats registered and funded.
-- [ ] `MASTER-18` — after M06 full, [M08 full-fleet checkpoint](20-build/M08-DISCORD-CHAT.md#full-fleet-checkpoint) has all ten direct-post paths; M07 full and M08 full may complete in parallel.
+- [ ] `MASTER-18` — after M06 full, [M08 full-fleet checkpoint](20-build/M08-TEAM-CHAT-LOGS.md#full-fleet-checkpoint) maps all ten seats to exactly one isolated team log under one frozen communication configuration; M07 full and M08 full may complete in parallel.
 - [ ] `MASTER-19` — [M11 Ten-agent tournament](30-execute/M11-TEN-AGENT-TOURNAMENT.md) readiness gate passed.
 - [ ] `MASTER-20` — one complete five-versus-five game reached its contract-defined end.
 - [ ] `MASTER-21` — [M13 Evidence export](40-observe/M13-EVIDENCE-EXPORT.md) reconciled the run with chain truth.
@@ -85,8 +88,8 @@ Preparation-only work may overlap where it does not claim completion or consume 
 
 ## Phase 5 — Observe and preserve fallback
 
-- [ ] `MASTER-22` — Discord is usable as the live chat feed.
-- [ ] `MASTER-23` — [M14 Observer and replay](40-observe/M14-OBSERVER-REPLAY.md) shows `defaulted` separately and labels replay unmistakably.
+- [ ] `MASTER-22` — raw team logs, accepted/rejected records, request/response logs, config/limits, every poke's `through_sequence`, and hashes are preserved for observer/replay.
+- [ ] `MASTER-23` — [M14 Observer and replay](40-observe/M14-OBSERVER-REPLAY.md) reads orchestrator/evidence output, applies the frozen anti-leakage display delay, shows `defaulted` separately, and labels replay unmistakably.
 - [ ] `MASTER-24` — the **OPEN/OPTIONAL** stats-page choice is recorded as built or skipped; any build started only after Gate 4.
 
 ## Phase 6 — Optional series
@@ -100,6 +103,7 @@ Preparation-only work may overlap where it does not claim completion or consume 
 
 - [ ] `MASTER-29` — every checked item points to evidence, UTC time, owner, and reviewer.
 - [ ] `MASTER-30` — every failure, default, draw, deviation, and replay is labeled.
-- [ ] `MASTER-31` — all six source sections are covered in the [coverage map](90-reference/DECISION-COVERAGE.md).
+- [ ] `MASTER-31` — all six historical source sections and all twelve replacement sections are covered in the [coverage map](90-reference/DECISION-COVERAGE.md).
 - [ ] `MASTER-32` — no secret value, mainnet asset, invented contract behavior, contract rewrite, or dashboard-first work entered scope.
 - [ ] `MASTER-33` — handoff records completed scope, blockers, residual risks, and the next module's minimum context.
+- [ ] `MASTER-34` — a full game can start and finish with no external chat account, application, bot, webhook, token, channel, API, or package.
