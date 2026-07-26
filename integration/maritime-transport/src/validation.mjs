@@ -107,11 +107,10 @@ export function validatePoke(poke) {
     }
     previousSequence = message.sequence;
   });
-  if (poke.team_chat.messages.length === 0) {
-    if (poke.team_chat.through_sequence !== 0) {
-      fail("poke.team_chat.through_sequence", "must equal 0 when messages is empty");
-    }
-  } else if (poke.team_chat.through_sequence !== previousSequence) {
+  if (
+    poke.team_chat.messages.length > 0 &&
+    poke.team_chat.through_sequence !== previousSequence
+  ) {
     fail(
       "poke.team_chat.through_sequence",
       "must equal the highest included message sequence"
@@ -214,16 +213,12 @@ export function assertNoSensitiveMaterial(value, path = "input") {
   if (typeof value === "string") {
     const leaf = path.split(".").at(-1).toLowerCase().replaceAll(/[^a-z0-9]/g, "");
     const publicHashField =
-      leaf.includes("hash") ||
-      leaf.includes("commitment") ||
-      leaf === "message" ||
-      leaf === "teammessage" ||
-      leaf === "errormessage";
+      leaf.includes("hash") || leaf.includes("commitment");
     if (
       /(?:^|\s)Bearer\s+\S+/i.test(value) ||
       /\bmk_[A-Za-z0-9_-]{6,}/.test(value) ||
       /\b(?:sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}/i.test(value) ||
-      (!publicHashField && /^0x[0-9a-fA-F]{64}$/.test(value))
+      (!publicHashField && /\b(?:0x)?[0-9a-fA-F]{64}\b/.test(value))
     ) {
       throw new Error(`SENSITIVE_MATERIAL_REJECTED: ${path}`);
     }

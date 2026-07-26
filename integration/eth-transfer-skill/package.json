@@ -1,0 +1,23 @@
+{
+  "name": "@dilemmaeval/eth-transfer-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./live": "./src/live.mjs",
+    "./cli": "./src/cli-lib.mjs"
+  },
+  "bin": {
+    "dilemmaeval-send-eth": "./src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "ethers": "6.15.0"
+  }
+}

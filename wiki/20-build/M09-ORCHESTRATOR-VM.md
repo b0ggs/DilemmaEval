@@ -19,23 +19,28 @@
 |---|---|---|---|
 | VM | OPEN | Human-selected small cloud VM and accountable operator; not a laptop | Resolve before deploy |
 | Orchestrator authority | LOCKED | Watch chain, construct pokes, validate structured responses, append agent-authored messages verbatim, advance phases from chain truth, and write derived observer state | Review every action path |
-| Timing | LIVE-VERIFY / OPEN final windows | Join in seconds; commit/reveal in blocks; early advance when all alive agents acted | Read live every phase |
-| Gameplay boundary | LOCKED / CONTRACT-AUTHORITY | Never choose a move/message, change text, sign/send a player transaction, or advance because an agent claims it acted | Trace and negative-test |
+| Phase-advancer signer | Secret / LOCKED narrow executor | One eleventh disposable non-player Base Sepolia operations wallet is injected by a VM secret manager/systemd credential or equivalent only into the separate advancement executor as `PHASE_ADVANCER_PRIVATE_KEY`; the bridge maps it internally to the pinned CLI's canonical signer variable for `advance` only | Verify address binding, isolation, funding ceiling, chain, and command allowlist |
+| Timing | LIVE-VERIFY / OPEN final windows | Join in seconds; commit/reveal in blocks; exact pinned predicates are strict join deadline, committed/alive equality or strict commit deadline, and revealed/committed equality or strict reveal deadline | Read live every phase |
+| Gameplay boundary | LOCKED / CONTRACT-AUTHORITY | Never choose a move/message, change text, hold a player key, sign/send a player transaction, or advance because an agent claims it acted; anyone-can-advance contract behavior plus current chain conditions are the only advancement authority | Trace and negative-test |
 | Restart | LOCKED | `request_id` idempotency, request/response persistence, auto-restart, chain-derived resume, log sequence recovery, and partial-line preservation | Test from interruption |
 | State file | LOCKED minimal observer input | Derived current state, clearly non-authoritative | Reconcile with chain |
 
 ## Execution checklist
 
 - [ ] `M09-01` Resolve and record the approved cloud VM and accountable operator.
-- [ ] `M09-02` Implement/verify supported chain reads, Maritime pokes, response validation, serialized JSONL appends, phase advancement, request/response logs, and state-file writes at exact source revisions.
+- [ ] `M09-02` Implement/verify supported chain reads, Maritime pokes, response validation, serialized JSONL appends, phase advancement through the narrowly scoped executor, request/response logs, and state-file writes at exact source revisions.
 - [ ] `M09-03` Prove no code/data path chooses a move/message, rewrites agent text, holds a player key, signs, or submits a player transaction.
-- [ ] `M09-04` Drive deadlines from current chain phase/block/config; treat windows as maxima and advance commit/reveal only when the relevant on-chain count equals `aliveCount` or the on-chain deadline passed.
+- [ ] `M09-04` Drive deadlines from current chain phase/block/config. Advance join only when `block.timestamp > joinDeadline`; commit only when `committedCount == aliveCount` or `block.number > commitDeadlineBlock`; reveal only when `revealedCount == committedCount` or `block.number > revealDeadlineBlock`. Immediately reread phase/count/deadline before submission; after a race/revert, reread and reevaluate rather than blind-retrying.
 - [ ] `M09-05` For each relevant poke, construct an identical-schema bounded same-team snapshot in ascending sequence, accepted-before-construction, with exact `through_sequence`.
 - [ ] `M09-06` Validate request/game/round/phase/seat/team/schema/length/duplicate status; append accepted `team_message` text verbatim and record every acceptance/rejection.
 - [ ] `M09-07` Persist non-secret request/response/idempotency state; on restart reread chain truth, last valid sequence, and request log before any retry.
 - [ ] `M09-08` Configure auto-restart and test interruption after response persistence/before phase completion, proving no duplicate poke/message/action.
 - [ ] `M09-09` Test partial JSONL recovery by preserving the damaged original, copying complete records, recording recovery, and reconciling derived state with chain truth.
 - [ ] `M09-10` Prove team-log reads/writes are off-chain informational transport and never a second wake trigger or gameplay authority.
+- [ ] `M09-11` Prove the advancement executor accepts only `PHASE_ADVANCER_PRIVATE_KEY`, maps it internally to `GAMEPLAY_WALLET_PRIVATE_KEY` only for the pinned `advance` child, rejects legacy keystore/signer alternatives, and cannot access any player, owner/configuration, funding, or Maritime billing key.
+- [ ] `M09-12` Generate the eleventh operations wallet, derive and bind its public address separately from the ten-seat manifest, and fund only its approved Base Sepolia gas ceiling before deploying/operating M09 or starting M10. Prove it is never ERC-8004 registered, joined, charged an entry fee, or included in the ten-seat manifest.
+- [ ] `M09-13` Load `PHASE_ADVANCER_PRIVATE_KEY` through a VM secret manager, systemd credential, or equivalent only into the separate advancement-executor process; prove it is absent from shell history, Git, `.env`, and the general orchestrator environment.
+- [ ] `M09-14` Before every signed `advance`, require a fresh actual-RPC `eth_chainId == 84532`, then immediately reread phase/count/deadline. On a race/revert, reread and reevaluate without blind retry.
 
 ## Acceptance and evidence
 
@@ -47,10 +52,11 @@
 | M09-05–M09-06 | Pokes are reproducible through sequence and accepted text is attributable/verbatim while invalid responses are recorded and excluded | Poke/request/response/log fixtures |
 | M09-07–M09-09 | Restart and partial-line recovery preserve originals and resume without duplicate/unsafe action; derived state matches chain | Failure-injection/reconciliation report |
 | M09-10 | Chat failure/writes cannot wake an agent, manufacture an action, or advance a phase | Negative-test report |
+| M09-11–M09-14 | Advancement uses the separately manifested and funded eleventh wallet, a process-local secret path, fresh Base Sepolia RPC verification, and immediately current contract conditions; no player/legacy/other privileged signer or blind retry can enter that path | Cross-role isolation fixtures, secret-loading review, public manifest/balance/sender/receipt, RPC preflight, and race timeline |
 
 ## Stop and escalate
 
-- Stop on unresolved VM ownership, stale/timer-only phase logic, duplicate requests/messages/actions, restart ambiguity, unsafe partial-line handling, missing/cross-team chat, secret persistence, unverified Maritime transport, or any orchestrator influence over player choice/message/signing.
+- Stop on unresolved VM ownership, stale/timer-only phase logic, missing immediate pre-submit reread, blind retry after race/revert, duplicate requests/messages/actions, restart ambiguity, unsafe partial-line handling, missing/cross-team chat, secret persistence, unverified Maritime transport, wrong actual-RPC chain ID, a legacy/player/owner/funding/Maritime-billing signer entering `advance`, phase-key exposure outside the dedicated process, a phase-advancer key entering any other operation, or any orchestrator influence over player choice/message/signing.
 - Escalate contract-condition questions to the contract owner and authority violations to the fairness/security reviewers.
 - Safe state: halt automatic writes/pokes, retain sanitized logs, and reread chain state before any human-approved recovery.
 

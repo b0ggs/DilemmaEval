@@ -69,6 +69,8 @@ The tournament uses:
 - Base Sepolia only
 - the historical verified Base Sepolia deployment identified in the decision sheet/addendum
 - disposable testnet gameplay wallets only
+- one separate eleventh disposable Base Sepolia operations wallet for phase
+  advancement; it is not a player or part of the ten-seat manifest
 - five OpenClaw agents versus five Hermes agents
 - one complete game as the floor
 - the same model, route, settings, prompt fields, game tools, retries, timeouts, and communication limits for both harnesses
@@ -406,6 +408,81 @@ No child implementation starts until shared schemas and paths exist.
 
 Failed artifacts do not block unrelated accepted artifacts.
 
+### Wave 1.5 — Wallet-role handoff before Wave 2
+
+Wave 2 must not start until this local bridge boundary is implemented, tested,
+and audited. Local acceptance does not pass S02, provision an agent, inject a
+real secret, send a transaction, or authorize any live operation.
+
+#### TASK-A1.5 — Player and phase-advancer signer isolation
+
+**Owner:** Game-bridge implementation child
+
+**References:** [wallet handoff issue](MARITIME-WALLET-HANDOFF-ISSUE.md), [M03](wiki/00-start-here/M03-SECURITY-AND-SECRETS.md), [S02](wiki/10-first-hour-spikes/S02-SELF-SIGNING.md), [M04](wiki/20-build/M04-AGENT-GAME-KIT.md), [M09](wiki/20-build/M09-ORCHESTRATOR-VM.md)
+
+- [x] Forward `GAMEPLAY_WALLET_PRIVATE_KEY` only to pinned-CLI child processes
+      for player operations `register`, `join`, `prepare_commit`,
+      `commit`, `reveal`, and `claim`.
+- [x] Implement bridge operation `register` through pinned `auth:register` inside the
+      assigned player boundary; the coordinator schedules it and verifies
+      public evidence but never receives the player key.
+- [x] Exclude player keys from `advance`, read-only commands, repository
+      verification, raw bridge arguments, schemas, output, logs, and evidence.
+- [x] Accept `PHASE_ADVANCER_PRIVATE_KEY` only for `advance` and map it
+      internally to the pinned CLI's canonical signer variable only in that
+      child process.
+- [x] Reject phase-advancer use for player operations and reject player,
+      owner/configuration, funding, or Maritime billing key substitution for
+      `advance`.
+- [x] Reject complete and incomplete legacy keystore/signer alternatives for
+      every signed operation; role-specific environment keys are the only
+      Wave 1.5 signing path.
+- [x] Query the configured RPC's actual `eth_chainId` immediately before every
+      signed operation and require `84532`; check once before Git and again
+      immediately before signed Yarn.
+- [x] Preserve Base Sepolia enforcement, structured missing-key failures, and
+      redaction across stdout, stderr, parsed output, and errors.
+- [x] Require one explicit bridge role per process: `player`,
+      `phase-advancer`, or `read-only`; keep their operation allowlists
+      disjoint and reject co-resident/cross-role key variables.
+- [x] Validate exact public seat/operations manifests, unique player wallets,
+      phase/seat/owner/privileged-address separation, and a non-empty reviewed
+      privileged-address exclusion list for the phase executor.
+- [x] Reject any file or symlink at pinned
+      `packages/foundry/.env` before Git and recheck before Yarn.
+- [x] Remove `register --out`; confine prepared commit output/input to a
+      prepared real player-local absolute artifact directory outside the
+      pinned checkout.
+- [x] Reject private-key-shaped substrings in every bridge argument and
+      defensively redact them from returned public arguments.
+
+#### TASK-AUDIT-1.5 — Paired isolation fixtures and audit
+
+**Owner:** Independent child auditor + lead Codex
+
+- [x] Add mocked OpenClaw/Hermes fixtures with two distinct placeholder player
+      keys and a third distinct phase-advancer placeholder.
+- [x] Prove each player operation sees only its assigned player key.
+- [x] Prove `advance` sees only the internally mapped phase-advancer value.
+- [x] Prove Git verification and read-only operations see none of the three
+      values.
+- [x] Prove cross-seat and cross-role substitutions fail closed.
+- [x] Prove complete and incomplete legacy keystore/signer alternatives fail
+      closed.
+- [x] Prove every signed operation performs a fresh actual-RPC chain-ID
+      preflight and rejects non-`84532` responses.
+- [x] Prove role allowlists, co-resident-key rejection, exact manifest
+      validation/uniqueness, ignored `.env` rejection, and artifact-directory
+      confinement fail closed before a key-bearing child.
+- [x] Run game-bridge, paired-adapter, redaction, wrong-network, and mainnet
+      rejection tests without live calls.
+- [x] Have the independent child audit operation allowlists, environment
+      construction, redaction, fixtures, and documentation.
+- [x] Lead reviews and remediates every accepted finding.
+- [x] Run the complete affected local test suite after remediation.
+- [ ] Commit the Wave 1.5 implementation atomically.
+- [ ] Push `origin/main`.
+
 ### Minute 60–90 — Wave 2
 
 #### TASK-A2 — Both harness adapters
@@ -427,8 +504,17 @@ Both adapters remain one task to prevent parity drift.
 
 - [ ] Consume game-bridge state output.
 - [ ] Model join/commit/reveal/terminal transitions.
-- [ ] Advance commit/reveal only on chain count equality or deadline.
+- [ ] Advance join only when `block.timestamp > joinDeadline`; advance commit
+      only when `committedCount == aliveCount` or
+      `block.number > commitDeadlineBlock`; advance reveal only when
+      `revealedCount == committedCount` or
+      `block.number > revealDeadlineBlock`.
+- [ ] Invoke `advance` only through the narrowly scoped
+      `PHASE_ADVANCER_PRIVATE_KEY` executor; never expose a player,
+      owner/configuration, funding, or Maritime billing key to that path.
 - [ ] Never treat an agent acknowledgement as chain truth.
+- [ ] Immediately reread phase/count/deadline before `advance`; after a
+      race/revert, reread and reevaluate instead of blind-retrying.
 - [ ] Implement restart/idempotency fixtures.
 
 #### TASK-C2 — Production Maritime transport adapter
@@ -449,7 +535,17 @@ Both adapters remain one task to prevent parity drift.
 - [ ] Verify live Maritime command surface.
 - [ ] Provision only the approved pilot pair.
 - [ ] Generate/inject two disposable wallet secrets under the approved policy.
-- [ ] Prepare ERC-8004 registration and funding actions.
+- [ ] Prepare player-local `register` actions and public verification;
+      the coordinator never receives a player key.
+- [ ] Generate the eleventh non-seat operations wallet, derive and bind its
+      public address in a separate operations manifest, and provision
+      `PHASE_ADVANCER_PRIVATE_KEY` only to a separate executor through a VM
+      secret manager/systemd credential or equivalent—not shell history, Git,
+      `.env`, or the general orchestrator environment.
+- [ ] Fund the eleventh wallet only for its approved Base Sepolia gas ceiling
+      before deploying/operating M09 or starting M10; never ERC-8004 register
+      it, join it, pay an entry fee from it, or place it in the ten-seat
+      manifest.
 - [ ] Do not execute registration/funding without explicit approval.
 
 ### Minute 90–105 — Audit and integration checkpoint 2
@@ -480,7 +576,8 @@ If M10 passes with time remaining:
 - provision the remaining eight agents
 - freeze the ten-wallet funding manifest
 - have OpenClaw fund only the approved public addresses and amounts
-- register identities
+- have each remaining player-local executor register its own identity while the
+  coordinator verifies only public evidence
 - run the ten-agent readiness checklist
 
 Do not launch M11 merely to satisfy the clock.
@@ -509,12 +606,14 @@ Child agents may build and locally test support, but may execute none of these:
 | Paid model/API probe | provider, model, request count, cost ceiling |
 | Maritime agent creation | account, templates, tiers, count, estimated cost |
 | Maritime environment update | exact agent, secret name, reload effect |
-| Gameplay-wallet creation/storage | count, chain, custody and backup policy |
+| Gameplay/phase-advancer wallet creation/storage | role, count (ten seats plus one operations wallet), chain, custody and backup policy |
 | ERC-8004 registration | chain, identity registry, wallet list, gas ceiling |
 | Funding | chain, sender, recipient manifest, per-wallet amount, total ceiling |
 | Owner configuration | chain, game address, exact before/after config |
 | Game create/launch | chain, game config, fee, causes, time windows |
-| Join/commit/reveal/advance/claim | game ID, seat/wallet, phase, gas ceiling |
+| Join/commit/reveal/claim | game ID, seat/player wallet, phase, gas ceiling |
+| Advance | game ID, phase-advancer public address, satisfied exact pinned-contract condition (timestamp strictly after join deadline; committed/alive equality or block strictly after commit deadline; revealed/committed equality or block strictly after reveal deadline), gas ceiling |
+| Phase-advancer secret provisioning | VM/host, separate executor identity, approved secret manager/systemd-credential-equivalent path, reload/restart effect |
 | VM provisioning/deployment | provider, owner, region, spend ceiling |
 
 OpenClaw funding additionally requires the frozen public manifest digest and operator approval.
@@ -530,6 +629,10 @@ OpenClaw funding additionally requires the frozen public manifest digest and ope
 - [ ] Model/route/settings fixtures match.
 - [ ] Team-log isolation/recovery fixtures pass.
 - [ ] Orchestrator restart/idempotency fixtures pass.
+- [ ] Player signer and phase-advancer command/key isolation fixtures pass.
+- [ ] Player-local registration, legacy signer rejection, and fresh actual-RPC
+      `eth_chainId == 84532` fixtures pass.
+- [ ] Advancement immediate-reread and race/revert reevaluation fixtures pass.
 - [ ] Evidence distinguishes chosen/defaulted Share.
 - [ ] No secret appears in code, fixtures, logs, or commits.
 
@@ -546,6 +649,8 @@ OpenClaw funding additionally requires the frozen public manifest digest and ope
 - [ ] M10 passes.
 - [ ] Exactly ten stable seats exist.
 - [ ] Exactly ten disposable Base Sepolia gameplay wallets map one-to-one.
+- [ ] One separately manifested eleventh operations wallet is gas-funded under
+      ceiling and absent from seats, ERC-8004, joins, and entry-fee payments.
 - [ ] All registrations and balances pass.
 - [ ] OpenClaw funding transactions match the approved manifest.
 - [ ] Team-to-cause mapping is frozen.

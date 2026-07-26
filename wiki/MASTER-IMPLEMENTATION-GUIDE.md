@@ -16,7 +16,10 @@ Also:
 
 - **CONTRACT-AUTHORITY:** verified game-contract behavior and live chain state control gameplay facts. The scoring layer derives team results; it never changes contract truth.
 - Base Sepolia and disposable testnet wallets only. No mainnet assets.
-- Team chat is off-chain, informational, and not a separate wake trigger. The orchestrator may wake, observe, construct bounded same-team snapshots, validate responses, append agent-authored text verbatim, advance phases from chain truth, and write observer state. It may not choose moves/messages, rewrite text, or sign/send player transactions.
+- Team chat is off-chain, informational, and not a separate wake trigger. The orchestrator may wake, observe, construct bounded same-team snapshots, validate responses, append agent-authored text verbatim, advance phases from chain truth, and write observer state. It may not choose moves/messages, rewrite text, hold a player key, or sign/send player transactions.
+- Player signing is limited to each seat's own `GAMEPLAY_WALLET_PRIVATE_KEY` for player-local bridge operation `register`/pinned `auth:register`, `join`, `prepare_commit`, `commit`, `reveal`, and `claim`. The coordinator may schedule registration and verify public evidence but never receives the key. Complete and incomplete legacy keystore/signer alternatives are rejected for signed operations.
+- `advance` uses an eleventh disposable non-player Base Sepolia operations wallet, exposed only to the separate advancement-executor process as `PHASE_ADVANCER_PRIVATE_KEY` through a VM secret manager/systemd credential or equivalent, then internally mapped for the pinned CLI. It is never in shell history, Git, `.env`, the general orchestrator environment, the ten-seat manifest, ERC-8004, a game join, or an entry-fee payment; it is not an owner/configuration, funding, or Maritime billing key.
+- Every signed bridge operation requires a fresh actual-RPC `eth_chainId == 84532` result. At the pinned contract revision, the advancement executor may act from join only when `block.timestamp > joinDeadline`; from commit only when `committedCount == aliveCount` or `block.number > commitDeadlineBlock`; and from reveal only when `revealedCount == committedCount` or `block.number > revealDeadlineBlock`. It rereads phase/count/deadline immediately before submitting and, on race/revert, rereads and reevaluates rather than blind-retrying. Agent acknowledgements and orchestrator policy never grant authority; anyone-can-advance contract behavior is authoritative.
 - Both harnesses receive identical message opportunities, fields, bounds, timeouts, retries, and recorded/deterministic ordering. Team logs are strictly isolated.
 - A missing commit/reveal is contract-scored as Share, but observers must label it `defaulted`, not voluntary Share.
 - Do not rewrite contracts. Redeploy is a human-selected fallback only.
@@ -60,12 +63,14 @@ Preparation-only work may overlap where it does not claim completion or consume 
 
 ## Phase 2 — Build only the pilot-ready system
 
+- [x] `MASTER-08A` — local tests prove player/phase-advancer command and key isolation, player-local bridge operation `register`, legacy signer rejection, and fresh actual-RPC chain-ID preflight before dependent Wave 2 work; this local gate does not pass S02 or authorize a live transaction.
 - [ ] `MASTER-09` — [M04 Agent game kit](20-build/M04-AGENT-GAME-KIT.md) accepted.
 - [ ] `MASTER-10` — [M05 Harness adapters](20-build/M05-HARNESS-ADAPTERS.md) accepted for OpenClaw and Hermes.
 - [ ] `MASTER-11` — [M06 Maritime fleet pilot checkpoint](20-build/M06-MARITIME-FLEET.md#pilot-checkpoint) has one persistent OpenClaw seat and one persistent Hermes seat.
 - [ ] `MASTER-12` — [M07 wallet/identity/funding pilot checkpoint](20-build/M07-WALLETS-IDENTITY-FUNDING.md#pilot-checkpoint) has the two pilot seats registered and funded.
 - [ ] `MASTER-13` — [M08 team-log pilot checkpoint](20-build/M08-TEAM-CHAT-LOGS.md#pilot-checkpoint) passes local schema, isolation, idempotency, ordering, restart, and recovery fixtures; M07 pilot and M08 pilot may complete in parallel after M06 pilot.
-- [ ] `MASTER-14` — [M09 Orchestrator and VM](20-build/M09-ORCHESTRATOR-VM.md) started only after M08 pilot and passed restart and boundary review.
+- [ ] `MASTER-13A` — before M09 is deployed/operated or M10 starts, the eleventh non-seat operations wallet is generated, its derived public address is bound in a separate operations manifest, and its Base Sepolia gas balance is funded under the approved ceiling; it is absent from ERC-8004, joins, entry fees, and the ten-seat manifest.
+- [ ] `MASTER-14` — [M09 Orchestrator and VM](20-build/M09-ORCHESTRATOR-VM.md) started only after M08 pilot and passed restart, player-key/legacy-signer exclusion, process-local phase-secret loading, phase-advancer isolation, fresh actual-RPC chain verification, immediate advancement reread/race handling, and boundary review.
 
 **Gate 2:** the shared system and one seat per harness require reviewable evidence before the pilot. Do not provision the remaining eight as a substitute for passing M10.
 
@@ -104,6 +109,6 @@ Preparation-only work may overlap where it does not claim completion or consume 
 - [ ] `MASTER-29` — every checked item points to evidence, UTC time, owner, and reviewer.
 - [ ] `MASTER-30` — every failure, default, draw, deviation, and replay is labeled.
 - [ ] `MASTER-31` — all six historical source sections and all twelve replacement sections are covered in the [coverage map](90-reference/DECISION-COVERAGE.md).
-- [ ] `MASTER-32` — no secret value, mainnet asset, invented contract behavior, contract rewrite, or dashboard-first work entered scope.
+- [ ] `MASTER-32` — no secret value entered Git/docs/pokes/logs/evidence/raw bridge arguments/shell history/`.env`/the general orchestrator environment; no mainnet asset, legacy signer alternative, invented contract behavior, contract rewrite, or dashboard-first work entered scope. The only accepted secret paths are the explicitly approved Maritime encrypted-environment injection of an assigned disposable player key and process-local VM secret-manager/systemd-credential-equivalent injection of the phase-advancer key.
 - [ ] `MASTER-33` — handoff records completed scope, blockers, residual risks, and the next module's minimum context.
 - [ ] `MASTER-34` — a full game can start and finish with no external chat account, application, bot, webhook, token, channel, API, or package.

@@ -31,7 +31,12 @@ One real error to correct: the logs flag is `-n` or `--lines`, not `--limit`. Us
 ### 1.3 The join window is not "10 minutes fixed"
 The join duration is configurable, and the reuse-candidate run used 300 seconds, which is 5 minutes.
 
-The catch is still correct and worth keeping: the join phase has no early exit. It only advances after the deadline passes, regardless of headcount. Commit and reveal do advance early once all alive players act. Join does not.
+The catch is still correct and worth keeping: the join phase has no early
+exit. It advances only when `block.timestamp > joinDeadline`, regardless of
+headcount. Commit advances early when every alive player committed. Reveal
+advances early when every player who committed has revealed; players who
+defaulted at commit have nothing to reveal. Deadline equality remains inside
+the active window. Join does not gain an early exit.
 
 Fix: read the live join duration during preflight. Since we hold owner access, set it deliberately for a 10-player game.
 
@@ -74,7 +79,17 @@ Fix: read these flags from the event. Confirm `query:export` surfaces them in `r
 
 The plan never says how the orchestrator decides a phase is finished. This matters because of default-to-Share. If the orchestrator advances too early, or trusts an agent's own "I committed" message, a slow agent gets silently defaulted to Share. That is the exact corruption the defaulted-Share fix is meant to prevent.
 
-Fix: make the rule explicit. Advance a phase only when on-chain `committedCount` equals `aliveCount`, or the block deadline has passed. Never advance on an agent's self-reported acknowledgement. Chain state is the trigger. Agent acks are only for logging.
+Fix: make the rule explicit. At pinned contract revision
+`955ce16a59b0efecf6ccdf2d391ede83de8902a8`, join advances only when
+`block.timestamp > joinDeadline`; there is no early join exit. Commit advances
+when `committedCount == aliveCount` or
+`block.number > commitDeadlineBlock`. Reveal advances when
+`revealedCount == committedCount` or
+`block.number > revealDeadlineBlock`. Reread the phase and predicate
+immediately before submitting an advance transaction; after a race or revert,
+reread chain state instead of blindly resubmitting. Never advance on an
+agent's self-reported acknowledgement. Chain state is the trigger. Agent acks
+are only for logging.
 
 ---
 
@@ -119,7 +134,7 @@ Useful facts confirmed from the live docs. Fold these into the orchestrator and 
 - The poke is a chat call. `maritime chat <agent> "..." --json` from CLI, or the REST chat endpoint. It wakes a sleeping agent and waits for the reply.
 - Wallet key injection: `maritime env set <agent> GAMEPLAY_WALLET_PRIVATE_KEY=0x... --reload`. Secret and encrypted by default.
 - Drift-proof syntax: `maritime guide --json` prints the full live command manifest. Point the orchestrator at it rather than trusting any doc snapshot.
-- Two different wallets. The Maritime account wallet pays about $1 per agent up front for compute, so 10 agents is about $10 of Maritime credit. The game wallets are separate and hold Base Sepolia ETH for entry fees and gas. Do not conflate them.
+- Three wallet classes. The Maritime account wallet pays for compute; ten separate gameplay wallets hold Base Sepolia ETH for player entry fees/gas; and an eleventh non-seat Base Sepolia operations wallet pays only phase-advancement gas. Do not conflate them.
 
 ---
 
@@ -128,10 +143,10 @@ Useful facts confirmed from the live docs. Fold these into the orchestrator and 
 So they survive editing:
 
 - The default-to-Share behavior is stated correctly, and distinguishing it from a chosen Share is central to the demo.
-- Discord rate-limiting, staggered pokes, and a real RPC provider instead of a free public endpoint.
+- Staggered Maritime pokes and a reviewed RPC provider instead of an unreliable free public endpoint.
 - The pre-game readiness gate before the join window that counts.
 - The orchestrator idempotency guard against double-poking on restart.
-- Treating webhook URLs and API tokens as secrets.
+- Treating API tokens and all other credentials as secrets.
 - Validating the scoring layer against the known 32-player canary numbers before trusting it.
 - Verifying team-to-cause mapping at join time for every seat.
 - The external-harness design kept as a fallback if self-signing fails.

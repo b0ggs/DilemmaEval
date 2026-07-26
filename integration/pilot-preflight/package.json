@@ -1,0 +1,17 @@
+{
+  "name": "@dilemmaeval/pilot-preflight",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": "./src/index.mjs",
+  "bin": {
+    "dilemmaeval-pilot-preflight": "./src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dry-run": "node src/cli.mjs"
+  }
+}

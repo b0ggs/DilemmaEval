@@ -20,15 +20,19 @@ live or paid call.
   settles inside the bounded cancellation grace; ignored aborts fail closed.
 - Agent ID, harness, team, and seat prefix must agree. Poke identity is copied
   into a deeply frozen snapshot before dispatch.
-- Team-log context must be same-team/same-game, nonfuture, strictly ascending,
-  and end exactly at `through_sequence`.
+- Team-log context must be same-team/same-game, nonfuture, and strictly
+  ascending. A nonempty snapshot must end exactly at `through_sequence`; an
+  empty snapshot may retain any nonnegative cursor from the shared schema.
 - Agent-reported status and transaction hash are returned as operational
   evidence only. They are never interpreted as chain truth.
 - Private keys, mnemonic/seed material, authorization/tokens, API keys,
   passwords, credentials, cookies, and environment dumps are rejected from
-  pokes and evidence metadata before serialization or recording. The standalone
-  redaction utility also covers common snake_case and camelCase credential
-  names.
+  pokes and evidence metadata before serialization or recording. This includes
+  private-key-shaped text in team messages, agent `team_message`, and structured
+  error messages; ordinary human text is preserved verbatim. Put public
+  transaction hashes in the dedicated `transaction_hash` field rather than
+  free-form text. The standalone redaction utility also covers common
+  snake_case and camelCase credential names.
 
 The OpenClaw and Hermes renderers are non-secret, representative reference
 data. They are explicitly marked `live_verify`; current Maritime/OpenClaw

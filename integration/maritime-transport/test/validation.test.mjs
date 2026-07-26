@@ -123,9 +123,65 @@ test("snapshot sequences are strictly ascending, unique, and exact through_seque
 
   const empty = validPoke();
   empty.team_chat.messages = [];
-  assert.throws(() => validatePoke(empty), /must equal 0 when messages is empty/);
-  empty.team_chat.through_sequence = 0;
+  empty.team_chat.through_sequence = 7;
   assert.equal(validatePoke(empty), empty);
+  assert.equal(JSON.parse(serializePoke(empty)).team_chat.through_sequence, 7);
+});
+
+test("message text rejects private-key-shaped material in every shared text channel", () => {
+  const privateKeyShaped = `0x${"cd".repeat(32)}`;
+
+  const poke = validPoke();
+  poke.team_chat.messages[0].message = `Do not relay ${privateKeyShaped}`;
+  assert.throws(
+    () => validatePoke(poke),
+    /SENSITIVE_MATERIAL_REJECTED: input\.team_chat\.messages\.0\.message/
+  );
+
+  assert.throws(
+    () =>
+      validateAgentResponse(
+        validResponse(validPoke(), { team_message: privateKeyShaped })
+      ),
+    /SENSITIVE_MATERIAL_REJECTED: input\.team_message/
+  );
+
+  assert.throws(
+    () =>
+      validateAgentResponse(
+        validResponse(validPoke(), {
+          status: "error",
+          error: {
+            code: "LOCAL_FAILURE",
+            message: `Signer returned ${privateKeyShaped}`
+          }
+        })
+      ),
+    /SENSITIVE_MATERIAL_REJECTED: input\.error\.message/
+  );
+});
+
+test("ordinary human messages and errors remain verbatim", () => {
+  const poke = validPoke();
+  poke.team_chat.messages[0].message =
+    "  Wait for block 123456, then commit together 🧭  ";
+  assert.equal(
+    validatePoke(poke).team_chat.messages[0].message,
+    "  Wait for block 123456, then commit together 🧭  "
+  );
+
+  const response = validResponse(poke, {
+    status: "error",
+    team_message: "No transaction submitted; I will wait.",
+    error: {
+      code: "RPC_UNAVAILABLE",
+      message: "RPC request timed out after 30 seconds."
+    }
+  });
+  assert.equal(
+    validateAgentResponse(response).error.message,
+    "RPC request timed out after 30 seconds."
+  );
 });
 
 test("generic key, mnemonic, seed, token, auth, password, cookie, and env dumps are rejected", () => {

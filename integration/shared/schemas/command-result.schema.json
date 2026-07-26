@@ -22,6 +22,7 @@
       "enum": [
         "state",
         "wallet_auth_status",
+        "register",
         "join",
         "prepare_commit",
         "commit",
