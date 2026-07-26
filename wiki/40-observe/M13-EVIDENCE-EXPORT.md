@@ -29,7 +29,7 @@
 - [ ] `M13-01` Identify and review the existing supported export command/workflow and its exact source revision.
 - [ ] `M13-02` Export the completed game's raw on-chain evidence and record game/chain/address identifiers.
 - [ ] `M13-03` Add frozen run config, seat mapping, phase/timing trace, public transaction references, both raw team JSONL logs, chat config/limits, every poke's `through_sequence`, accepted/rejected records, redacted orchestrator request/response logs, and any recovery record.
-- [ ] `M13-04` Reconcile every action, missed action, `defaulted` label, elimination, contract winner, and payout/claim against chain truth.
+- [ ] `M13-04` Reconcile every action, missed action, `defaulted` label, elimination, contract winner, and payout/claim against chain truth. Source default labels from `EffectiveChoiceMaterialized.defaultedCommit` and `.defaultedReveal` (via `query:export` when present, otherwise event logs), not from missing-transaction inference.
 - [ ] `M13-05` Record derived team scoring separately from contract outputs.
 - [ ] `M13-06` Remove/redact excluded material, compute a hash for every exported file, and have an independent reviewer reproduce key conclusions plus every supplied chat snapshot.
 - [ ] `M13-07` Freeze the accepted package for replay and later games.

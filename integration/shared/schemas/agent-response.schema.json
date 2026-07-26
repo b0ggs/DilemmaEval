@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dilemmaeval.local/schemas/agent-response.schema.json",
+  "title": "DilemmaEval agent response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "game_id",
+    "round",
+    "phase",
+    "seat_id",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "game_id": { "type": "string", "minLength": 1 },
+    "round": { "type": "integer", "minimum": 0 },
+    "phase": { "enum": ["join", "commit", "reveal", "claim"] },
+    "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+    "status": { "enum": ["submitted", "observed", "skipped", "error"] },
+    "transaction_hash": {
+      "type": ["string", "null"],
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "team_message": { "type": "string" },
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string", "minLength": 1 },
+            "message": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

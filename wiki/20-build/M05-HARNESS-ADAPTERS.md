@@ -1,7 +1,7 @@
 # M05 — OpenClaw and Hermes adapters
 
 - **Status:** Not started
-- **Purpose:** Install the same game kit in both harnesses while preserving the proven direct OpenAI parity path.
+- **Purpose:** Install the same game kit in both harnesses while preserving the proven Maritime-proxy parity path.
 - **Accountable owner:** Adapter integration lead — unassigned
 - **Evidence reviewer:** Fairness reviewer — unassigned
 - **Classification:** LOCKED build scope / FAIRNESS CONTROL
@@ -19,7 +19,7 @@
 | Input | Classification | Requirement | Source/freshness |
 |---|---|---|---|
 | Game kit | LOCKED shared surface | Same accepted revision/digest in both harnesses | Verify at adapter build |
-| OpenAI route | LOCKED / LIVE-VERIFY | Same direct route, model, and settings | Recheck effective runtime config |
+| Model route | LOCKED / LIVE-VERIFY | Same Maritime proxy endpoint, model, and settings; native `api.openai.com` excluded | Recheck effective runtime config |
 | Harness contributors | Implementation responsibility | One named OpenClaw adapter contributor and one named Hermes adapter contributor work under the accountable lead | Confirm assignments before adapter work |
 | Prompts/tools | Fairness control | Same tournament prompt and game capability semantics | Digest/freeze for run |
 | Communication protocol | LOCKED fairness control | Same poke fields, response schema, opportunities, limits, timeouts, retries, and ordering; harness-specific glue only | Compare effective runtime behavior |
@@ -30,7 +30,7 @@
 - [ ] `M05-00` Assign one OpenClaw adapter contributor and one Hermes adapter contributor under the single accountable integration lead.
 - [ ] `M05-01` Install/reference the accepted M04 kit revision in the OpenClaw adapter.
 - [ ] `M05-02` Install/reference the same kit revision in the Hermes adapter.
-- [ ] `M05-03` Configure each to the S01-proven direct OpenAI route, exact model, and settings using secret references only.
+- [ ] `M05-03` Configure each to the S01-proven Maritime proxy endpoint, exact model, and settings using secret references only.
 - [ ] `M05-04` Compare effective prompts, tools, settings, retry/timeout behavior, poke fields, chat snapshots, response schemas, communication opportunities, and ordering.
 - [ ] `M05-05` Document every unavoidable harness-specific difference and its fairness impact.
 - [ ] `M05-06` Run equivalent non-secret smoke tests and rerun S01 if any parity-sensitive field changed.

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "game_repository": "https://github.com/botnotstrawberry/prisoners-daolemma",
+  "game_revision": "955ce16a59b0efecf6ccdf2d391ede83de8902a8",
+  "runtime_path_environment": "DILEMMA_GAME_REPO",
+  "network": {
+    "name": "base-sepolia",
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "game_chat_address": "0xc2604D5C87663efE959342F23c3DC9E4D9Db3e99",
+    "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+    "identity_registry_address": "0x7177a6867296406881E20d6647232314736Dd09A",
+    "expected_owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408"
+  },
+  "model_route": {
+    "endpoint": "https://api.maritime.sh/api/llm/v1",
+    "primary_model": "gpt-5.4-mini",
+    "fallback_model": "gpt-4o"
+  },
+  "excluded": [
+    "base-mainnet",
+    "native-api.openai.com",
+    "unpinned-game-repository-checkout"
+  ]
+}

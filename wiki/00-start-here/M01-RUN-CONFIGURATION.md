@@ -16,18 +16,23 @@
 
 ## Inputs and prerequisites
 
-The six rows marked **OPEN** are exactly the decision sheet's unresolved items. Do not silently resolve them. **RUN-FROZEN** values implement locked equality requirements but are not claimed as additional sheet decisions.
+The historical decision sheet listed six **OPEN** items. The final addendum
+resolves the exact model and route; the remaining rows marked **OPEN** still
+require explicit human decisions. Do not silently resolve them. **RUN-FROZEN**
+values implement locked equality requirements but are not claimed as additional
+sheet decisions.
 
 | ID | Classification | Required value/status before dependent work |
 |---|---|---|
-| `CFG-MODEL` | OPEN | Exact cheap, fast OpenAI model selected before S01 |
+| `CFG-MODEL` | LOCKED by final addendum / LIVE-VERIFY | Primary `gpt-5.4-mini`; fallback `gpt-4o`; confirm the Maritime proxy serves the selected model before S01 |
 | `CFG-GAME-COUNT` | OPEN; floor/optional/stretch | Select 1, 3, or 5; one remains the floor, five remains stretch |
 | `CFG-STATS-PAGE` | OPEN / OPTIONAL | Build or skip; no build before M11 + M13 pass |
 | `CFG-VM` | OPEN | VM location and accountable owner |
 | `CFG-DEBRIEF` | OPEN; conditional | Equal factual-summary delivery for both harnesses if more than one game |
 | `CFG-WINDOWS` | OPEN / LIVE-VERIFY | Final commit/reveal block windows selected at launch after live read |
-| `CFG-MODEL-ROUTE` | LOCKED / RUN-FROZEN / LIVE-VERIFY | Same direct-to-OpenAI route for both harnesses |
+| `CFG-MODEL-ROUTE` | LOCKED by final addendum / RUN-FROZEN / LIVE-VERIFY | Both harnesses use the same Maritime OpenAI-compatible proxy endpoint: `https://api.maritime.sh/api/llm/v1`; do not use native `api.openai.com` |
 | `CFG-MODEL-SETTINGS` | LOCKED / RUN-FROZEN / LIVE-VERIFY | Exact same effective settings for both harnesses |
+| `CFG-NETWORK` | LOCKED / LIVE-VERIFY | Base Sepolia only; explicitly supply its chain ID/RPC and tournament addresses; exclude Base mainnet configuration, keys, and assets |
 | `CFG-GAME-ADDRESS` | LIVE-VERIFY | Candidate `0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a` |
 | `CFG-GAMECHAT-ADDRESS` | LIVE-VERIFY; not used for demo chat | Candidate `0xc2604D5C87663efE959342F23c3DC9E4D9Db3e99` |
 | `CFG-AUTH-ADAPTER` | LIVE-VERIFY | Candidate `0xc893Ca037b796e7710a4948Bbb6fBfb94539b806` |

@@ -9,7 +9,7 @@
 
 ## Read first
 
-- [ ] All five spike verdicts: [S01](../10-first-hour-spikes/S01-MODEL-PARITY.md), [S02](../10-first-hour-spikes/S02-SELF-SIGNING.md), [S03](../10-first-hour-spikes/S03-POKE-AND-ACT.md), [S04](../10-first-hour-spikes/S04-OWNER-CONFIG.md), and [S05](../10-first-hour-spikes/S05-PERSISTENCE.md).
+- [ ] Required one-game spike verdicts: [S01](../10-first-hour-spikes/S01-MODEL-PARITY.md), [S02](../10-first-hour-spikes/S02-SELF-SIGNING.md), [S03](../10-first-hour-spikes/S03-POKE-AND-ACT.md), and [S04](../10-first-hour-spikes/S04-OWNER-CONFIG.md). Record [S05](../10-first-hour-spikes/S05-PERSISTENCE.md) if available; it gates multi-game learning claims, not this pilot.
 - [ ] [M04](../20-build/M04-AGENT-GAME-KIT.md)/[M05](../20-build/M05-HARNESS-ADAPTERS.md)/[M09](../20-build/M09-ORCHESTRATOR-VM.md) handoffs; [M06](../20-build/M06-MARITIME-FLEET.md#pilot-checkpoint)/[M07](../20-build/M07-WALLETS-IDENTITY-FUNDING.md#pilot-checkpoint)/[M08](../20-build/M08-TEAM-CHAT-LOGS.md#pilot-checkpoint) pilot checkpoints.
 - [ ] Active [M01](../00-start-here/M01-RUN-CONFIGURATION.md) rows, [M03](../00-start-here/M03-SECURITY-AND-SECRETS.md) rules, and verified contract behavior/configuration required for a two-player round.
 - [ ] Decision sheet [§6.2](../../prisoners-daolemma-tournament-decisions-v1_0.md#6-build-order).

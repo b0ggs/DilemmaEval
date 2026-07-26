@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dilemmaeval.local/schemas/poke.schema.json",
+  "title": "DilemmaEval Maritime poke",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "game_id",
+    "round",
+    "phase",
+    "seat_id",
+    "team",
+    "chain_state",
+    "team_chat",
+    "requested_action",
+    "response_schema_version"
+  ],
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "game_id": { "type": "string", "minLength": 1 },
+    "round": { "type": "integer", "minimum": 0 },
+    "phase": { "enum": ["join", "commit", "reveal", "claim"] },
+    "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+    "team": { "enum": ["openclaw", "hermes"] },
+    "chain_state": { "type": "object" },
+    "team_chat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["through_sequence", "messages"],
+      "properties": {
+        "through_sequence": { "type": "integer", "minimum": 0 },
+        "messages": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "./team-message.schema.json" }
+        }
+      }
+    },
+    "requested_action": { "enum": ["join", "commit", "reveal", "claim"] },
+    "response_schema_version": { "const": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "team": { "const": "openclaw" } } },
+      "then": { "properties": { "seat_id": { "pattern": "^oc-[1-5]$" } } }
+    },
+    {
+      "if": { "properties": { "team": { "const": "hermes" } } },
+      "then": { "properties": { "seat_id": { "pattern": "^hs-[1-5]$" } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "join" } } },
+      "then": { "properties": { "requested_action": { "const": "join" } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "commit" } } },
+      "then": { "properties": { "requested_action": { "const": "commit" } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "reveal" } } },
+      "then": { "properties": { "requested_action": { "const": "reveal" } } }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "claim" } } },
+      "then": { "properties": { "requested_action": { "const": "claim" } } }
+    }
+  ]
+}

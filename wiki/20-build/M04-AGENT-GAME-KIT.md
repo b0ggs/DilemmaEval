@@ -9,7 +9,7 @@
 
 ## Read first
 
-- [ ] All five spike handoffs: [S01](../10-first-hour-spikes/S01-MODEL-PARITY.md), [S02](../10-first-hour-spikes/S02-SELF-SIGNING.md), and [S03](../10-first-hour-spikes/S03-POKE-AND-ACT.md) are `Passed`; [S04](../10-first-hour-spikes/S04-OWNER-CONFIG.md) provides a usable contract path; [S05](../10-first-hour-spikes/S05-PERSISTENCE.md) claim limits are recorded.
+- [ ] [S01](../10-first-hour-spikes/S01-MODEL-PARITY.md), [S02](../10-first-hour-spikes/S02-SELF-SIGNING.md), and [S03](../10-first-hour-spikes/S03-POKE-AND-ACT.md) are `Passed`; [S04](../10-first-hour-spikes/S04-OWNER-CONFIG.md) provides a usable contract path. Record the [S05](../10-first-hour-spikes/S05-PERSISTENCE.md) verdict if available, but do not block the one-game floor on it.
 - [ ] [M01](../00-start-here/M01-RUN-CONFIGURATION.md) verified game/auth/RPC rows and [M03](../00-start-here/M03-SECURITY-AND-SECRETS.md) secret boundaries.
 - [ ] Actual contract/interface and existing implementation commands at recorded revisions.
 - [ ] Replacement [§5 poke schema](../../prisoners-daolemma-discord-replacement.md#5-maritime-poke), [§6 response schema](../../prisoners-daolemma-discord-replacement.md#6-agent-response), and [§8 gameplay boundary](../../prisoners-daolemma-discord-replacement.md#8-relationship-to-gameplay).

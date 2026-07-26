@@ -52,7 +52,7 @@ Create one copy per spike, pilot, game, or series in the team's approved artifac
 
 - Team log paths and hashes:
 - Chat schema/config/limits digest:
-- Transport proof/reference (proposed Maritime CLI syntax remains LIVE-VERIFY until confirmed):
+- Transport proof/reference (addendum-verified syntax plus installed `maritime guide --json` drift check):
 - Poke ordering policy:
 - Request/response log paths and hashes:
 - Accepted/rejected record paths and hashes:

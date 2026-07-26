@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dilemmaeval.local/schemas/team-message.schema.json",
+  "title": "DilemmaEval accepted team message",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "game_id",
+    "round",
+    "phase",
+    "team",
+    "seat_id",
+    "sequence",
+    "received_at",
+    "request_id",
+    "message"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "game_id": { "type": "string", "minLength": 1 },
+    "round": { "type": "integer", "minimum": 0 },
+    "phase": { "enum": ["join", "commit", "reveal", "claim"] },
+    "team": { "enum": ["openclaw", "hermes"] },
+    "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "received_at": { "type": "string", "format": "date-time" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "message": { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "team": { "const": "openclaw" } } },
+      "then": { "properties": { "seat_id": { "pattern": "^oc-[1-5]$" } } }
+    },
+    {
+      "if": { "properties": { "team": { "const": "hermes" } } },
+      "then": { "properties": { "seat_id": { "pattern": "^hs-[1-5]$" } } }
+    }
+  ]
+}

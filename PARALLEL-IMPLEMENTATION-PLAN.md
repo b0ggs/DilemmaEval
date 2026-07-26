@@ -333,13 +333,13 @@ The plan does not fake a completed tournament when a hard gate or external depen
 **Owner:** Lead Codex  
 **References:** [M00](wiki/00-start-here/M00-PROJECT-CANON.md), [M01](wiki/00-start-here/M01-RUN-CONFIGURATION.md)
 
-- [ ] Track the approved final addendum in this repository.
-- [ ] Link the pinned game implementation.
-- [ ] Correct the wiki's stale direct-OpenAI instructions.
-- [ ] Record Base Sepolia configuration and mainnet exclusions.
-- [ ] Freeze shared poke, response, seat-manifest, and game-command result schemas.
-- [ ] Freeze how the pinned game source is acquired at runtime: an exact pinned checkout, submodule, package artifact, or configured sibling path. An unpinned `main` checkout is not acceptable.
-- [ ] Create non-overlapping implementation directories.
+- [x] Track the approved final addendum in this repository.
+- [x] Link the pinned game implementation.
+- [x] Correct the wiki's stale direct-OpenAI instructions.
+- [x] Record Base Sepolia configuration and mainnet exclusions.
+- [x] Freeze shared poke, response, seat-manifest, and game-command result schemas.
+- [x] Freeze how the pinned game source is acquired at runtime: an exact pinned checkout, submodule, package artifact, or configured sibling path. An unpinned `main` checkout is not acceptable.
+- [x] Create non-overlapping implementation directories.
 - [ ] Commit the baseline atomically to `origin/main`.
 
 No child implementation starts until shared schemas and paths exist.
@@ -352,11 +352,11 @@ No child implementation starts until shared schemas and paths exist.
 **Owned path:** game-bridge leaf directory  
 **References:** [M04](wiki/20-build/M04-AGENT-GAME-KIT.md), [S02](wiki/10-first-hour-spikes/S02-SELF-SIGNING.md)
 
-- [ ] Execute and parse pinned existing game commands.
-- [ ] Cover state, wallet/auth status, join, prepare-commit, commit, reveal, advance, and claim.
-- [ ] Preserve stdout/stderr, exit status, and structured error information.
-- [ ] Add fixture tests without sending transactions.
-- [ ] Do not implement ABI/RPC/game rules independently.
+- [x] Execute and parse pinned existing game commands.
+- [x] Cover state, wallet/auth status, join, prepare-commit, commit, reveal, advance, and claim.
+- [x] Preserve stdout/stderr, exit status, and structured error information.
+- [x] Add fixture tests without sending transactions.
+- [x] Do not implement ABI/RPC/game rules independently.
 
 #### TASK-B1 — Pure team-log library
 
@@ -364,11 +364,11 @@ No child implementation starts until shared schemas and paths exist.
 **Owned path:** team-log leaf directory  
 **References:** [M08](wiki/20-build/M08-TEAM-CHAT-LOGS.md)
 
-- [ ] Implement isolated append-only logs.
-- [ ] Implement validation, sequence, cursor, bounded snapshot, and verbatim text.
-- [ ] Implement duplicate/cross-team/malformed/stale/oversized rejection.
-- [ ] Implement restart and partial-line recovery fixtures.
-- [ ] Keep the library independent of chain and Maritime transport.
+- [x] Implement isolated append-only logs.
+- [x] Implement validation, sequence, cursor, bounded snapshot, and verbatim text.
+- [x] Implement duplicate/cross-team/malformed/stale/oversized rejection.
+- [x] Implement restart and partial-line recovery fixtures.
+- [x] Keep the library independent of chain and Maritime transport.
 
 #### TASK-C1 — Maritime transport/config fixture harness
 
@@ -376,11 +376,11 @@ No child implementation starts until shared schemas and paths exist.
 **Owned path:** Maritime transport leaf directory  
 **References:** [S01](wiki/10-first-hour-spikes/S01-MODEL-PARITY.md), [S03](wiki/10-first-hour-spikes/S03-POKE-AND-ACT.md)
 
-- [ ] Represent the shared proxy/model/settings configuration.
-- [ ] Build poke/response request fixtures.
-- [ ] Implement timeout/retry/idempotency behavior against a fake transport.
-- [ ] Capture redacted parity evidence fields.
-- [ ] Make no paid or live Maritime call.
+- [x] Represent the shared proxy/model/settings configuration.
+- [x] Build poke/response request fixtures.
+- [x] Implement timeout/retry/idempotency behavior against a fake transport.
+- [x] Capture redacted parity evidence fields.
+- [x] Make no paid or live Maritime call.
 
 #### TASK-D1 — Pilot fleet and wallet manifest
 
@@ -395,12 +395,12 @@ No child implementation starts until shared schemas and paths exist.
 
 ### Minute 45–60 — Audit and integration checkpoint 1
 
-- [ ] Agent A audits Agent C.
-- [ ] Agent B audits Agent A.
-- [ ] Agent C audits Agent B.
-- [ ] Lead Codex reviews all diffs and audit findings.
-- [ ] Lead fixes shared wiring only.
-- [ ] Lead runs combined local tests.
+- [x] Agent A audits Agent C.
+- [x] Agent B audits Agent A.
+- [x] Agent C audits Agent B.
+- [x] Lead Codex reviews all diffs and audit findings.
+- [x] Lead applies final shared-boundary and audit-regression fixes.
+- [x] Lead runs combined local tests.
 - [ ] Lead commits each accepted artifact atomically.
 - [ ] Lead pushes `origin/main`.
 

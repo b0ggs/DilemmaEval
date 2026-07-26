@@ -19,7 +19,7 @@
 | Input | Classification | Requirement | Source/freshness |
 |---|---|---|---|
 | Wake path | LOCKED / LIVE-VERIFY | Maritime poke is the only wake trigger; team-log writes are not a separate trigger | Prove current behavior |
-| Transport syntax | LIVE-VERIFY | The proposed `maritime chat <agent> "<serialized-poke>" --json` is an example to verify against installed Maritime, never established tooling truth | Cite supported current path/revision |
+| Transport syntax | VERIFIED DOCS / LIVE-VERIFY INSTALLED CLI | The final addendum verifies `maritime chat <agent> "<serialized-poke>" --json` returning `{ response }`, plus the equivalent REST call; check `maritime guide --json` for installed-CLI drift | Cite installed command manifest/revision |
 | Chat context | LOCKED fairness rule / RUN-FROZEN limits | Same-team messages accepted before construction, ascending sequence, bounded identically, with `through_sequence` | Test actual selection/order/content |
 | Response | LOCKED schema | Matching `request_id` envelope; optional `team_message` may be empty and must not block gameplay | Validate positive and negative fixtures |
 | Deadlines | LIVE-VERIFY / OPEN final values | Read block-based commit/reveal windows and live phase/deadline | Read for every trial |
@@ -29,7 +29,7 @@
 
 - [ ] `S03-01` Put the selected agent into a documented sleeping state.
 - [ ] `S03-02` Read the live phase, current block, and applicable contract deadline.
-- [ ] `S03-03` Resolve the supported Maritime chat/REST invocation from current tooling, recording the example CLI syntax as `LIVE-VERIFY` until proven.
+- [ ] `S03-03` Compare the installed `maritime guide --json` manifest with the addendum's verified chat/REST invocation and record any drift before use.
 - [ ] `S03-04` Construct a serialized poke with only the agent's team messages, the frozen limits, and an exact `through_sequence`; send it through the verified Maritime path.
 - [ ] `S03-05` Record wake, exact context receipt, structured response, decision start, submission, receipt, and reveal timestamps/blocks.
 - [ ] `S03-06` Validate request/seat/game/round/phase identity and preserve any returned `team_message` verbatim; prove an empty message is non-blocking.

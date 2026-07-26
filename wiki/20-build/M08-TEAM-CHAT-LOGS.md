@@ -22,7 +22,7 @@
 | Poke snapshot | LOCKED schema / RUN-FROZEN limits | `request_id`, game/round/phase/seat/team, `chain_state`, `team_chat.through_sequence`, `team_chat.messages`, `requested_action`, and `response_schema_version`; same-team eligible messages ascending and bounded identically | Construct before each poke |
 | Response envelope | LOCKED schema | `schema_version`, matching request/game/round/phase/seat, `status`, `transaction_hash`, optional `team_message`, and `error` | Treat reported status/hash as operational, not chain truth |
 | Acceptance records | LOCKED evidence control | Retain response identity, validation decision, rejection reason when applicable, and receive time for every accepted/rejected response; only valid messages enter a team log | Retain for evidence |
-| Transport | LIVE-VERIFY | Resolve supported current Maritime chat or REST invocation; `maritime chat <agent> "<serialized-poke>" --json` is proposed syntax only | Cite exact installed tooling/revision |
+| Transport | VERIFIED DOCS / LIVE-VERIFY INSTALLED CLI | The final addendum verifies `maritime chat <agent> "<serialized-poke>" --json` returning `{ response }`, plus the equivalent REST call; check `maritime guide --json` for installed-CLI drift | Cite installed command manifest/revision |
 | Concurrency | LOCKED implementation rule | Serialize appends in the single orchestrator; if multiple writers exist, use the same schema in storage with a unique sequence constraint | Review topology before test |
 
 ## Execution checklist
@@ -63,7 +63,8 @@
 ## Stop and escalate
 
 - Stop on cross-team access, rewritten text, non-unique/out-of-order sequence, unrecorded rejection, duplicated request/message, unsafe recovery, unequal limits/opportunities, secret-bearing content, or chat affecting chain advancement.
-- Stop if the transport remains unverified; do not treat the proposed Maritime CLI example as supported tooling truth.
+- Stop if the installed command manifest or a dry probe contradicts the
+  addendum's verified transport syntax; resolve drift before live use.
 - Escalate isolation/security issues to the security owner, fairness divergence to the fairness reviewer, and transport/recovery gaps to the orchestrator owner.
 - Safe state: stop pokes/appends/publication, preserve originals and hashes, reread chain truth, and keep dependent modules blocked.
 

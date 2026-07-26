@@ -9,7 +9,7 @@
 
 ## Read first
 
-- [ ] [M05](M05-HARNESS-ADAPTERS.md) adapter handoff, [S03](../10-first-hour-spikes/S03-POKE-AND-ACT.md) wake proof, [S05](../10-first-hour-spikes/S05-PERSISTENCE.md) persistence verdict.
+- [ ] [M05](M05-HARNESS-ADAPTERS.md) adapter handoff and [S03](../10-first-hour-spikes/S03-POKE-AND-ACT.md) wake proof. [S05](../10-first-hour-spikes/S05-PERSISTENCE.md) is required only before multi-game learning claims, not for the one-game floor.
 - [ ] [M01](../00-start-here/M01-RUN-CONFIGURATION.md) `CFG-SEATS` and [M03](../00-start-here/M03-SECURITY-AND-SECRETS.md) isolation rules.
 
 ## Inputs and prerequisites
