@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Live Agent Transfer</title>
+<style>
+  :root {
+    --bg: #eef1f5;
+    --surface: #ffffff;
+    --ink: #12151c;
+    --ink-dim: #5a6472;
+    --ink-faint: #8892a0;
+    --line: #dde2e9;
+    --accent: #0e7c86;
+    --accent-ink: #ffffff;
+    --hermes: #6d5ae6;
+    --openclaw: #b5590a;
+    --ok-bg: #e4f5ee;
+    --ok-ink: #0f6b47;
+    --err-bg: #fbe9e7;
+    --err-ink: #b5301f;
+    --shadow: 0 1px 2px rgba(18, 21, 28, 0.04), 0 8px 24px -12px rgba(18, 21, 28, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0e14; --surface: #131820; --ink: #e7ecf3; --ink-dim: #8b96a8; --ink-faint: #5f6a7c;
+      --line: #232b38; --accent: #35d6c4; --accent-ink: #06231f; --hermes: #9e8fff; --openclaw: #f0a84b;
+      --ok-bg: #12271e; --ok-ink: #4fd39a; --err-bg: #2b1512; --err-ink: #ff8a75;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e14; --surface: #131820; --ink: #e7ecf3; --ink-dim: #8b96a8; --ink-faint: #5f6a7c;
+    --line: #232b38; --accent: #35d6c4; --accent-ink: #06231f; --hermes: #9e8fff; --openclaw: #f0a84b;
+    --ok-bg: #12271e; --ok-ink: #4fd39a; --err-bg: #2b1512; --err-ink: #ff8a75;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f5; --surface: #ffffff; --ink: #12151c; --ink-dim: #5a6472; --ink-faint: #8892a0;
+    --line: #dde2e9; --accent: #0e7c86; --accent-ink: #ffffff; --hermes: #6d5ae6; --openclaw: #b5590a;
+    --ok-bg: #e4f5ee; --ok-ink: #0f6b47; --err-bg: #fbe9e7; --err-ink: #b5301f;
+    --shadow: 0 1px 2px rgba(18,21,28,0.04), 0 8px 24px -12px rgba(18,21,28,0.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Inter", system-ui, sans-serif;
+    line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 640px; margin: 0 auto; padding: 48px 24px 80px; display: flex; flex-direction: column; gap: 28px; }
+  .eyebrow { text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; font-weight: 600; color: var(--accent); }
+  h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.01em; margin: 6px 0 0; text-wrap: balance; }
+  .lede { color: var(--ink-dim); font-size: 14.5px; margin: 8px 0 0; max-width: 60ch; }
+
+  form.panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 24px; display: flex; flex-direction: column; gap: 18px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12.5px; font-weight: 600; color: var(--ink-dim); }
+  select, input[type="number"] {
+    font: inherit; font-size: 14.5px; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: end; }
+  .row .swap-hint { display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-size: 18px; padding-bottom: 10px; }
+  .amount-field { display: flex; gap: 12px; align-items: end; }
+  .amount-field .field { flex: 1; }
+  .hint { font-size: 12px; color: var(--ink-faint); }
+
+  button.submit {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 650; font-size: 15px;
+    border: none; padding: 13px 18px; border-radius: 9px; cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+  button.submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px -6px var(--accent); }
+  button.submit:disabled { opacity: 0.6; cursor: progress; }
+  button.submit:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .spinner {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.4); border-top-color: currentColor;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 1.4s; } }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;
+    padding: 5px 12px 5px 10px; border-radius: 999px; width: fit-content;
+  }
+  .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-pill.pending { background: var(--line); color: var(--ink-dim); }
+  .status-pill.ok { background: var(--ok-bg); color: var(--ok-ink); }
+  .status-pill.err { background: var(--err-bg); color: var(--err-ink); }
+
+  #result { display: none; flex-direction: column; gap: 16px; }
+  #result.visible { display: flex; }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .panel-header { padding: 14px 20px; border-bottom: 1px solid var(--line); font-size: 12.5px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
+  dl.ledger { margin: 0; display: grid; grid-template-columns: auto 1fr; }
+  dl.ledger > div { display: contents; }
+  dl.ledger dt, dl.ledger dd { padding: 11px 20px; border-bottom: 1px solid var(--line); margin: 0; }
+  dl.ledger > div:last-child dt, dl.ledger > div:last-child dd { border-bottom: none; }
+  dl.ledger dt { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; }
+  dl.ledger dd { font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace; font-size: 12.5px; overflow-wrap: anywhere; text-align: right; }
+
+  .cta {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 22px; box-shadow: var(--shadow); flex-wrap: wrap;
+  }
+  .cta-text h2 { font-size: 14.5px; margin: 0 0 2px; font-weight: 650; }
+  .cta-text p { margin: 0; font-size: 12.5px; color: var(--ink-dim); }
+  .cta-button {
+    display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-ink);
+    font-weight: 650; font-size: 13.5px; text-decoration: none; padding: 10px 16px; border-radius: 9px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+
+  .agent-reply {
+    font-size: 12.5px; color: var(--ink-dim); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; white-space: pre-wrap; max-height: 200px; overflow-y: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  footer { font-size: 12px; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div>
+    <div class="eyebrow">Live &middot; Base Sepolia testnet</div>
+    <h1>Trigger a real agent-to-agent transfer</h1>
+    <p class="lede">
+      Pick a sender and recipient agent, set an amount, and submit. The sender agent is instructed
+      live via Maritime, writes and signs its own transaction, and the result populates below as
+      soon as it's confirmed on-chain.
+    </p>
+  </div>
+
+  <form class="panel" id="transfer-form">
+    <div class="row">
+      <div class="field">
+        <label for="from">From (sender agent)</label>
+        <select id="from" required></select>
+      </div>
+      <div class="swap-hint" aria-hidden="true">&rarr;</div>
+      <div class="field">
+        <label for="to">To (recipient agent)</label>
+        <select id="to" required></select>
+      </div>
+    </div>
+
+    <div class="amount-field">
+      <div class="field">
+        <label for="amount">Amount (ETH)</label>
+        <input type="number" id="amount" value="0.0001" step="any" min="0.00001" max="0.01" required />
+      </div>
+      <span class="hint">Capped at 0.01 ETH for this demo</span>
+    </div>
+
+    <button class="submit" type="submit" id="submit-btn">
+      <span id="submit-label">Submit transfer</span>
+    </button>
+
+    <div class="status-pill pending" id="status-pill" style="display:none"></div>
+  </form>
+
+  <div id="result">
+    <div class="panel">
+      <div class="panel-header">Transaction details</div>
+      <dl class="ledger" id="ledger"></dl>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Agent reply</div>
+      <div class="agent-reply" id="agent-reply"></div>
+    </div>
+
+    <div class="cta">
+      <div class="cta-text">
+        <h2>Verify it yourself</h2>
+        <p>See the live, canonical record on the block explorer.</p>
+      </div>
+      <a class="cta-button" id="explorer-link" href="#" target="_blank" rel="noopener">View on Basescan &nearr;</a>
+    </div>
+  </div>
+
+  <footer>
+    This page talks only to a local server on this machine, which holds no keys itself &mdash;
+    it shells out to the already-authenticated Maritime CLI and reads public Base Sepolia RPC data.
+    Testnet ETH only, no real monetary value.
+  </footer>
+</div>
+
+<script>
+  const fromSelect = document.getElementById("from");
+  const toSelect = document.getElementById("to");
+  const form = document.getElementById("transfer-form");
+  const submitBtn = document.getElementById("submit-btn");
+  const submitLabel = document.getElementById("submit-label");
+  const statusPill = document.getElementById("status-pill");
+  const resultEl = document.getElementById("result");
+  const ledgerEl = document.getElementById("ledger");
+  const agentReplyEl = document.getElementById("agent-reply");
+  const explorerLink = document.getElementById("explorer-link");
+
+  let agents = [];
+
+  function badge(team) {
+    const color = team === "hermes" ? "var(--hermes)" : "var(--openclaw)";
+    return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;"></span>`;
+  }
+
+  async function loadAgents() {
+    const res = await fetch("/api/agents");
+    agents = await res.json();
+    for (const sel of [fromSelect, toSelect]) {
+      sel.innerHTML = agents
+        .map((a) => `<option value="${a.name}">${a.name} (${a.team})</option>`)
+        .join("");
+    }
+    if (agents.length > 1) toSelect.selectedIndex = 1;
+  }
+
+  function setStatus(kind, text) {
+    statusPill.style.display = "inline-flex";
+    statusPill.className = `status-pill ${kind}`;
+    statusPill.textContent = text;
+  }
+
+  function ledgerRow(label, value) {
+    return `<div><dt>${label}</dt><dd>${value}</dd></div>`;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const from = fromSelect.value;
+    const to = toSelect.value;
+    const amountEth = document.getElementById("amount").value;
+
+    if (from === to) {
+      setStatus("err", "Sender and recipient must differ");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitLabel.innerHTML = '<span class="spinner"></span> Waiting on agent + chain confirmation&hellip;';
+    resultEl.classList.remove("visible");
+    setStatus("pending", "Instructing agent&hellip;");
+
+    try {
+      const res = await fetch("/api/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to, amountEth }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        setStatus("err", data.error || "Transfer failed");
+        if (data.agentReply) {
+          agentReplyEl.textContent = data.agentReply;
+          resultEl.classList.add("visible");
+        }
+        return;
+      }
+
+      setStatus(data.onchain.found && data.onchain.status === "success" ? "ok" : "err",
+        data.onchain.found ? `Confirmed on-chain (block ${data.onchain.blockNumber})` : "Tx submitted, not yet confirmed");
+
+      ledgerEl.innerHTML = [
+        ledgerRow("Hash", data.txHash),
+        ledgerRow("From", `${badge(data.from.team)}${data.from.name} &middot; ${data.from.address}`),
+        ledgerRow("To", `${badge(data.to.team)}${data.to.name} &middot; ${data.to.address}`),
+        ledgerRow("Value", `${data.amountEth} ETH`),
+        data.onchain.found ? ledgerRow("Block", data.onchain.blockNumber.toLocaleString()) : "",
+        data.onchain.found ? ledgerRow("Gas used", Number(data.onchain.gasUsed).toLocaleString()) : "",
+        data.onchain.found
+          ? ledgerRow("Timestamp", new Date(data.onchain.timestamp * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC")
+          : "",
+      ].join("");
+
+      agentReplyEl.textContent = data.agentReply;
+      explorerLink.href = data.explorerUrl;
+      resultEl.classList.add("visible");
+    } catch (err) {
+      setStatus("err", err.message || "Request failed");
+    } finally {
+      submitBtn.disabled = false;
+      submitLabel.textContent = "Submit transfer";
+    }
+  });
+
+  loadAgents();
+</script>
+</body>
+</html>
