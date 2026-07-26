@@ -1,0 +1,19 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+
+# Editor and OS files
+.DS_Store
+*.swp
+.idea/
+.vscode/
