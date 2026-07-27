@@ -123,7 +123,7 @@ export function createCurrentMaritimeLiveBinding({
             apiKey,
             path: `/agents/${agent.id}/deploy`,
             method: "POST",
-            accepted: [202]
+            accepted: [200, 202]
           });
           await waitUntilReady({
             maritime,
@@ -286,7 +286,7 @@ async function uploadSkillFiles({ agentId, apiKey, fetchImpl, readFileImpl }) {
     path: `/agents/${agentId}/files`,
     method: "POST",
     body: { files },
-    accepted: [201]
+    accepted: [200, 201]
   });
 }
 
