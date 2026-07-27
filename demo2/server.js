@@ -42,88 +42,6 @@ function extractTxHash(text) {
   return match ? match[0] : null;
 }
 
-async function verifyOnChain(txHash, { maxAttempts = 12, delayMs = 3000 } = {}) {
-  const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const receipt = await provider.getTransactionReceipt(txHash);
-    if (receipt) {
-      const tx = await provider.getTransaction(txHash);
-      const block = await provider.getBlock(receipt.blockNumber);
-      return {
-        found: true,
-        status: receipt.status === 1 ? "success" : "failed",
-        from: receipt.from,
-        to: receipt.to,
-        value: ethers.utils.formatEther(tx.value),
-        blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed.toString(),
-        timestamp: block.timestamp,
-      };
-    }
-    await new Promise((r) => setTimeout(r, delayMs));
-  }
-  return { found: false };
-}
-
-async function handleTransfer(req, res) {
-  let body = "";
-  for await (const chunk of req) body += chunk;
-  let payload;
-  try {
-    payload = JSON.parse(body);
-  } catch {
-    res.writeHead(400, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ error: "Invalid JSON body" }));
-  }
-
-  const { from, to, amountEth } = payload;
-  const roster = loadRoster();
-  const sender = roster.find((a) => a.name === from);
-  const recipient = roster.find((a) => a.name === to);
-  const amount = Number(amountEth);
-
-  if (!sender) return sendError(res, 400, `Unknown sender agent: ${from}`);
-  if (!recipient) return sendError(res, 400, `Unknown recipient agent: ${to}`);
-  if (sender.name === recipient.name) return sendError(res, 400, "Sender and recipient must differ");
-  if (!Number.isFinite(amount) || amount <= 0 || amount > 0.01) {
-    return sendError(res, 400, "Amount must be > 0 and <= 0.01 ETH (demo safety cap)");
-  }
-
-  const instruction =
-    `Send exactly ${amount} ETH from your wallet to ${recipient.address} on Base Sepolia ` +
-    `(chain ID 84532, RPC https://sepolia.base.org). Your private key is available as ` +
-    `GAMEPLAY_WALLET_PRIVATE_KEY. Use Node.js with ethers or viem (install if needed) to sign ` +
-    `and broadcast the transaction yourself. Report back only the resulting transaction hash.`;
-
-  let agentReply;
-  try {
-    agentReply = await runMaritimeChat(sender.name, instruction);
-  } catch (err) {
-    return sendError(res, 502, `maritime chat failed: ${err.message}`);
-  }
-
-  const txHash = extractTxHash(agentReply);
-  if (!txHash) {
-    return sendError(res, 502, "Agent did not report a transaction hash", { agentReply });
-  }
-
-  const onchain = await verifyOnChain(txHash);
-
-  res.writeHead(200, { "Content-Type": "application/json" });
-  res.end(
-    JSON.stringify({
-      ok: true,
-      from: sender,
-      to: recipient,
-      amountEth: amount,
-      txHash,
-      agentReply,
-      onchain,
-      explorerUrl: `https://sepolia.basescan.org/tx/${txHash}`,
-    }),
-  );
-}
-
 function sendError(res, code, message, extra = {}) {
   res.writeHead(code, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ ok: false, error: message, ...extra }));
@@ -141,13 +59,145 @@ function serveStatic(req, res) {
   });
 }
 
+// --- SSE transfer stream ---
+// Emits real stage transitions from the request's own lifecycle as they
+// genuinely happen (not simulated agent-internal reasoning - see plan
+// addendum "live status feed for demo2": neither `maritime logs -f` nor the
+// chat API expose real per-request agent activity, so this reports on our
+// own side of the pipeline instead, which is real telemetry, just not
+// agent-internal).
+async function handleTransferStream(req, res, query) {
+  const { from, to, amountEth } = query;
+  const roster = loadRoster();
+  const sender = roster.find((a) => a.name === from);
+  const recipient = roster.find((a) => a.name === to);
+  const amount = Number(amountEth);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+
+  const emit = (event, data) => {
+    if (res.writableEnded) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify({ ...data, timestamp: Date.now() })}\n\n`);
+  };
+
+  let clientGone = false;
+  req.on("close", () => {
+    clientGone = true;
+  });
+
+  if (!sender) return emit("error", { ok: false, error: `Unknown sender agent: ${from}` }), res.end();
+  if (!recipient) return emit("error", { ok: false, error: `Unknown recipient agent: ${to}` }), res.end();
+  if (sender.name === recipient.name) {
+    emit("error", { ok: false, error: "Sender and recipient must differ" });
+    return res.end();
+  }
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 0.01) {
+    emit("error", { ok: false, error: "Amount must be > 0 and <= 0.01 ETH (demo safety cap)" });
+    return res.end();
+  }
+
+  const instruction =
+    `Send exactly ${amount} ETH from your wallet to ${recipient.address} on Base Sepolia ` +
+    `(chain ID 84532, RPC https://sepolia.base.org). Your private key is available as ` +
+    `GAMEPLAY_WALLET_PRIVATE_KEY. Use Node.js with ethers or viem (install if needed) to sign ` +
+    `and broadcast the transaction yourself. Report back only the resulting transaction hash.`;
+
+  emit("stage", { stage: "sending", message: `Instruction sent to ${sender.name}` });
+
+  let agentReply;
+  try {
+    const waitingTimer = setTimeout(() => {
+      emit("stage", { stage: "waiting", message: `Still waiting on ${sender.name}…` });
+    }, 5000);
+    emit("stage", { stage: "waiting", message: `Waiting for ${sender.name}'s response…` });
+    agentReply = await runMaritimeChat(sender.name, instruction);
+    clearTimeout(waitingTimer);
+  } catch (err) {
+    emit("error", { ok: false, error: `maritime chat failed: ${err.message}` });
+    return res.end();
+  }
+
+  if (clientGone) return res.end();
+
+  emit("stage", { stage: "received", message: "Response received — extracting transaction hash…" });
+  emit("agentReply", { agentReply });
+
+  const txHash = extractTxHash(agentReply);
+  if (!txHash) {
+    emit("error", { ok: false, error: "Agent did not report a transaction hash", agentReply });
+    return res.end();
+  }
+
+  emit("stage", { stage: "hash-found", message: `Transaction hash found: ${txHash}` });
+
+  const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+  const maxAttempts = 12;
+  let onchain = { found: false };
+  for (let attempt = 1; attempt <= maxAttempts && !clientGone; attempt++) {
+    emit("stage", {
+      stage: "verifying",
+      message: `Verifying on Base Sepolia (attempt ${attempt} of ${maxAttempts})…`,
+    });
+    const receipt = await provider.getTransactionReceipt(txHash);
+    if (receipt) {
+      const tx = await provider.getTransaction(txHash);
+      const block = await provider.getBlock(receipt.blockNumber);
+      onchain = {
+        found: true,
+        status: receipt.status === 1 ? "success" : "failed",
+        from: receipt.from,
+        to: receipt.to,
+        value: ethers.utils.formatEther(tx.value),
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+        timestamp: block.timestamp,
+      };
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  if (clientGone) return res.end();
+
+  if (onchain.found) {
+    emit("stage", {
+      stage: "confirmed",
+      message: `Confirmed in block ${onchain.blockNumber.toLocaleString()}`,
+    });
+  } else {
+    emit("stage", { stage: "unconfirmed", message: "Not yet confirmed after all attempts" });
+  }
+
+  emit("result", {
+    ok: true,
+    from: sender,
+    to: recipient,
+    amountEth: amount,
+    txHash,
+    agentReply,
+    onchain,
+    explorerUrl: `https://sepolia.basescan.org/tx/${txHash}`,
+  });
+  res.end();
+}
+
 const server = http.createServer((req, res) => {
-  if (req.method === "GET" && req.url === "/api/agents") {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  if (req.method === "GET" && url.pathname === "/api/agents") {
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(loadRoster()));
   }
-  if (req.method === "POST" && req.url === "/api/transfer") {
-    return handleTransfer(req, res).catch((err) => sendError(res, 500, err.message));
+  if (req.method === "GET" && url.pathname === "/api/transfer/stream") {
+    const query = Object.fromEntries(url.searchParams);
+    return handleTransferStream(req, res, query).catch((err) => {
+      if (!res.headersSent) return sendError(res, 500, err.message);
+      res.end();
+    });
   }
   return serveStatic(req, res);
 });

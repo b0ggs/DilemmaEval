@@ -100,6 +100,38 @@
   #result { display: none; flex-direction: column; gap: 16px; }
   #result.visible { display: flex; }
 
+  #live-feed {
+    display: none; flex-direction: column; gap: 0;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  #live-feed.visible { display: flex; }
+  #live-feed .panel-header { display: flex; align-items: center; gap: 8px; }
+  #live-feed .panel-header .live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { #live-feed .panel-header .live-dot { animation: none; } }
+
+  #live-feed-log {
+    max-height: 220px; overflow-y: auto; padding: 4px 0;
+  }
+  .feed-row {
+    display: flex; gap: 12px; padding: 9px 20px; font-size: 13px;
+    border-bottom: 1px solid var(--line); animation: feed-in 0.2s ease;
+  }
+  .feed-row:last-child { border-bottom: none; }
+  @keyframes feed-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .feed-row { animation: none; } }
+  .feed-row .feed-time {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px;
+    color: var(--ink-faint); white-space: nowrap; padding-top: 1px;
+  }
+  .feed-row .feed-msg { color: var(--ink); }
+  .feed-row.feed-confirmed .feed-msg { color: var(--ok-ink); font-weight: 600; }
+  .feed-row.feed-error .feed-msg { color: var(--err-ink); font-weight: 600; }
+
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
   .panel-header { padding: 14px 20px; border-bottom: 1px solid var(--line); font-size: 12.5px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
   dl.ledger { margin: 0; display: grid; grid-template-columns: auto 1fr; }
@@ -171,6 +203,11 @@
     <div class="status-pill pending" id="status-pill" style="display:none"></div>
   </form>
 
+  <div id="live-feed">
+    <div class="panel-header"><span class="live-dot"></span>Live status</div>
+    <div id="live-feed-log"></div>
+  </div>
+
   <div id="result">
     <div class="panel">
       <div class="panel-header">Transaction details</div>
@@ -209,8 +246,11 @@
   const ledgerEl = document.getElementById("ledger");
   const agentReplyEl = document.getElementById("agent-reply");
   const explorerLink = document.getElementById("explorer-link");
+  const liveFeedEl = document.getElementById("live-feed");
+  const liveFeedLog = document.getElementById("live-feed-log");
 
   let agents = [];
+  let currentSource = null;
 
   function badge(team) {
     const color = team === "hermes" ? "var(--hermes)" : "var(--openclaw)";
@@ -238,7 +278,30 @@
     return `<div><dt>${label}</dt><dd>${value}</dd></div>`;
   }
 
-  form.addEventListener("submit", async (e) => {
+  function formatTime(ms) {
+    const d = new Date(ms);
+    return d.toTimeString().slice(0, 8) + "." + String(d.getMilliseconds()).padStart(3, "0");
+  }
+
+  function appendFeedRow(message, timestamp, kind) {
+    const row = document.createElement("div");
+    row.className = "feed-row" + (kind ? ` feed-${kind}` : "");
+    row.innerHTML = `<span class="feed-time">${formatTime(timestamp)}</span><span class="feed-msg"></span>`;
+    row.querySelector(".feed-msg").textContent = message;
+    liveFeedLog.appendChild(row);
+    liveFeedLog.scrollTop = liveFeedLog.scrollHeight;
+  }
+
+  function finishRequest() {
+    if (currentSource) {
+      currentSource.close();
+      currentSource = null;
+    }
+    submitBtn.disabled = false;
+    submitLabel.textContent = "Submit transfer";
+  }
+
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
     const from = fromSelect.value;
     const to = toSelect.value;
@@ -249,27 +312,33 @@
       return;
     }
 
+    if (currentSource) currentSource.close();
+
     submitBtn.disabled = true;
-    submitLabel.innerHTML = '<span class="spinner"></span> Waiting on agent + chain confirmation&hellip;';
+    submitLabel.innerHTML = '<span class="spinner"></span> Live&hellip;';
     resultEl.classList.remove("visible");
-    setStatus("pending", "Instructing agent&hellip;");
+    liveFeedLog.innerHTML = "";
+    liveFeedEl.classList.add("visible");
+    setStatus("pending", "Starting&hellip;");
 
-    try {
-      const res = await fetch("/api/transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, amountEth }),
-      });
-      const data = await res.json();
+    const params = new URLSearchParams({ from, to, amountEth });
+    const source = new EventSource(`/api/transfer/stream?${params}`);
+    currentSource = source;
 
-      if (!data.ok) {
-        setStatus("err", data.error || "Transfer failed");
-        if (data.agentReply) {
-          agentReplyEl.textContent = data.agentReply;
-          resultEl.classList.add("visible");
-        }
-        return;
-      }
+    source.addEventListener("stage", (e) => {
+      const data = JSON.parse(e.data);
+      const kind = data.stage === "confirmed" ? "confirmed" : data.stage === "unconfirmed" ? "error" : null;
+      appendFeedRow(data.message, data.timestamp, kind);
+      setStatus("pending", data.message);
+    });
+
+    source.addEventListener("agentReply", (e) => {
+      const data = JSON.parse(e.data);
+      agentReplyEl.textContent = data.agentReply;
+    });
+
+    source.addEventListener("result", (e) => {
+      const data = JSON.parse(e.data);
 
       setStatus(data.onchain.found && data.onchain.status === "success" ? "ok" : "err",
         data.onchain.found ? `Confirmed on-chain (block ${data.onchain.blockNumber})` : "Tx submitted, not yet confirmed");
@@ -286,15 +355,28 @@
           : "",
       ].join("");
 
-      agentReplyEl.textContent = data.agentReply;
       explorerLink.href = data.explorerUrl;
       resultEl.classList.add("visible");
-    } catch (err) {
-      setStatus("err", err.message || "Request failed");
-    } finally {
-      submitBtn.disabled = false;
-      submitLabel.textContent = "Submit transfer";
-    }
+      finishRequest();
+    });
+
+    source.addEventListener("error", (e) => {
+      if (e.data) {
+        const data = JSON.parse(e.data);
+        setStatus("err", data.error || "Transfer failed");
+        appendFeedRow(data.error || "Transfer failed", Date.now(), "error");
+        if (data.agentReply) {
+          agentReplyEl.textContent = data.agentReply;
+          resultEl.classList.add("visible");
+        }
+      } else if (source.readyState === EventSource.CLOSED) {
+        // normal close after our own explicit error/result event, nothing to do
+      } else {
+        setStatus("err", "Connection lost");
+        appendFeedRow("Connection to server lost", Date.now(), "error");
+      }
+      finishRequest();
+    });
   });
 
   loadAgents();

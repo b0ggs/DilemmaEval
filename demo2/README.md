@@ -2,53 +2,56 @@
 
 Pick a sender agent, a recipient agent, and an amount. Hit submit. The sender
 agent is instructed live via Maritime, writes and signs its own Base Sepolia
-transaction using its own wallet key, and the result populates in the page
-once it's confirmed on-chain.
+transaction using its own wallet key, and a **live status feed updates in
+real time** as the request actually progresses, before the final result
+populates once it's confirmed on-chain.
 
-This is the interactive companion to a static snapshot demo (not included in
-this branch) that shows one already-completed transfer. This one triggers a
-*new* real transfer on demand.
-
-## Placement — this depends on a checkout of the game repo
-
-This folder is **not self-contained**. `server.js` reads the live roster and
-per-seat secrets from a sibling `packages/harness/` tree that belongs to
-[`botnotstrawberry/prisoners-daolemma`](https://github.com/botnotstrawberry/prisoners-daolemma)
-(the pinned game repo this project's `integration/shared/runtime-source.json`
-already references via `DILEMMA_GAME_REPO`), specifically:
-
-- `../packages/harness/roster.json` — seat names, teams, wallet addresses
-- `../packages/harness/.secrets/*.pass` — keystore passwords (gitignored in
-  that repo, not present here)
-
-To actually run this, drop (or symlink) this `demo2/` folder at the root of
-a `prisoners-daolemma` checkout, alongside its `packages/` directory — same
-pattern as this repo's own `game-bridge` integration already assumes. It
-will not find agents/wallets if run standalone inside `DilemmaEval`.
+This is the interactive companion to the static snapshot demo in `../demo/`
+(which shows one already-completed transfer). This one triggers a *new* real
+transfer on demand.
 
 ## How it works
 
 ```
 Browser (live-dashboard.html)
-   │  fetch("/api/transfer", { from, to, amountEth })
+   │  new EventSource("/api/transfer/stream?from=&to=&amountEth=")
    ▼
 server.js (local only, holds no secrets itself)
    │  execFile("maritime", ["chat", from, instruction])
+   │  emits SSE "stage" events as each step genuinely happens:
+   │  sending → waiting → received → hash-found → verifying (per attempt) → confirmed
    ▼
 Maritime agent container (has GAMEPLAY_WALLET_PRIVATE_KEY as its own env var)
    │  writes + runs its own Node/ethers script, signs, broadcasts
    ▼
 Base Sepolia
    │
-server.js polls the RPC for the receipt, returns the verified result
+server.js polls the RPC for the receipt, emits an SSE "result" event
    ▼
-Browser renders tx hash, addresses, block, gas, timestamp + Basescan link
+Browser: live feed panel shows each stage as it arrives, then the
+         Transaction details panel populates from the "result" event
 ```
 
 The server never holds or sees a private key. It shells out to the already
 `maritime login`-authenticated CLI to send the instruction, and reads public
 RPC data to verify the result. The agent's own container is the only place
 the signing key lives.
+
+### Why the live feed shows request stages, not "agent thinking"
+
+Two candidate sources for real per-request agent activity were checked and
+ruled out before building this:
+
+- **`maritime logs -f <agent>`** — only streams VM/kernel boot and gateway
+  infrastructure logs, not activity tied to a specific chat request.
+- **Maritime's chat API** — confirmed synchronous request/response only
+  (`chat()` "send a message and wait for the reply"); no streaming, SSE, or
+  token-by-token support anywhere in the platform.
+
+So the live feed reports real telemetry about *this server's own* request
+lifecycle (when the instruction was sent, when the reply arrived, each
+real on-chain verification attempt) rather than simulating agent-internal
+reasoning that isn't actually exposed anywhere.
 
 ## Running it
 
@@ -76,16 +79,19 @@ shell instead.
 2. **To** — the recipient agent (must differ from the sender).
 3. **Amount (ETH)** — capped at **0.01 ETH** as a demo safety limit
    (`server.js`'s `handleTransfer` rejects anything above that, or `<= 0`).
-4. **Submit transfer** — the button disables and shows a spinner while
-   waiting on the agent's response and on-chain confirmation (typically
-   10-60s total: LLM response time + tx broadcast + a few block
-   confirmations).
+4. **Submit transfer** — the button disables, and a **Live status** panel
+   appears showing each real stage as it happens: instruction sent, waiting
+   for a response (with a "still waiting…" nudge past 5s), response
+   received, hash found, each on-chain verification attempt, then confirmed.
+   Typically 10-60s total: LLM response time + tx broadcast + a few block
+   confirmations.
 5. On success, the **Transaction details** panel populates with the real
    hash, from/to addresses, value, block number, gas used, and timestamp,
    plus the agent's own raw reply and a **View on Basescan** link.
 6. On failure (agent didn't report a hash, chat call failed, etc.) the status
-   pill turns red and, where available, the agent's raw reply is still shown
-   so you can see what it actually said.
+   pill turns red, the live feed shows the error inline, and — where
+   available — the agent's raw reply is still shown so you can see what it
+   actually said.
 
 ## Known fragile bits
 
@@ -109,6 +115,22 @@ shell instead.
   later, remember to run `maritime env reload <agent>` — otherwise the agent's
   live session won't see the new value even though `maritime env list` shows
   it as set. (Already applied to all 10 existing agents as of this writing.)
+- **The SSE endpoint (`/api/transfer/stream`) is `GET`, not `POST`**, because
+  browser `EventSource` only supports `GET`. Sender/recipient/amount are
+  passed as query params, not a JSON body — if you extend this, keep that in
+  mind rather than trying to add a request body to the stream request.
+- **One request per `EventSource`.** Submitting again while a previous
+  transfer is still in flight closes the old connection first
+  (`currentSource.close()`) rather than running two in parallel — the backend
+  doesn't track multiple concurrent streams per client. Fine for a single-user
+  demo, would need real session/request IDs to support concurrent transfers.
+- **If the browser tab closes mid-request**, `server.js` detects it via the
+  request's `close` event (`clientGone`) and stops emitting/polling rather
+  than continuing to hammer the RPC for a client that's no longer listening —
+  but the underlying `maritime chat` call itself can't be cancelled once
+  started (the CLI doesn't expose a way to abort it), so the agent's
+  transaction still completes even if you close the tab immediately after
+  submitting.
 
 ## Safety notes
 
