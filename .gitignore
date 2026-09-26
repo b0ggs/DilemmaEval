@@ -14,6 +14,17 @@ dist/
 build/
 coverage/
 
+# Local runtime state (canonical live state also stays outside the repository)
+runtime/
+logs/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+*.journal
+*.jsonl
+
 # Editor and OS files
 .DS_Store
 *.swp

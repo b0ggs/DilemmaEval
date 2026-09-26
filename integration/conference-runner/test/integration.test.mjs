@@ -7,7 +7,9 @@ import { fixtureConfig,createFixtureAdapters } from '../src/fixture.mjs';
 import { validateConfig,prepareRuntimeDirectory,assertCoordinatorEnvironment } from '../src/config.mjs';
 import { createConferenceRunner } from '../src/runner/index.mjs';
 import { buildPublicState } from '../src/public-state.mjs';
-import { assessChainReadiness,assessControlledChainReadiness,validateControlledRuntimeEvidence,validateRuntimeEvidence,rosterFingerprint } from '../src/readiness.mjs';
+import { assessChainReadiness,assessControlledChainReadiness,validateControlledRuntimeEvidence,validateRuntimeEvidence,
+  buildControlledRuntimeEvidence,rosterFingerprint,configFingerprint,runtimeEvidenceFingerprint,
+  TRANSPORT_FINGERPRINT,RUNTIME_EVIDENCE_MAX_AGE_MS } from '../src/readiness.mjs';
 import { createOperatorAdapters } from '../src/operator.mjs';
 import { playerFundingBudget } from '../src/player-funding.mjs';
 
@@ -142,25 +144,54 @@ test('live readiness rejects historical 32-seat config and unverified harness ev
   assert.throws(()=>validateRuntimeEvidence(config,{schema_version:1,run_id:config.run_id,roster_fingerprint:rosterFingerprint(config),verified_at:new Date().toISOString(),game_code_hash:`0x${'ab'.repeat(32)}`,seats:[]}),/TOOL_EXECUTION/);
 });
 
-function controlledEvidence(config) {
-  return {schema_version:1,run_id:config.run_id,roster_fingerprint:rosterFingerprint(config),verified_at:'2026-09-24T20:00:00.000Z',
+function diagnostic(seat,mode,index) {
+  return {schema_version:1,type:'runtime-diagnostic-response',request_id:`diagnostic:${seat.seat_id}:${mode}:${index}`,
+    seat_id:seat.seat_id,team:seat.team,mode,status:'ready',checks:{stdin:true,wallet_identity:true,checkout:true,
+      dependencies:true,wrapper:true,private_state:true,seat_lock:true,chain_id:true,contract_read:true}};
+}
+
+function controlledEvidence(config, now=Date.parse('2026-09-25T18:00:00.000Z')) {
+  const verifiedAt=now-1000;
+  return {schema_version:2,run_id:config.run_id,roster_fingerprint:rosterFingerprint(config),
+    config_fingerprint:configFingerprint(config),transport_fingerprint:TRANSPORT_FINGERPRINT,
+    verified_at:new Date(verifiedAt).toISOString(),expires_at:new Date(verifiedAt+RUNTIME_EVIDENCE_MAX_AGE_MS).toISOString(),
+    confirmed_block_number:'47290000',confirmed_block_hash:`0x${'cd'.repeat(32)}`,
     sdk:{package:'maritime-sdk',version:'0.6.0',maxRetries:0},ready_for_controlled_gameplay:true,
-    seats:config.roster.map(seat=>({seat_id:seat.seat_id,agent_id:seat.agent_id,harness:seat.harness,
+    seats:config.roster.map((seat,index)=>({seat_id:seat.seat_id,agent_id:seat.agent_id,harness:seat.harness,
       wallet_address:seat.wallet_address.toLowerCase(),framework_status_verified:true,direct_runtime_inspection_verified:true,
       wallet_identity_verified:true,persistent_storage_verified:true,tool_execution_verified:true,
       gameplay_command:['node',`/volume/${seat.seat_id}/player-cli.mjs`,`/volume/${seat.seat_id}/seat.json`],
-      persistent_bundles_verified:false,model_profile_verified:false,spectator_access_blocked:false}))};
+      artifact_sha256:'ab'.repeat(32),activation_generation:index,final_agent_status:'sleeping',sleep_confirmed:true,
+      lifecycle_ambiguous:false,model_profile:{model_endpoint:'https://api.maritime.sh/api/llm/v1',model:'gpt-5.4-mini',
+        reasoning_effort:'low',max_output_tokens:2048,automatic_fallback:false},
+      diagnostics:{gameplay_input:diagnostic(seat,'gameplay-input',index),commit_input:diagnostic(seat,'commit-input',index)},
+      persistent_bundles_verified:false,model_profile_verified:true,spectator_access_blocked:false}))};
 }
 
 test('controlled rehearsal accepts exact provision evidence while strict live readiness keeps later proof gates',async()=>{
-  const config=await fixtureConfig();const evidence=controlledEvidence(config);
-  assert.equal(validateControlledRuntimeEvidence(config,evidence),evidence);
-  assert.throws(()=>validateRuntimeEvidence(config,evidence),/CODE_HASH/);
-  assert.throws(()=>validateRuntimeEvidence(config,{...evidence,game_code_hash:`0x${'ab'.repeat(32)}`}),/PERSISTENT_BUNDLES/);
+  const config=await fixtureConfig();const now=Date.parse('2026-09-25T18:00:00.000Z');const evidence=controlledEvidence(config,now);
+  assert.equal(validateControlledRuntimeEvidence(config,evidence,{now}),evidence);
+  assert.throws(()=>validateRuntimeEvidence(config,evidence),/IDENTITY_MISMATCH/);
+});
+
+test('controlled evidence builder binds public diagnostics to the current config and transport',async()=>{
+  const config=await fixtureConfig();const now=Date.parse('2026-09-25T18:00:00.000Z');
+  const seed=controlledEvidence(config,now);
+  const evidence=buildControlledRuntimeEvidence(config,{confirmedBlockNumber:seed.confirmed_block_number,
+    confirmedBlockHash:seed.confirmed_block_hash,seats:seed.seats,now});
+  assert.equal(evidence.verified_at,new Date(now).toISOString());
+  assert.equal(evidence.expires_at,new Date(now+RUNTIME_EVIDENCE_MAX_AGE_MS).toISOString());
+  assert.equal(evidence.config_fingerprint,configFingerprint(config));
+  assert.equal(evidence.transport_fingerprint,TRANSPORT_FINGERPRINT);
+  assert.equal(validateControlledRuntimeEvidence(config,evidence,{now}),evidence);
+  const reordered=Object.fromEntries(Object.entries(evidence).reverse());
+  assert.equal(runtimeEvidenceFingerprint(reordered),runtimeEvidenceFingerprint(evidence));
+  assert.throws(()=>buildControlledRuntimeEvidence(config,{confirmedBlockNumber:seed.confirmed_block_number,
+    confirmedBlockHash:seed.confirmed_block_hash,seats:[...seed.seats,{...seed.seats[0]}],now}),/SEAT_IDENTITY/);
 });
 
 test('controlled rehearsal rejects incomplete proof, unpinned SDK, unsafe commands and seat identity drift',async()=>{
-  const config=await fixtureConfig();
+  const config=await fixtureConfig();const now=Date.parse('2026-09-25T18:00:00.000Z');
   for(const mutate of [
     evidence=>evidence.ready_for_controlled_gameplay=false,
     evidence=>evidence.seats[0].direct_runtime_inspection_verified=false,
@@ -169,7 +200,24 @@ test('controlled rehearsal rejects incomplete proof, unpinned SDK, unsafe comman
     evidence=>evidence.seats[0].gameplay_command=['node','/volume/private/player-cli.mjs','/volume/seat.json'],
     evidence=>evidence.seats[0].wallet_address=config.roster[1].wallet_address,
     evidence=>evidence.seats[0].agent_id=config.roster[1].agent_id
-  ]) {const evidence=controlledEvidence(config);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence));}
+  ]) {const evidence=controlledEvidence(config,now);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now}));}
+});
+
+test('controlled rehearsal requires fresh exact-path diagnostics from one safe lifecycle generation',async()=>{
+  const config=await fixtureConfig();const now=Date.parse('2026-09-25T18:00:00.000Z');
+  for(const [mutate,code] of [
+    [e=>e.expires_at=new Date(now).toISOString(),/EXPIRED/],
+    [e=>e.verified_at=new Date(now+1).toISOString(),/EXPIRED/],
+    [e=>e.transport_fingerprint='00'.repeat(32),/IDENTITY/],
+    [e=>e.config_fingerprint='00'.repeat(32),/IDENTITY/],
+    [e=>e.seats[0].diagnostics.commit_input.status='error',/DIAGNOSTIC/],
+    [e=>e.seats[0].diagnostics.commit_input.choice='steal',/PRIVATE_FIELD/],
+    [e=>e.seats[0].diagnostics.commit_input.commit_choice='steal',/PRIVATE_FIELD/],
+    [e=>e.seats[0].raw_provider_response={ok:true},/PRIVATE_FIELD/],
+    [e=>e.seats[0].diagnostics.commit_input.request_id=e.seats[0].diagnostics.gameplay_input.request_id,/IDENTITY_REUSED/],
+    [e=>e.seats[0].sleep_confirmed=false,/LIFECYCLE/],
+    [e=>e.seats[0].lifecycle_ambiguous=true,/LIFECYCLE/]
+  ]) {const evidence=controlledEvidence(config,now);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now}),code);}
 });
 
 test('controlled chain readiness permits only bounded longer rehearsal windows',async()=>{

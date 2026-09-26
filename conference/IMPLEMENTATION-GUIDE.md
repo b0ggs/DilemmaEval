@@ -1,9 +1,11 @@
 # Conference demo implementation guide
 
+> **Current operators:** Read [CURRENT-STATUS.md](CURRENT-STATUS.md) first and execute [TAKEOVER-IMPLEMENTATION-CHECKLIST.md](TAKEOVER-IMPLEMENTATION-CHECKLIST.md). This guide preserves the original three-agent design and build sequence. Its three-agent targets, old readiness claims, and unchecked milestones are chronological/historical wherever they conflict with the canonical current status.
+
 **Event:** September 25, 2026, America/New_York.
 **Branch:** `codex/converge-demo-2026-09-25`, created from `bcc7490`.
-**Starting scope:** three Maritime agents, two spectator rooms, continuous games on Base Sepolia.
-**Implementation status:** local implementation and fixture integration tested; credential smoke check passed; live setup and rehearsal remain outstanding. See [RUN-STATUS.md](RUN-STATUS.md) for verified progress.
+**Historical starting scope:** three Maritime agents, two spectator rooms, continuous games on Base Sepolia.
+**Status when this guide was written:** local implementation and fixture integration tested; credential smoke check passed; live setup and rehearsal remained outstanding. See [CURRENT-STATUS.md](CURRENT-STATUS.md) for the active target and verified present state.
 
 **Development workflow:** follow the root [AGENTS.md](../AGENTS.md) for concurrent sub-agent assignments, exclusive file ownership, and lead-owned integration.
 

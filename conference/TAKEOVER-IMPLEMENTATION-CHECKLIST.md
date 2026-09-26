@@ -4,6 +4,7 @@
 **Branch:** `codex/converge-demo-2026-09-25`
 **Working target:** five existing OpenClaw agents versus five existing Hermes agents on Base Sepolia.
 **Fallback:** the independently proven three-agent configuration remains available, but must not be substituted silently for 5v5 acceptance.
+**Canonical status:** [CURRENT-STATUS.md](CURRENT-STATUS.md)
 
 This checklist replaces launch-first debugging. Do not create another game until the prelaunch gate below passes for all ten seats during the same bounded preparation run. Local fixtures, direct runtime inspection, and cached transactions are useful evidence, but none alone proves readiness for a fresh game.
 
@@ -19,36 +20,36 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 ## Phase 0 — preserve the implementation
 
-- [ ] Confirm the current branch and working tree before any Git operation.
-- [ ] Inventory all modified and untracked files. Classify each as source, test, documentation, public evidence, private runtime state, dependency output, or temporary artifact.
-- [ ] Secret-scan the complete intended commit set. Inspect suspicious matches manually; transaction hashes and public addresses are not secrets, but private keys, API tokens, raw environment files, sessions, and commit bundles are forbidden.
-- [ ] Confirm `node_modules`, private configuration links, runtime databases, journals, logs, and temporary proof directories are ignored.
-- [ ] Preserve the private operator, provisioning, player, Telegram, and scoreboard state in place. Record their locations without copying their contents into the repository.
-- [ ] Create a recoverable checkpoint commit containing the intended conference source, tests, documentation, and sanitized evidence. Do not leave the entire conference implementation dependent on one untracked checkout.
-- [ ] Verify the checkpoint with `git status`, `git diff --check`, and a clean secret scan of the committed tree.
+- [x] Confirm the current branch and working tree before any Git operation. Verified on `codex/converge-demo-2026-09-25` before checkpoint commit `688f3b9`.
+- [x] Inventory all modified and untracked files. The checkpoint set was classified before `688f3b9`; this hardening tranche contains only source, tests, documentation, and `.gitignore` changes.
+- [x] Secret-scan the complete intended commit set. The intended checkpoint tree passed the takeover scan before commit `688f3b9`; transaction hashes and public addresses were treated as public data, while private keys, API tokens, raw environment files, sessions, and commit bundles remained forbidden.
+- [x] Confirm `node_modules`, private configuration links, runtime databases, journals, logs, and temporary proof directories are ignored. Runtime patterns were added to `.gitignore`; canonical state remains outside the repository.
+- [x] Preserve the private operator, provisioning, player, Telegram, and scoreboard state in place. The existing `conference-secrets-local` link, `/Users/wade/.local/state/dilemmaeval-conference`, and `/private/tmp/dilemma-*` directories were left untouched; their contents were not copied or printed.
+- [x] Create a recoverable checkpoint commit containing the intended conference source, tests, documentation, and sanitized evidence. Commit `688f3b9` is the takeover checkpoint.
+- [x] Verify the checkpoint with `git status`, `git diff --check`, and a clean secret scan of the committed tree. The verification applies to `688f3b9`; subsequent implementation edits must be verified separately before their next checkpoint.
 
 **Exit condition:** the current implementation can be recovered from Git without including secrets or private runtime state.
 
 ## Phase 1 — establish one truthful scope and status
 
-- [ ] Make 5v5 the explicit active implementation target in one short current-status section.
-- [ ] Label the original three-agent guide and older handoffs as historical where they conflict with the active target.
-- [ ] Preserve the three-agent Games 12–14 as proven baseline evidence; do not relabel them as 5v5 evidence.
-- [ ] Record Games 15–17 as failed 5v5 attempts, including their exact pre-signing/runtime failure and cleanup status.
-- [ ] Remove or correct stale completion boxes that claim no real game has completed.
-- [ ] Name one canonical checklist and one canonical current-status section. Older chronological evidence may remain, but must not function as competing instructions.
+- [x] Make 5v5 the explicit active implementation target in one short current-status section.
+- [x] Label the original three-agent guide and older handoffs as historical where they conflict with the active target.
+- [x] Preserve the three-agent Games 12–14 as proven baseline evidence; do not relabel them as 5v5 evidence.
+- [x] Record Games 15–17 as failed 5v5 attempts, including their exact pre-signing/runtime failure and cleanup status.
+- [x] Remove or correct stale completion boxes that claim no real game has completed. Historical unchecked boxes remain only inside the explicitly labeled chronological archive.
+- [x] Name one canonical checklist and one canonical current-status section. Older chronological evidence may remain, but must not function as competing instructions.
 
 **Exit condition:** a new operator can identify the active target, current safe state, proven baseline, and next gate without interpreting contradictory documents.
 
 ## Phase 2 — restore a trustworthy local test baseline
 
-- [ ] Reproduce the deterministic failing test: `ambiguous lifecycle refresh is inspected and never blindly replayed`.
-- [ ] Determine whether the third Hermes configuration write is required for a new activation generation or is an unintended replay.
-- [ ] Correct the implementation or the invariant—not merely the assertion—and add a test proving ambiguous repair is inspected before any repeat mutation.
-- [ ] Make the conference-runner default test command deterministic. Either remove wall-clock-sensitive assumptions under parallel load or run this suite with an explicit safe test concurrency.
-- [ ] Run the conference-runner suite to zero failures and zero cancellations.
-- [ ] Run the site suite and the changed shared package suites: game bridge, harness adapters, Maritime transport, orchestrator core, and team logs.
-- [ ] Run `git diff --check`.
+- [x] Reproduce the deterministic failing test: `ambiguous lifecycle refresh is inspected and never blindly replayed`.
+- [x] Determine whether the third Hermes configuration write is required for a new activation generation or is an unintended replay. It is required after the confirmed sleep/reload generation boundary can rematerialize configuration.
+- [x] Correct the implementation or the invariant—not merely the assertion—and add a test proving ambiguous repair is inspected before any repeat mutation. The test also proves a stable rerun performs no fourth write.
+- [x] Make the conference-runner default test command deterministic. The package default now uses `--test-concurrency=1`.
+- [x] Run the conference-runner suite to zero failures and zero cancellations. Result: 255/255.
+- [x] Run the site suite and the changed shared package suites: game bridge, harness adapters, Maritime transport, orchestrator core, and team logs. Result: 199/199.
+- [x] Run `git diff --check`.
 
 **Exit condition:** all affected local suites pass using the documented default commands. A targeted pass cannot override a red full suite.
 
@@ -56,27 +57,27 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 ### 3.1 Diagnostic protocol
 
-- [ ] Add a dedicated diagnostic request/response type. Do not disguise diagnostics as `join`, `commit`, or another gameplay action.
-- [ ] Make the diagnostic consume staged JSON through the same stdin redirect or pipe mechanism used by live gameplay.
-- [ ] Add a commit-shaped diagnostic in which the agent selects `share`, `steal`, or `catch`, while the player runtime validates the sibling `choice` location without preparing a bundle, signing, submitting, or returning the selected choice.
-- [ ] Ensure diagnostic execution cannot create a gameplay operation journal, transaction, commit bundle, claim, refund, or phase action.
-- [ ] Return only fixed public readiness fields and allowlisted error codes.
+- [x] Add a dedicated diagnostic request/response type. Do not disguise diagnostics as `join`, `commit`, or another gameplay action.
+- [x] Make the diagnostic consume staged JSON through the same stdin redirect or pipe mechanism used by live gameplay.
+- [x] Add a commit-shaped diagnostic in which the agent selects `share`, `steal`, or `catch`, while the player runtime validates the sibling `choice` location without preparing a bundle, signing, submitting, or returning the selected choice.
+- [x] Ensure diagnostic execution cannot create a gameplay operation journal, transaction, commit bundle, claim, refund, or phase action.
+- [x] Return only fixed public readiness fields and allowlisted error codes.
 
 ### 3.2 Per-seat checks
 
-- [ ] Verify exact seat, harness, agent ID, team, wallet address, chain ID, game address, and runtime paths.
-- [ ] Derive the injected wallet address locally inside the agent and match it to the roster without returning the key.
-- [ ] Verify the pinned clean checkout, source revision, absence of a Foundry `.env`, required game CLI, dependencies, and executable wrapper.
-- [ ] Verify private state directory access and lock acquisition/release without reading bundles or request journals.
-- [ ] Perform bounded read-only `eth_chainId`, contract-state, admission, and cause checks through the same player bridge prerequisites used before signing.
-- [ ] Verify the effective `gpt-5.4-mini` model profile and native tool execution for both harnesses.
-- [ ] Exercise wake, environment reload, harness configuration, model configuration, staged request write, native chat/tool invocation, CLI stdin, response validation, and confirmed sleep.
-- [ ] Run within the verified five-awake capacity and fail if an unrelated awake agent consumes a required slot.
+- [x] Verify exact seat, harness, agent ID, team, wallet address, chain ID, game address, and runtime paths in the diagnostic implementation and local tests.
+- [x] Derive the injected wallet address locally inside the agent and match it to the roster without returning the key.
+- [x] Verify the pinned clean checkout, source revision, absence of a Foundry `.env`, required game CLI, dependencies, and executable wrapper.
+- [x] Verify private state directory access and lock acquisition/release without reading bundles or request journals.
+- [x] Perform bounded read-only `eth_chainId`, contract-state, admission, and cause checks through the same player bridge prerequisites used before signing.
+- [x] Verify the configured `gpt-5.4-mini` model profile and native tool execution path in local adapter tests. Actual all-ten live verification remains a Phase 6 item.
+- [x] Exercise wake, environment reload, harness configuration, model configuration, staged request write, native chat/tool invocation, CLI stdin, response validation, and confirmed sleep in local adapter tests.
+- [x] Run within the five-awake scheduler and fail if an unrelated awake agent consumes a required slot in local tests. The live account check remains a Phase 6 item.
 
 ### 3.3 Fresh evidence
 
 - [ ] Produce one durable readiness record containing run ID, roster fingerprint, agent IDs, artifact hashes, transport/protocol version, activation generation, model profile, timestamps, and per-seat diagnostic results.
-- [ ] Enforce a short maximum evidence age, initially ten minutes, at game preparation and again immediately before creation.
+- [x] Enforce a short maximum evidence age, initially ten minutes, at game preparation and again immediately before creation.
 - [ ] Invalidate evidence when roster identity, runtime artifact, transport code, player CLI, model configuration, activation generation, chain ID, game address, or relevant defaults change.
 - [ ] Require all ten seats to pass in the same bounded readiness run.
 - [ ] Require all agents to be confirmed sleeping at the end of readiness, with no poisoned awake lease or ambiguous lifecycle operation.
@@ -85,17 +86,17 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 ## Phase 4 — harden proof control and evidence
 
-- [ ] Persist every dispatch attempt before remote work begins.
-- [ ] Persist success, explicit rejection, pre-submit expiry, timeout, ambiguity, cancellation, and late completion in a `finally`-safe path.
-- [ ] Ensure the first seat failure does not erase the outcomes of other already-running seat dispatches.
-- [ ] Reconcile every reported transaction against the expected wallet, contract, game, round, operation event, confirmed canonical receipt, and current chain snapshot.
-- [ ] Add a regression for the Game 17 shape: one transport failure, nine confirmed joins, and complete evidence for all ten attempted seats.
-- [ ] Bind the one-game creation fuse to the exact config digest and fresh readiness-evidence digest.
+- [x] Persist every dispatch attempt before remote work begins.
+- [x] Persist success, explicit rejection, pre-submit expiry, timeout, ambiguity, cancellation, and late completion through the durable proof journal.
+- [x] Ensure the first seat failure does not erase the outcomes of other already-running seat dispatches.
+- [x] Reconcile every reported transaction against the expected wallet, contract, game, round, operation event, confirmed canonical receipt, and current chain snapshot through the independent proof auditor.
+- [x] Add a regression for the Game 17 shape: one transport failure, nine late successful outcomes, and complete evidence for all ten attempted seats.
+- [x] Bind the one-game creation fuse to the exact config digest and fresh readiness-evidence digest.
 - [ ] Refuse creation if the operator journal has an unresolved transaction, any owner or player nonce is pending, another runner/operator is active, or a game is already active.
 - [ ] Replace expired, workstation-specific proof preparation with a versioned repository command that accepts explicit paths and deadlines.
 - [ ] Make preparation safe to rerun into a new directory while refusing to overwrite an existing fuse, journal, evidence record, or runtime.
 - [ ] Add a read-only `plan`/`status` command that shows gates and fixed error codes without loading a signing key or printing secrets.
-- [ ] Keep `candidate_proof_complete` non-authoritative. Only the independent chain/Telegram audit may mark a proof complete.
+- [x] Keep `candidate_proof_complete` non-authoritative. Only the independent chain/Telegram audit may mark a proof complete.
 
 **Exit condition:** a failed or interrupted proof leaves enough durable, sanitized evidence to reconcile every seat and transaction without guessing or blindly retrying.
 
@@ -103,13 +104,13 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 - [ ] Run repeated ten-seat fixture games through discussion, commit, reveal, result, claims/refunds, scoreboards, and restart recovery.
 - [ ] Exercise five-awake scheduling with slow, rejected, timed-out, and abort-ignoring adapters.
-- [ ] Verify a phase change aborts pending discussion and cannot dispatch stale commits.
-- [ ] Verify an incomplete discussion blocks all commits.
-- [ ] Verify a Telegram outage does not stop gameplay and that recovery does not duplicate uncertain sends.
-- [ ] Verify scoreboards exclude funding, refunds, claims, cancellations, duplicate events, and historical unequal-roster games.
-- [ ] Verify both team rooms receive only their own agent strategy while Dealer status/results reach both.
+- [x] Verify a phase change aborts pending discussion and cannot dispatch stale commits.
+- [x] Verify an incomplete discussion blocks all commits.
+- [x] Verify a Telegram outage does not stop gameplay and that recovery does not duplicate uncertain sends.
+- [x] Verify scoreboards exclude funding, refunds, claims, cancellations, duplicate events, and historical unequal-roster games.
+- [x] Verify both team rooms receive only their own agent strategy while Dealer status/results reach both.
 - [ ] Exercise graceful restart after completed joins and a simulated crash around a pending non-signing adapter call.
-- [ ] Run the independent proof auditor against valid and deliberately corrupted fixtures.
+- [x] Run the independent proof auditor against valid and deliberately corrupted fixtures.
 
 **Exit condition:** the assembled local system passes all acceptance and failure-path tests without live agents or chain writes.
 

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAgentPrompt, createMaritimeAdapter as rawMaritimeAdapter, reconcileRoster } from '../../src/maritime/index.mjs';
-import { buildPublicRequestArtifact, buildGameplayShellCommand, stagePublicRequest } from '../../src/maritime/transport.mjs';
+import { buildPublicRequestArtifact, buildGameplayShellCommand, stagePublicRequest,
+  buildRuntimeDiagnosticArtifact, buildRuntimeDiagnosticShellCommand } from '../../src/maritime/transport.mjs';
 import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -87,6 +88,111 @@ test('exact shell commands deliver hostile request text and agent-selected commi
   }
 });
 
+test('runtime diagnostic uses the gameplay CLI stdin path while keeping commit choice outside the staged request', async t => {
+  const root = await fs.realpath(await fs.mkdtemp(join(tmpdir(), 'conference-diagnostic-shell-')));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const cli = join(root, 'player-cli.mjs');
+  await fs.writeFile(cli, 'let text="";for await(const part of process.stdin)text+=part;process.stdout.write(text);');
+  const binding = { gameplay_command: ['node', cli, join(root, 'seat.json')] };
+  for (const mode of ['gameplay-input', 'commit-input']) {
+    const request = diagnostic(mode);
+    const artifact = buildRuntimeDiagnosticArtifact(request, binding, 'openclaw');
+    await fs.mkdir(join(root, 'public-requests'), { recursive: true });
+    await fs.writeFile(artifact.path, artifact.content);
+    assert.deepEqual(JSON.parse(artifact.content), { request });
+    assert.equal(artifact.content.includes('"choice"'), false);
+    const command = buildRuntimeDiagnosticShellCommand(request, binding, artifact.path,
+      mode === 'commit-input' ? 'steal' : undefined);
+    assert.match(command, /--diagnose/);
+    const { stdout } = await promisify(execFile)('/bin/sh', ['-c', command]);
+    assert.deepEqual(JSON.parse(stdout), { request, ...(mode === 'commit-input' ? { choice: 'steal' } : {}) });
+  }
+});
+
+test('diagnose runs v2-bound exact staging, chat, and confirmed-sleep lifecycle without returning choice data', async () => {
+  const order = [];
+  const adapter = rawMaritimeAdapter({ config, apiKey: 'test-credential', runtimeEvidence: runtimeEvidenceV2(),
+    oneAwake: true, wakeDelayMs: 0, fetchImpl: async (url, options) => {
+      const path = new URL(url).pathname;
+      const body = options.body ? JSON.parse(options.body) : undefined;
+      if (path.endsWith('/reload-env')) { order.push('reload'); return jsonResponse({ status: 'active' }); }
+      if (path.endsWith('/exec') && body.command[1] === '--input-type=module') {
+        order.push('stage');
+        const spec = JSON.parse(body.command[4]);
+        assert.deepEqual(Object.keys(JSON.parse(spec.content)), ['request']);
+        assert.match(spec.artifact_id, /^runtime-diagnostic:/);
+        return jsonResponse({ exitCode: 0, stdout: JSON.stringify({ ready: true, sha256: spec.sha256 }), stderr: '' });
+      }
+      if (path.endsWith('/exec')) {
+        order.push('model');
+        return jsonResponse({ exitCode: 0, stdout: JSON.stringify(modelConfigurationEvidence(roster[0])), stderr: '' });
+      }
+      if (path.endsWith('/chat')) {
+        order.push('chat');
+        assert.match(body.message, /non-signing runtime diagnostic/);
+        assert.match(body.message, /--diagnose/);
+        const request = JSON.parse(body.message.split('REQUEST_JSON\n')[1]);
+        if (request.mode === 'commit-input') assert.match(body.message, /YOUR_CHOICE/);
+        return jsonResponse({ response: JSON.stringify(diagnosticReply(request)) });
+      }
+      if (path.endsWith('/sleep')) { order.push('sleep'); return jsonResponse({ status: 'sleeping' }); }
+      throw new Error(`unexpected ${path}`);
+    } });
+  for (const mode of ['gameplay-input', 'commit-input']) {
+    const request = diagnostic(mode, roster[0], `:${order.length}`);
+    const result = await adapter.diagnose({ seat: roster[0], request });
+    assert.deepEqual(result, diagnosticReply(request));
+    assert.equal(JSON.stringify(result).includes('choice'), false);
+  }
+  assert.deepEqual(order, [
+    'reload', 'model', 'stage', 'chat', 'sleep',
+    'reload', 'model', 'stage', 'chat', 'sleep'
+  ]);
+});
+
+test('diagnose fails closed on extra response data and unconfirmed sleep, poisoning one-awake rotation', async () => {
+  for (const failure of ['extra-response', 'unconfirmed-sleep']) {
+    const calls = [];
+    const adapter = rawMaritimeAdapter({ config, apiKey: 'test-credential', runtimeEvidence: runtimeEvidence(),
+      oneAwake: true, wakeDelayMs: 0, fetchImpl: async (url, options) => {
+        const path = new URL(url).pathname; calls.push(path);
+        const body = options.body ? JSON.parse(options.body) : undefined;
+        if (path.endsWith('/reload-env')) return jsonResponse({ status: 'active' });
+        if (path.endsWith('/exec') && body.command[1] === '--input-type=module') {
+          const spec = JSON.parse(body.command[4]);
+          return jsonResponse({ exitCode: 0, stdout: JSON.stringify({ ready: true, sha256: spec.sha256 }), stderr: '' });
+        }
+        if (path.endsWith('/exec')) return jsonResponse({ exitCode: 0,
+          stdout: JSON.stringify(modelConfigurationEvidence(roster[0])), stderr: '' });
+        if (path.endsWith('/chat')) {
+          const request = JSON.parse(body.message.split('REQUEST_JSON\n')[1]);
+          return jsonResponse({ response: JSON.stringify({ ...diagnosticReply(request),
+            ...(failure === 'extra-response' ? { choice: 'share' } : {}) }) });
+        }
+        if (path.endsWith('/sleep')) return jsonResponse({ status: 'active' });
+        throw new Error(`unexpected ${path}`);
+      } });
+    const first = diagnostic('commit-input', roster[0], `:${failure}`);
+    await assert.rejects(adapter.diagnose({ seat: roster[0], request: first }), error =>
+      error.ambiguous === true && error.code === (failure === 'extra-response' ?
+        'MARITIME_DIAGNOSTIC_RESPONSE_INVALID' : 'MARITIME_SLEEP_UNCONFIRMED'));
+    const before = calls.length;
+    await assert.rejects(adapter.diagnose({ seat: roster[0], request: diagnostic('gameplay-input', roster[0], `:${failure}:next`) }),
+      error => error.code === 'MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED' && !error.ambiguous);
+    assert.equal(calls.length, before);
+  }
+});
+
+test('an expired unsent diagnostic makes no remote mutation and can retry its stable identity', async () => {
+  let calls = 0;
+  const request = diagnostic();
+  const adapter = rawMaritimeAdapter({ config, apiKey: 'test-credential', runtimeEvidence: runtimeEvidence(),
+    oneAwake: true, wakeDelayMs: 0, fetchImpl: async () => { calls++; throw new Error('must not call'); } });
+  await assert.rejects(adapter.diagnose({ seat: roster[0], request, deadline_at_ms: Date.now() - 1 }),
+    error => error.code === 'MARITIME_DISPATCH_EXPIRED' && error.retryable && !error.ambiguous);
+  assert.equal(calls, 0);
+});
+
 test('staging verifies digest before chat, retries only its uncertain write once, and discussion never stages', async () => {
   for (const mode of ['success', 'uncertain-once', 'mismatch', 'persistent-uncertain', 'discussion']) {
     const calls = [];
@@ -124,6 +230,23 @@ function runtimeEvidence(configuration = config) {
       `/volume/${row.agent_id}/dilemma-conference/${row.seat_id}/code/integration/conference-runner/src/maritime/player-cli.mjs`,
       `/volume/${row.agent_id}/dilemma-conference/${row.seat_id}/seat.json`]
   })) };
+}
+
+function runtimeEvidenceV2(configuration = config) {
+  return { ...runtimeEvidence(configuration), schema_version: 2 };
+}
+
+function diagnostic(mode = 'gameplay-input', seat = roster[0], suffix = '') {
+  return { schema_version: 1, type: 'runtime-diagnostic', request_id: `diagnostic:${seat.seat_id}:${mode}${suffix}`,
+    seat_id: seat.seat_id, team: seat.team, mode, chain_state: { chain_id: 84532,
+      game_address: config.game_address, confirmed_block_number: '123', confirmed_block_hash: `0x${'a'.repeat(64)}` } };
+}
+
+function diagnosticReply(request) {
+  return { schema_version: 1, type: 'runtime-diagnostic-response', request_id: request.request_id,
+    seat_id: request.seat_id, team: request.team, mode: request.mode, status: 'ready',
+    checks: { stdin: true, wallet_identity: true, checkout: true, dependencies: true, wrapper: true,
+      private_state: true, seat_lock: true, chain_id: true, contract_read: true } };
 }
 
 function modelConfigurationEvidence(seat) {

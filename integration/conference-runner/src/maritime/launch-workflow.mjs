@@ -502,6 +502,11 @@ export function createConferenceLaunchWorkflow({ config, runtimeDir, maritime, a
     const generation = state.activation_generation ?? 0;
     let configurationStage = state.post_restart_configuration ?? 'unstarted';
     const priorRepairStage = state.post_restart_configuration_repair ?? 'unstarted';
+    // A completed configuration belongs only to the activation generation in
+    // which it was observed. A lifecycle reload can rematerialize config.yaml,
+    // so the new generation needs its own configuration. An ambiguous intent,
+    // however, is never discarded solely because the generation changed: it
+    // must be inspected before any later mutation is authorized.
     if (state.post_restart_configuration_generation !== generation &&
         configurationStage !== 'intent' && priorRepairStage !== 'intent') {
       configurationStage = 'unstarted';

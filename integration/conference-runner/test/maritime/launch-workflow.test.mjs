@@ -361,23 +361,44 @@ test('ambiguous completed Hermes repair resumes only when inspection proves the 
   assert.equal(first.ready_for_controlled_gameplay, false);
   await assert.rejects(f.make({ reverifyIncomplete: true }).launch(), error =>
     error.code === 'HERMES_POST_RESTART_CONFIGURATION_REPAIR_OUTCOME_UNKNOWN' && error.ambiguous);
+  const ambiguousRepairIndex = f.calls.findLastIndex(call => call.method === 'configureHarnessConfiguration');
+  const inspectionBeforeRepair = f.calls.findLastIndex((call, index) =>
+    index < ambiguousRepairIndex && call.method === 'inspectHarnessConfiguration');
+  assert.ok(inspectionBeforeRepair >= 0);
   const recovered = await f.make({ reverifyIncomplete: true }).launch();
   assert.equal(recovered.ready_for_controlled_gameplay, true);
+  const inspectionAfterRepair = f.calls.findIndex((call, index) =>
+    index > ambiguousRepairIndex && call.method === 'inspectHarnessConfiguration');
+  assert.ok(inspectionAfterRepair > ambiguousRepairIndex);
   assert.equal(f.calls.filter(call => call.method === 'restart').length, 1);
   assert.equal(f.calls.filter(call => call.method === 'configureHarnessConfiguration').length, 2);
   assert.equal(f.calls.filter(call => call.method === 'chat' && call.id === 'fresh-conference-hs-1').length, 1);
 });
 
-test('ambiguous lifecycle refresh is inspected and never blindly replayed', async t => {
+test('ambiguous lifecycle refresh is inspected before required next-generation configuration', async t => {
   const f = await fixture(t, { enforceOneAwake: true, invalidateConfigurationBeforeVerification: true,
     repairFailureAfterCompletion: true });
   const make = () => f.make({ oneAwake: true });
   await assert.rejects(make().launch(), error => error.code === 'RUNTIME_VERIFICATION_ROTATION_UNKNOWN');
+  const configurationsAfterAmbiguousResponse = f.calls
+    .map((call, index) => ({ call, index })).filter(row => row.call.method === 'configureHarnessConfiguration');
+  assert.equal(configurationsAfterAmbiguousResponse.length, 2);
   const recovered = await make().launch();
   assert.equal(recovered.ready_for_controlled_gameplay, true);
+  const configurationsAfterRecovery = f.calls
+    .map((call, index) => ({ call, index })).filter(row => row.call.method === 'configureHarnessConfiguration');
+  assert.equal(configurationsAfterRecovery.length, 3);
+  const ambiguousIndex = configurationsAfterRecovery[1].index;
+  const nextGenerationIndex = configurationsAfterRecovery[2].index;
+  assert.ok(f.calls.some((call, index) => index > ambiguousIndex && index < nextGenerationIndex &&
+    call.method === 'inspectHarnessConfiguration'));
+  assert.ok(f.calls.some((call, index) => index > ambiguousIndex && index < nextGenerationIndex &&
+    call.method === 'sleep' && call.id === 'fresh-conference-hs-1'));
+  assert.ok(f.calls.some((call, index) => index > ambiguousIndex && index < nextGenerationIndex &&
+    call.method === 'reloadEnv' && call.id === 'fresh-conference-hs-1'));
   await make().launch();
   assert.equal(f.calls.filter(call => call.method === 'restart').length, 1);
-  assert.equal(f.calls.filter(call => call.method === 'configureHarnessConfiguration').length, 2);
+  assert.equal(f.calls.filter(call => call.method === 'configureHarnessConfiguration').length, 3);
   assert.equal(f.calls.filter(call => call.method === 'chat' && call.id === 'fresh-conference-hs-1').length, 1);
 });
 

@@ -1,7 +1,11 @@
-export { createMaritimeAdapter, MaritimeAdapterError, MARITIME_API_BASE, buildAgentPrompt } from './transport.mjs';
-export { validateDiscussionRequest, validateDiscussionResponse, discussionToLogResponse, validateGameplayResponse } from './protocol.mjs';
+export { createMaritimeAdapter, MaritimeAdapterError, MARITIME_API_BASE, buildAgentPrompt,
+  buildRuntimeDiagnosticPrompt, buildRuntimeDiagnosticArtifact,
+  buildRuntimeDiagnosticShellCommand } from './transport.mjs';
+export { validateDiscussionRequest, validateDiscussionResponse, discussionToLogResponse, validateGameplayResponse,
+  validateRuntimeDiagnosticRequest, validateRuntimeDiagnosticInput,
+  validateRuntimeDiagnosticResponse } from './protocol.mjs';
 export { validateMaritimeRoster, reconcileRoster } from './roster.mjs';
-export { createPlayerRuntime, validatePlayerSettings } from './player-runtime.mjs';
+export { createPlayerRuntime, validatePlayerSettings, createPlayerContractVerifier } from './player-runtime.mjs';
 export { HERMES_RUNTIME_IDENTITY, runtimeIdentityForSettings } from './runtime-identity.mjs';
 export { buildInstallArtifact, createMaritimeInstaller, verifyPublicArtifactIntegrity,
   INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH } from './install.mjs';

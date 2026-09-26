@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { buildInvocation, createJsonRpcChainVerifier, deriveEthereumAddress, FROZEN_NETWORK, PINNED_GAME_REVISION } from '../../../game-bridge/src/index.js';
-import { createPlayerRuntime, buildInstallArtifact, validatePlayerSettings,
+import { createPlayerRuntime, createPlayerContractVerifier, buildInstallArtifact, validatePlayerSettings,
   buildRestrictedYarnWrapper, FOUNDRY_SCRIPT_MAPPINGS, HERMES_TERMINAL_PASSTHROUGH_ENV,
   updateHermesConfigText, configureHermesTerminalEnvPassthrough,
   updateOpenClawConfigText, inspectOpenClawConfigText,
@@ -85,6 +85,134 @@ test('returned wrong or unusable chain IDs are not retried or rewritten before b
     assert.equal(await verify({ rpcUrl: config.rpc_url, expectedChainId: 84532 }), response);
     assert.equal(reads, 1);
   }
+});
+
+test('diagnostic contract verifier reads the exact confirmed block and pinned contract without a signer', async () => {
+  const blockHash = `0x${'a'.repeat(64)}`;
+  let calls = 0;
+  const verify = createPlayerContractVerifier({ fetchImpl: async (url, options) => {
+    calls++;
+    assert.equal(url, config.rpc_url);
+    assert.equal(options.method, 'POST');
+    const body = JSON.parse(options.body);
+    assert.deepEqual(body.map(row => [row.method, row.params]), [
+      ['eth_getBlockByNumber', ['0x7b', false]],
+      ['eth_getCode', [config.game_address, '0x7b']],
+      ['eth_call', [{ to: config.game_address, data: '0x8da5cb5b' }, '0x7b']],
+      ['eth_call', [{ to: config.game_address, data: '0x8ca4f1f5' }, '0x7b']],
+      ['eth_call', [{ to: config.game_address, data: `0x240afc06${'1'.padStart(64, '0')}` }, '0x7b']]
+    ]);
+    return new Response(JSON.stringify([
+      { jsonrpc: '2.0', id: 1, result: { number: '0x7b', hash: blockHash } },
+      { jsonrpc: '2.0', id: 2, result: '0x6000' },
+      { jsonrpc: '2.0', id: 3, result: `0x${FROZEN_NETWORK.owner.slice(2).padStart(64, '0')}` },
+      { jsonrpc: '2.0', id: 4, result: `0x${'0'.repeat(64)}` },
+      { jsonrpc: '2.0', id: 5, result: `0x${'1'.padStart(64, '0')}` }
+    ]));
+  } });
+  assert.deepEqual(await verify({ rpcUrl: config.rpc_url, gameAddress: config.game_address,
+    causeId: 1, blockNumber: '123', blockHash }), { contract_read: true });
+  assert.equal(calls, 1);
+});
+
+test('diagnostic contract verifier rejects active games and non-whitelisted assigned causes', async () => {
+  const blockHash = `0x${'a'.repeat(64)}`;
+  const base = [
+    { jsonrpc: '2.0', id: 1, result: { number: '0x7b', hash: blockHash } },
+    { jsonrpc: '2.0', id: 2, result: '0x6000' },
+    { jsonrpc: '2.0', id: 3, result: `0x${FROZEN_NETWORK.owner.slice(2).padStart(64, '0')}` },
+    { jsonrpc: '2.0', id: 4, result: `0x${'0'.repeat(64)}` },
+    { jsonrpc: '2.0', id: 5, result: `0x${'1'.padStart(64, '0')}` }
+  ];
+  for (const [id, result] of [[4, `0x${'1'.padStart(64, '0')}`], [5, `0x${'0'.repeat(64)}`]]) {
+    const verify = createPlayerContractVerifier({ fetchImpl: async () => new Response(JSON.stringify(
+      base.map(row => row.id === id ? { ...row, result } : row))) });
+    await assert.rejects(verify({ rpcUrl: config.rpc_url, gameAddress: config.game_address,
+      causeId: 1, blockNumber: '123', blockHash }), /PLAYER_DIAGNOSTIC_CONTRACT_CHECK_FAILED/);
+  }
+});
+
+test('diagnostic runtime verifies both stdin shapes without signer, journal, or bundle mutation', async t => {
+  const f = await fixture(t);
+  const privateKey = `0x${'1'.repeat(64)}`;
+  const wallet = deriveEthereumAddress(privateKey);
+  const settings = { ...f.settings, bin_directory: join(f.directory, 'bin'),
+    roster: f.settings.roster.map((row, index) => index === 0 ? { ...row, wallet_address: wallet } : row) };
+  const calls = [];
+  const make = () => createPlayerRuntime({ settings, env: { GAMEPLAY_WALLET_PRIVATE_KEY: privateKey },
+    bridgeFactory: () => assert.fail('runtime diagnostics must not construct gameplay bridges'),
+    diagnosticReaderFactory: () => ({ run: async (operation, options) => {
+      calls.push(['reader', operation, options]);
+      return { exit_code: 0, error: null, parsed: { wallet, isAuthorized: true, agentId: '1' } };
+    } }),
+    checkoutVerifier: async (...args) => { calls.push(['checkout', ...args.slice(0, 1)]); return { ok: true }; },
+    accessImpl: async (path, mode) => { calls.push(['access', path, mode]); },
+    diagnosticChainVerifier: async request => { calls.push(['chain', request]); return { chainId: 84532 }; },
+    diagnosticContractVerifier: async request => { calls.push(['contract', request]); return { contract_read: true }; }
+  });
+  for (const mode of ['gameplay-input', 'commit-input']) {
+    const request = { schema_version: 1, type: 'runtime-diagnostic', request_id: `diagnostic:${mode}`,
+      seat_id: 'oc-1', team: 'openclaw', mode, chain_state: { chain_id: 84532,
+        game_address: config.game_address, confirmed_block_number: '123', confirmed_block_hash: `0x${'a'.repeat(64)}` } };
+    const input = { request, ...(mode === 'commit-input' ? { choice: 'catch' } : {}) };
+    const original = structuredClone(input);
+    const result = await make().diagnose(input);
+    assert.deepEqual(input, original);
+    assert.equal(result.status, 'ready');
+    assert.equal(JSON.stringify(result).includes('catch'), false);
+    assert.deepEqual(Object.values(result.checks), Array(9).fill(true));
+  }
+  assert.equal(calls.filter(row => row[0] === 'checkout').length, 2);
+  assert.equal(calls.filter(row => row[0] === 'reader').length, 2);
+  assert.equal(calls.filter(row => row[0] === 'chain').length, 2);
+  assert.equal(calls.filter(row => row[0] === 'contract').length, 2);
+  assert.deepEqual(await readdir(settings.state_directory), [], 'transient seat lock must be released');
+  assert.equal((await readdir(settings.state_directory)).some(name => ['requests', 'bundles'].includes(name)), false);
+  assert.equal(f.calls.length, 0);
+});
+
+test('diagnostic runtime rejects malformed commit input before filesystem, chain, or bridge work', async t => {
+  const f = await fixture(t);
+  const privateKey = `0x${'1'.repeat(64)}`;
+  const settings = { ...f.settings, bin_directory: join(f.directory, 'bin'),
+    roster: f.settings.roster.map((row, index) => index === 0 ?
+      { ...row, wallet_address: deriveEthereumAddress(privateKey) } : row) };
+  let work = 0;
+  const runtime = createPlayerRuntime({ settings, env: { GAMEPLAY_WALLET_PRIVATE_KEY: privateKey },
+    bridgeFactory: () => { work++; }, checkoutVerifier: async () => { work++; return { ok: true }; },
+    accessImpl: async () => { work++; }, privateDirectoryImpl: async () => { work++; },
+    lockSeatImpl: async () => { work++; return async () => {}; },
+    diagnosticReaderFactory: () => { work++; return { run: async () => { work++; } }; },
+    diagnosticChainVerifier: async () => { work++; }, diagnosticContractVerifier: async () => { work++; } });
+  const request = { schema_version: 1, type: 'runtime-diagnostic', request_id: 'diagnostic:commit',
+    seat_id: 'oc-1', team: 'openclaw', mode: 'commit-input', chain_state: { chain_id: 84532,
+      game_address: config.game_address, confirmed_block_number: '123', confirmed_block_hash: `0x${'a'.repeat(64)}` } };
+  await assert.rejects(runtime.diagnose({ request }), /RUNTIME_DIAGNOSTIC_CHOICE_INVALID/);
+  await assert.rejects(runtime.execute({ request, choice: 'share' }));
+  assert.equal(work, 0);
+});
+
+test('diagnostic runtime requires assigned wallet authorization before its direct chain checks', async t => {
+  const f = await fixture(t);
+  const privateKey = `0x${'1'.repeat(64)}`;
+  const wallet = deriveEthereumAddress(privateKey);
+  const settings = { ...f.settings, bin_directory: join(f.directory, 'bin'),
+    roster: f.settings.roster.map((row, index) => index === 0 ? { ...row, wallet_address: wallet } : row) };
+  let chainReads = 0, released = 0;
+  const runtime = createPlayerRuntime({ settings, env: { GAMEPLAY_WALLET_PRIVATE_KEY: privateKey },
+    bridgeFactory: () => assert.fail('diagnostic must not construct a player bridge'),
+    checkoutVerifier: async () => ({ ok: true }), accessImpl: async () => {},
+    privateDirectoryImpl: async () => {}, lockSeatImpl: async () => async () => { released++; },
+    diagnosticReaderFactory: () => ({ run: async () => ({ exit_code: 0, error: null,
+      parsed: { wallet, isAuthorized: false, agentId: null } }) }),
+    diagnosticChainVerifier: async () => { chainReads++; },
+    diagnosticContractVerifier: async () => { chainReads++; } });
+  const request = { schema_version: 1, type: 'runtime-diagnostic', request_id: 'diagnostic:unauthorized',
+    seat_id: 'oc-1', team: 'openclaw', mode: 'gameplay-input', chain_state: { chain_id: 84532,
+      game_address: config.game_address, confirmed_block_number: '123', confirmed_block_hash: `0x${'a'.repeat(64)}` } };
+  await assert.rejects(runtime.diagnose({ request }), /PLAYER_DIAGNOSTIC_WRAPPER_CHECK_FAILED/);
+  assert.equal(chainReads, 0);
+  assert.equal(released, 1);
 });
 
 test('Linux process birth identity hashes boot and starttime without retaining process names', async () => {

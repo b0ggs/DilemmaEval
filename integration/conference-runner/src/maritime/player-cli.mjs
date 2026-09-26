@@ -22,7 +22,9 @@ export function playerCliErrorCode(error) {
 export async function main(args = process.argv.slice(2), env = process.env, {
   readFileImpl = readFile, stdin = process.stdin, createPlayerRuntimeImpl = createPlayerRuntime
 } = {}) {
-  if (args.length < 1 || args.length > 2 || (args[1] && args[1] !== '--inspect')) throw new TypeError('PLAYER_CLI_ARGUMENTS_INVALID');
+  if (args.length < 1 || args.length > 2 || (args[1] && !['--inspect', '--diagnose'].includes(args[1]))) {
+    throw new TypeError('PLAYER_CLI_ARGUMENTS_INVALID');
+  }
   const settings = parsePlayerJson(await readFileImpl(args[0], 'utf8'), 'PLAYER_SETTINGS_JSON_INVALID');
   const runtime = createPlayerRuntimeImpl({ settings, env });
   if (args[1] === '--inspect') return runtime.inspect();
@@ -36,7 +38,8 @@ export async function main(args = process.argv.slice(2), env = process.env, {
     if (error?.code === 'PLAYER_INPUT_TOO_LARGE') throw error;
     throw cliError('PLAYER_STDIN_READ_FAILED');
   }
-  return runtime.execute(parsePlayerJson(text, 'PLAYER_INPUT_JSON_INVALID'));
+  const input = parsePlayerJson(text, 'PLAYER_INPUT_JSON_INVALID');
+  return args[1] === '--diagnose' ? runtime.diagnose(input) : runtime.execute(input);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

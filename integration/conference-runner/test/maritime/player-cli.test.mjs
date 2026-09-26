@@ -113,6 +113,19 @@ test('valid input and inspection preserve runtime results and invocation semanti
   assert.equal(inspections, 1);
 });
 
+test('diagnostic CLI mode consumes stdin but cannot route through gameplay execute', async () => {
+  const input = { request: { type: 'runtime-diagnostic' } };
+  const response = { schema_version: 1, type: 'runtime-diagnostic-response' };
+  let diagnoses = 0;
+  const dependencies = { readFileImpl: async () => '{}', stdin: [JSON.stringify(input)],
+    createPlayerRuntimeImpl: () => ({
+      execute: () => assert.fail('diagnostics must not use gameplay execute'),
+      diagnose: received => { diagnoses++; assert.deepEqual(received, input); return response; }
+    }) };
+  assert.equal(await main(['fixture-settings.json', '--diagnose'], {}, dependencies), response);
+  assert.equal(diagnoses, 1);
+});
+
 test('actual CLI distinguishes malformed settings from malformed input with exact safe output', async t => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), 'conference-player-cli-')));
   t.after(() => rm(directory, { recursive: true, force: true }));

@@ -1,7 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDiscussionRequest, validateDiscussionResponse, discussionToLogResponse } from '../../src/maritime/index.mjs';
-import { discussion, discussionReply } from './fixtures.mjs';
+import { validateDiscussionRequest, validateDiscussionResponse, discussionToLogResponse,
+  validateRuntimeDiagnosticRequest, validateRuntimeDiagnosticInput,
+  validateRuntimeDiagnosticResponse } from '../../src/maritime/index.mjs';
+import { config, roster, discussion, discussionReply } from './fixtures.mjs';
+
+const diagnostic = (mode = 'gameplay-input') => ({ schema_version: 1, type: 'runtime-diagnostic',
+  request_id: `diagnostic:${mode}`, seat_id: roster[0].seat_id, team: roster[0].team, mode,
+  chain_state: { chain_id: 84532, game_address: config.game_address,
+    confirmed_block_number: '123', confirmed_block_hash: `0x${'a'.repeat(64)}` } });
+const diagnosticReply = request => ({ schema_version: 1, type: 'runtime-diagnostic-response',
+  request_id: request.request_id, seat_id: request.seat_id, team: request.team, mode: request.mode, status: 'ready',
+  checks: { stdin: true, wallet_identity: true, checkout: true, dependencies: true, wrapper: true,
+    private_state: true, seat_lock: true, chain_id: true, contract_read: true } });
 
 test('explicit discussion validates and maps only for team-log ingestion', () => {
   const request = discussion();
@@ -28,4 +39,35 @@ test('discussion blocks opposing team input and coordinator move selection', () 
     sequence: 1, received_at: '2026-09-24T12:00:00Z', request_id: 'other', message: 'opposing text' };
   assert.throws(() => validateDiscussionRequest({ ...request, team_chat: { through_sequence: 1, messages: [other] } }));
   assert.throws(() => validateDiscussionRequest({ ...request, chain_state: { choice: 'share' } }));
+});
+
+test('runtime diagnostic accepts only exact public request, input, and successful response shapes', () => {
+  for (const mode of ['gameplay-input', 'commit-input']) {
+    const request = diagnostic(mode);
+    const input = { request, ...(mode === 'commit-input' ? { choice: 'catch' } : {}) };
+    assert.equal(validateRuntimeDiagnosticRequest(request), request);
+    assert.equal(validateRuntimeDiagnosticInput(input), input);
+    assert.equal(validateRuntimeDiagnosticResponse(diagnosticReply(request), request).status, 'ready');
+  }
+});
+
+test('runtime diagnostic rejects choice leakage, wrong placement, identity drift, failed checks, and extra fields', () => {
+  const gameplay = diagnostic();
+  const commit = diagnostic('commit-input');
+  for (const input of [{ request: gameplay, choice: 'share' }, { request: commit },
+    { request: commit, choice: 'other' }, { request: { ...commit, choice: 'steal' }, choice: 'steal' }]) {
+    assert.throws(() => validateRuntimeDiagnosticInput(input));
+  }
+  for (const request of [{ ...gameplay, extra: true }, { ...gameplay, team: 'hermes' },
+    { ...gameplay, chain_state: { ...gameplay.chain_state, confirmed_block_number: '01' } },
+    { ...gameplay, chain_state: { ...gameplay.chain_state, confirmed_block_hash: '0x00' } }]) {
+    assert.throws(() => validateRuntimeDiagnosticRequest(request));
+  }
+  const response = diagnosticReply(gameplay);
+  for (const changed of [{ ...response, choice: 'share' }, { ...response, status: 'error' },
+    { ...response, mode: 'commit-input' },
+    { ...response, checks: { ...response.checks, contract_read: false } },
+    { ...response, checks: { ...response.checks, extra: true } }]) {
+    assert.throws(() => validateRuntimeDiagnosticResponse(changed, gameplay));
+  }
 });

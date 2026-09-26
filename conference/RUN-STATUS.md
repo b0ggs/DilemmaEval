@@ -1,4 +1,23 @@
-# Fresh-session handoff — September 25, 2026, 23:48 UTC
+# Conference run-status archive
+
+**Canonical current status:** Read [CURRENT-STATUS.md](CURRENT-STATUS.md) before acting, and use [TAKEOVER-IMPLEMENTATION-CHECKLIST.md](TAKEOVER-IMPLEMENTATION-CHECKLIST.md) as the only active checklist.
+
+Everything below is preserved as chronological/historical evidence. Labels such as “current,” “next,” “resume,” and unchecked completion boxes apply only to their recorded checkpoint and do not override the canonical status, current authorization, or current gates.
+
+## Takeover hardening implementation — September 25, 2026
+
+No live game, transaction, message, model call, agent wake, or external mutation ran in this implementation pass.
+
+- Checkpoint `688f3b9` preserves the inherited conference tree before hardening. The active tree remains on `codex/converge-demo-2026-09-25`.
+- The lifecycle test failure was investigated rather than patched around. The third Hermes configuration is required after the confirmed sleep/reload generation boundary; tests now prove inspection precedes repair, the generation boundary precedes the third write, and a stable rerun makes no fourth write.
+- A dedicated non-signing runtime diagnostic now validates both exact stdin shapes. It derives the seat wallet locally, requires wallet authorization, verifies the pinned checkout/dependencies/wrapper and seat lock, performs confirmed-block chain/contract/idle/cause reads, and confirms sleep before releasing capacity. It never calls gameplay execution or creates a signer journal/bundle.
+- Readiness schema v2 is short-lived (ten-minute maximum), rejects private/decision fields, binds roster/config and the complete diagnostic/runtime source fingerprint, and requires both exact diagnostic results plus sanitized lifecycle/model evidence. The all-ten durable producer is not implemented yet; therefore Phase 3 is not complete and historical evidence cannot satisfy it.
+- Proof dispatches are durably recorded before adapter work and receive a sanitized terminal status. A Game-17-shaped regression retains one ambiguous failure and nine late successes. The one-game fuse now binds the exact prepared-config digest and the fresh readiness-evidence digest and revalidates both immediately before creation.
+- Verification: conference runner 255/255; site 9/9; game bridge 68/68; harness adapters 19/19; Maritime transport 40/40; orchestrator core 41/41; team logs 22/22. `git diff --check` passed before this status update. These are local/fixture results, not live 5v5 evidence.
+
+Next implementation action: add the durable all-ten diagnostic/evidence producer, then add repeated ten-seat assembly coverage. Do not create a game to discover either defect.
+
+## Historical fresh-session handoff — September 25, 2026, 23:48 UTC
 
 Read [FRESH-SESSION-HANDOFF.md](FRESH-SESSION-HANDOFF.md) for the concise takeover checklist, latest tested fix, state paths and remaining acceptance checks. The original three-hour window **expired at 19:46:14Z**; no new window or explicit launch override has been granted. Automatic approval review's Game18 rejection remains unresolved. No live operations ran during this documentation handoff. The stopped/idle observations below are the last verified checkpoint, not fresh chain reads at 23:48. Preserve the same working directory: the conference runner and conference directory are untracked and would be absent from a branch-only checkout.
 

@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "start": "node src/cli.mjs run",
     "preflight": "node src/cli.mjs preflight",
     "fixture": "node src/cli.mjs fixture",

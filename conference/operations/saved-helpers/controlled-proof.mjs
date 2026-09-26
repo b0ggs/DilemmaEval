@@ -10,7 +10,9 @@ import { createTelegramMirror } from '/Users/wade/Documents/DilemmaEval/integrat
 import { createConferenceRunner } from '/Users/wade/Documents/DilemmaEval/integration/conference-runner/src/runner/index.mjs';
 import { createSpectatorServer } from '/Users/wade/Documents/DilemmaEval/integration/conference-runner/src/server.mjs';
 import { buildPublicState } from '/Users/wade/Documents/DilemmaEval/integration/conference-runner/src/public-state.mjs';
-import { assessControlledChainReadiness, validateControlledRuntimeEvidence } from '/Users/wade/Documents/DilemmaEval/integration/conference-runner/src/readiness.mjs';
+import { assessControlledChainReadiness, configFingerprint, validateControlledRuntimeEvidence } from '/Users/wade/Documents/DilemmaEval/integration/conference-runner/src/readiness.mjs';
+import { createProofDispatchJournal, writeProofReport } from './proof-dispatch-journal.mjs';
+import { createProofBindings, verifyProofBindings } from './proof-bindings.mjs';
 const root='/Users/wade/Documents/DilemmaEval';
 const directory=process.env.PROOF_DIRECTORY??'/private/tmp/hermes-one-game-2026-09-24';
 const evidencePath=process.env.PROOF_EVIDENCE??root+'/conference/evidence/hermes-controlled-game-2026-09-24.json';
@@ -23,18 +25,20 @@ const launchCutoff=process.env.PROOF_STOP_NEW_GAMES_AT===undefined?absoluteDeadl
 if((absoluteDeadline!==null&&!Number.isFinite(absoluteDeadline))||(launchCutoff!==null&&!Number.isFinite(launchCutoff))||(absoluteDeadline!==null&&launchCutoff>absoluteDeadline))throw new Error('PROOF_DEADLINE_INVALID');
 if(!Number.isInteger(expectedSeats)||expectedSeats<2||expectedSeats>20||!Number.isInteger(maxAwake)||maxAwake<1||maxAwake>expectedSeats)throw new Error('PROOF_CAPACITY_INVALID');
 const configPath=directory+'/config.json';
+const bindingsPath=directory+'/proof-bindings.json';
 const json=async p=>JSON.parse(await readFile(p,'utf8'));
 let runner,provider,spectatorServer;let stage="configuration";
 const report=process.argv[2]==='resume'?await json(evidencePath):{schema_version:1,started_at:new Date().toISOString(),maximum_fresh_games:1,launch_attempts:0,dispatches:[],proof_complete:false};
-const save=()=>writeFile(evidencePath,JSON.stringify(report,null,2)+'\n');
+const save=()=>writeProofReport(evidencePath,report);
 try {
-  const config=await json(sourceConfigPath);
+  const sourceConfig=await json(sourceConfigPath);
+  const config=structuredClone(sourceConfig);
   if(config.roster?.length!==expectedSeats)throw new Error('PROOF_ROSTER_SIZE_MISMATCH');
   provider=makeProvider(config.rpc_url);
   const chain=createChainReader({config,provider});
   if(process.argv[2]==='prepare') {
     if(launchCutoff!==null&&Date.now()>=launchCutoff)throw new Error('PROOF_WINDOW_CLOSED');
-    validateControlledRuntimeEvidence(config,await json(runtimeEvidencePath));
+    const runtimeEvidence=validateControlledRuntimeEvidence(sourceConfig,await json(runtimeEvidencePath));
     stage='chain-preflight';const p=await chain.preflight();
     if(p.active_game_id!=='0'||!assessControlledChainReadiness(config,p).ready)throw new Error('CHAIN_NOT_READY');
     for(const address of [config.expected_owner,...config.roster.map(s=>s.wallet_address)]) {
@@ -46,14 +50,17 @@ try {
     config.intermission_ms=0;
     config.agent_timeout_ms=300000;
     validateConfig(config);
+    const bindings=createProofBindings({sourceConfig,preparedConfig:config,runtimeEvidence});
     await mkdir(directory,{mode:0o700});
     await writeFile(configPath,JSON.stringify(config,null,2)+'\n',{flag:'wx',mode:0o600});
     await writeFile(directory+'/preflight.json',JSON.stringify(p,null,2)+'\n',{flag:'wx',mode:0o600});
+    await writeFile(bindingsPath,JSON.stringify(bindings,null,2)+'\n',{flag:'wx',mode:0o600});
     console.log(JSON.stringify({prepared:true,start_block:config.start_block,stop_new_games_at:config.stop_time}));
   } else {
     Object.assign(config,await json(configPath));
     validateConfig(config);
-    stage='runtime-evidence';const runtimeEvidence=validateControlledRuntimeEvidence(config,await json(runtimeEvidencePath));
+    stage='runtime-evidence';const runtimeEvidence=validateControlledRuntimeEvidence(sourceConfig,await json(runtimeEvidencePath));
+    const bindings=verifyProofBindings(await json(bindingsPath),{sourceConfig,preparedConfig:config,runtimeEvidence});
     const secrets=await loadCoordinatorSecrets('/Users/wade/.config/dilemmaeval-conference/coordinator.env');
     const agents=createMaritimeAdapter({config,apiKey:secrets.MARITIME_API_KEY,runtimeEvidence,maxAwake,maxAgents:expectedSeats,timeoutMs:config.agent_timeout_ms});
     stage='maritime-preflight';if(!(await agents.preflight()).ready)throw new Error('MARITIME_NOT_READY');
@@ -69,9 +76,18 @@ try {
     const spectator=createTelegramMirror({config,runtimeDir:directory+'/runtime',token:secrets.TELEGRAM_BOT_TOKEN,...(scoreboard?{scoreboard}:{})});
     const launcher={create:async intent=>{
       if(launchCutoff!==null&&Date.now()>=launchCutoff)throw new Error('PROOF_WINDOW_CLOSED');
+      // Re-read and validate all three bound inputs at the last possible point.
+      // Preparation is not permission to create after evidence or config drift.
+      const currentSourceConfig=await json(sourceConfigPath);
+      const currentPreparedConfig=await json(configPath);
+      const currentRuntimeEvidence=validateControlledRuntimeEvidence(currentSourceConfig,await json(runtimeEvidencePath));
+      const currentBindings=verifyProofBindings(await json(bindingsPath),{sourceConfig:currentSourceConfig,
+        preparedConfig:currentPreparedConfig,runtimeEvidence:currentRuntimeEvidence});
+      if(configFingerprint(config)!==bindings.prepared_config_sha256||
+          JSON.stringify(currentBindings)!==JSON.stringify(bindings))throw new Error('PROOF_BINDINGS_CHANGED');
       // Durable one-shot fuse is written before the sole create request.
       const fuse=await open(directory+'/launch-once.json','wx',0o600);
-      try{await fuse.writeFile(JSON.stringify({intent,maximum_fresh_games:1}));await fuse.sync();}finally{await fuse.close();}
+      try{await fuse.writeFile(JSON.stringify({intent,maximum_fresh_games:1,...bindings}));await fuse.sync();}finally{await fuse.close();}
       const dir=await open(directory,'r');try{await dir.sync();}finally{await dir.close();}
       report.launch_attempts++;await save();
       const outcome=await operator.launcher.create(intent);
@@ -79,23 +95,15 @@ try {
       console.log(JSON.stringify({operation:'create',...outcome}));
       return outcome;
     }};
+    const journal=createProofDispatchJournal({adapter:{dispatch:async args=>{
+      const deadlineAt=absoluteDeadline===null?args.deadline_at_ms:Math.min(args.deadline_at_ms,absoluteDeadline);
+      if(Date.now()>=deadlineAt)throw Object.assign(new Error('MARITIME_DISPATCH_EXPIRED'),{code:'MARITIME_DISPATCH_EXPIRED',ambiguous:false,retryable:true});
+      return agents.dispatch({...args,deadline_at_ms:deadlineAt,signal:AbortSignal.any([args.signal,stopDispatch.signal,...(absoluteDeadline===null?[]:[AbortSignal.timeout(Math.max(1,absoluteDeadline-Date.now()))])])});
+    }},report,persist:save,stopController:stopDispatch});
     const guardedAgents={dispatch:async args=>{
-      if(failure)throw new Error('CONTROLLED_PROOF_STOPPED');
-      const row={started_at:new Date().toISOString(),request_id:args.request.request_id,seat_id:args.seat.seat_id,operation:args.request.type==='discussion'?'discussion':args.request.requested_action,game_id:args.request.game_id,round:args.request.round};
-      console.log(JSON.stringify({...row,state:'dispatching'}));
-      try{
-        const deadlineAt=absoluteDeadline===null?args.deadline_at_ms:Math.min(args.deadline_at_ms,absoluteDeadline);
-        if(Date.now()>=deadlineAt)throw Object.assign(new Error('MARITIME_DISPATCH_EXPIRED'),{code:'MARITIME_DISPATCH_EXPIRED',ambiguous:false,retryable:true});
-        const response=await agents.dispatch({...args,deadline_at_ms:deadlineAt,signal:AbortSignal.any([args.signal,stopDispatch.signal,...(absoluteDeadline===null?[]:[AbortSignal.timeout(Math.max(1,absoluteDeadline-Date.now()))])])});
-        Object.assign(row,{finished_at:new Date().toISOString(),status:response.status,transaction_hash:response.transaction_hash??null,error_code:response.error?safePlayerErrorCode(response.error.code):null,has_team_message:!!response.team_message});
-        if(response.status==='error'&&row.operation!=='claim'){failure={...row};stopDispatch.abort();}
-        report.dispatches.push(row);await save();console.log(JSON.stringify(row));
-        return response;
-      }catch(error){
-        if(!error?.ambiguous&&(error?.code==='MARITIME_DISPATCH_EXPIRED'||error?.code==='MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED'&&error.retryable===true))throw error;
-        if(!failure&&row.operation!=='claim'){failure={...row,status:'transport-error',error_code:['MARITIME_TIMEOUT','MARITIME_AGENT_RESPONSE_INVALID','MARITIME_PUBLIC_REQUEST_STAGE_FAILED','MARITIME_DISPATCH_EXPIRED','MARITIME_HTTP_500'].includes(error.code)?error.code:'MARITIME_OPERATION_FAILED',diagnostic_code:safePlayerErrorCode(error.diagnostic_code,null)};stopDispatch.abort();}
-        throw error;
-      }
+      console.log(JSON.stringify({request_id:args.request.request_id,seat_id:args.seat.seat_id,state:'dispatching'}));
+      try{return await journal.dispatch(args);}
+      finally{failure=journal.getFailure();}
     }};
     stage='runner-create';runner=createConferenceRunner({config,runtimeDir:directory+'/runtime',chain:createChainReader({config,provider}),agents:guardedAgents,launcher,phaseExecutor:operator.phaseExecutor,spectator});
     stage='runner-initialize';await runner.initialize();

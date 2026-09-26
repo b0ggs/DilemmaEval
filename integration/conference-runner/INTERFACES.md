@@ -48,3 +48,75 @@ Site owns `conference/site/` exclusively. Prefer static HTML/CSS/JS served by ru
 - Telegram: `src/telegram/**`, `test/telegram/**`: durable dedup, rate limits/outage/uncertainty, real text preservation, complete Dealer formatting fixtures.
 - Site: `conference/site/**`: phone layout, dynamic roster/counters, correct denominator/links, stale/fixture/error handling.
 - Lead: all other paths, dependencies, config/public API/entry point, integration tests, existing shared modules, live actions and status.
+
+## Takeover hardening additions
+
+These additions are the precondition for another live creation. They do not change the gameplay request or response schemas.
+
+### Non-signing runtime diagnostic
+
+Maritime exports a separate diagnostic boundary; it must never be routed through gameplay `dispatch`:
+
+`createMaritimeAdapter(...)` additionally returns `diagnose({seat,request,deadline_at_ms?,signal?})`.
+
+Diagnostic request:
+
+```json
+{
+  "schema_version": 1,
+  "type": "runtime-diagnostic",
+  "request_id": "stable public identity",
+  "seat_id": "oc-1",
+  "team": "openclaw",
+  "mode": "gameplay-input or commit-input",
+  "chain_state": {
+    "chain_id": 84532,
+    "game_address": "0x...",
+    "confirmed_block_number": "decimal string",
+    "confirmed_block_hash": "0x..."
+  }
+}
+```
+
+The request is staged as public JSON and supplied through the same shell stdin mechanism as gameplay. `commit-input` requires the agent to select `share`, `steal`, or `catch` as a sibling of `request`; the runtime validates the location/value but never returns or persists the choice. `gameplay-input` has no choice. Both modes run wallet-identity, pinned-checkout, dependency/wrapper, private-state/lock, read-only chain-ID, and read-only contract checks. They must not invoke a player signer operation, create a gameplay request journal or bundle, or mutate chain state.
+
+Diagnostic response:
+
+```json
+{
+  "schema_version": 1,
+  "type": "runtime-diagnostic-response",
+  "request_id": "same identity",
+  "seat_id": "oc-1",
+  "team": "openclaw",
+  "mode": "gameplay-input or commit-input",
+  "status": "ready",
+  "checks": {
+    "stdin": true,
+    "wallet_identity": true,
+    "checkout": true,
+    "dependencies": true,
+    "wrapper": true,
+    "private_state": true,
+    "seat_lock": true,
+    "chain_id": true,
+    "contract_read": true
+  }
+}
+```
+
+Only this exact successful response shape is accepted. Fixed diagnostic error codes may be returned through the existing safe CLI error wrapper. The diagnostic uses the existing max-awake lifecycle and the same one-deadline/ambiguity rules as dispatch, including confirmed sleep before releasing a permit.
+
+### Fresh readiness evidence
+
+The lead composes diagnostic results into readiness evidence. Version 2 evidence adds:
+
+- `schema_version:2`, `verified_at`, `expires_at`, `roster_fingerprint`, `config_fingerprint`, `transport_fingerprint`, and `confirmed_block_number/hash`;
+- one row per seat with exact agent ID, harness, wallet, artifact digest, activation generation, model profile, both diagnostic modes, and confirmed final sleeping state;
+- no choices, salts, prompts, sessions, raw replies, environment values, or private paths.
+
+Validation uses an injected clock in tests and a maximum age of ten minutes. Evidence is invalid if it is expired or from the future, any fingerprint/identity differs, both diagnostic modes did not pass in one bounded run, activation generation differs, a lifecycle outcome is ambiguous, or final sleep is unconfirmed. Preparation and creation each validate the same evidence digest; a creation fuse binds that digest and the exact config digest.
+
+### Durable proof dispatch outcomes
+
+The controlled proof helper persists a sanitized dispatch record before invoking an adapter and terminally updates it for `submitted`, `observed`, `skipped`, `agent-error`, `rejected-before-submit`, `ambiguous`, or `cancelled-after-submit`. Every started dispatch remains represented even when another seat triggers the proof stop signal. Concurrent late completions are awaited or explicitly left `ambiguous`; they are never dropped. No raw exception, provider response, prompt, choice, salt, or private journal content enters proof evidence.

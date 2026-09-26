@@ -4,6 +4,15 @@ import {
 
 const REQUEST_KEYS = ['schema_version', 'type', 'request_id', 'game_id', 'round', 'phase', 'seat_id', 'team', 'chain_state', 'team_chat', 'max_message_chars'];
 const RESPONSE_KEYS = ['schema_version', 'type', 'request_id', 'game_id', 'round', 'phase', 'seat_id', 'team', 'status'];
+const DIAGNOSTIC_REQUEST_KEYS = ['schema_version', 'type', 'request_id', 'seat_id', 'team', 'mode', 'chain_state'];
+const DIAGNOSTIC_CHAIN_KEYS = ['chain_id', 'game_address', 'confirmed_block_number', 'confirmed_block_hash'];
+const DIAGNOSTIC_RESPONSE_KEYS = ['schema_version', 'type', 'request_id', 'seat_id', 'team', 'mode', 'status', 'checks'];
+const DIAGNOSTIC_CHECK_KEYS = ['stdin', 'wallet_identity', 'checkout', 'dependencies', 'wrapper',
+  'private_state', 'seat_lock', 'chain_id', 'contract_read'];
+const DIAGNOSTIC_MODES = ['gameplay-input', 'commit-input'];
+const SEAT = /^(?:oc|hs)-(?:[1-9]|10)$/;
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const HASH = /^0x[0-9a-fA-F]{64}$/;
 
 function exact(value, required, optional = []) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -18,6 +27,58 @@ export function assertPublicGameplayRequest(request) {
   rejectDecisionMaterial(request.chain_state);
   for (const message of request.team_chat.messages) assertMessage(message.message);
   return request;
+}
+
+export function validateRuntimeDiagnosticRequest(request) {
+  exact(request, DIAGNOSTIC_REQUEST_KEYS);
+  exact(request?.chain_state, DIAGNOSTIC_CHAIN_KEYS);
+  if (request.schema_version !== 1 || request.type !== 'runtime-diagnostic' ||
+      typeof request.request_id !== 'string' || !request.request_id || request.request_id.length > 256 ||
+      /[\0\r\n]/.test(request.request_id) || !SEAT.test(request.seat_id ?? '') ||
+      !['openclaw', 'hermes'].includes(request.team) ||
+      !request.seat_id.startsWith(request.team === 'openclaw' ? 'oc-' : 'hs-') ||
+      !DIAGNOSTIC_MODES.includes(request.mode) || request.chain_state.chain_id !== 84532 ||
+      !ADDRESS.test(request.chain_state.game_address ?? '') ||
+      !/^(?:0|[1-9][0-9]*)$/.test(request.chain_state.confirmed_block_number ?? '') ||
+      !HASH.test(request.chain_state.confirmed_block_hash ?? '')) {
+    throw new TypeError('RUNTIME_DIAGNOSTIC_REQUEST_INVALID');
+  }
+  assertNoSensitiveMaterial(request);
+  return request;
+}
+
+export function validateRuntimeDiagnosticInput(input) {
+  exact(input, ['request'], input?.request?.mode === 'commit-input' ? ['choice'] : []);
+  validateRuntimeDiagnosticRequest(input.request);
+  if (input.request.mode === 'commit-input') {
+    if (!Object.hasOwn(input, 'choice') || !['share', 'steal', 'catch'].includes(input.choice)) {
+      throw new TypeError('RUNTIME_DIAGNOSTIC_CHOICE_INVALID');
+    }
+  } else if (Object.hasOwn(input, 'choice')) {
+    throw new TypeError('RUNTIME_DIAGNOSTIC_CHOICE_FORBIDDEN');
+  }
+  return input;
+}
+
+export function validateRuntimeDiagnosticResponse(response, request) {
+  exact(response, DIAGNOSTIC_RESPONSE_KEYS);
+  exact(response?.checks, DIAGNOSTIC_CHECK_KEYS);
+  if (response.schema_version !== 1 || response.type !== 'runtime-diagnostic-response' ||
+      typeof response.request_id !== 'string' || !response.request_id || response.request_id.length > 256 ||
+      /[\0\r\n]/.test(response.request_id) || response.status !== 'ready' || !DIAGNOSTIC_MODES.includes(response.mode) ||
+      !SEAT.test(response.seat_id ?? '') || !['openclaw', 'hermes'].includes(response.team) ||
+      !response.seat_id.startsWith(response.team === 'openclaw' ? 'oc-' : 'hs-') ||
+      DIAGNOSTIC_CHECK_KEYS.some(key => response.checks[key] !== true)) {
+    throw new TypeError('RUNTIME_DIAGNOSTIC_RESPONSE_INVALID');
+  }
+  assertNoSensitiveMaterial(response);
+  if (request) {
+    validateRuntimeDiagnosticRequest(request);
+    for (const field of ['request_id', 'seat_id', 'team', 'mode']) {
+      if (response[field] !== request[field]) throw new TypeError('RUNTIME_DIAGNOSTIC_RESPONSE_IDENTITY_MISMATCH');
+    }
+  }
+  return response;
 }
 
 function rejectDecisionMaterial(value) {

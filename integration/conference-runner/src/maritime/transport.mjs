@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 import { parseAndValidateResponse } from '../../../maritime-transport/src/validation.mjs';
 import { safePlayerErrorCode } from './diagnostics.mjs';
-import { assertPublicGameplayRequest, validateDiscussionRequest, validateDiscussionResponse, validateGameplayResponse } from './protocol.mjs';
+import { assertPublicGameplayRequest, validateDiscussionRequest, validateDiscussionResponse, validateGameplayResponse,
+  validateRuntimeDiagnosticRequest, validateRuntimeDiagnosticResponse } from './protocol.mjs';
 import { reconcileRoster, validateMaritimeRoster } from './roster.mjs';
 import { buildCompletedJournalReadCommand, verifyCompletedReceipt } from './reconcile.mjs';
 import { TEAM_PAYOUT_OBJECTIVE } from './recipes.mjs';
@@ -141,7 +142,7 @@ async function boundedRecoveryVerification(verify, input, boundary) {
 
 function runtimeBindings(runtimeEvidence, roster, runId) {
   if (runtimeEvidence === undefined || runtimeEvidence === null) return new Map();
-  if (runtimeEvidence?.schema_version !== 1 || runtimeEvidence.run_id !== runId || !Array.isArray(runtimeEvidence.seats)) {
+  if (![1, 2].includes(runtimeEvidence?.schema_version) || runtimeEvidence.run_id !== runId || !Array.isArray(runtimeEvidence.seats)) {
     throw new TypeError('MARITIME_RUNTIME_EVIDENCE_INVALID');
   }
   const result = new Map();
@@ -175,8 +176,9 @@ export async function stagePublicRequest(spec, { fsImpl } = {}) {
   const { posix: path } = await import('node:path');
   const digest = text => createHash('sha256').update(text).digest('hex');
   const fail = () => { throw new Error('PUBLIC_REQUEST_STAGE_FAILED'); };
+  const artifactId = spec.artifact_id ?? spec.request_id;
   if (path.dirname(spec.settings_path) !== spec.base || path.basename(spec.settings_path) !== 'seat.json' ||
-      spec.path !== path.join(spec.base, 'public-requests', `${digest(spec.request_id)}.json`) ||
+      spec.path !== path.join(spec.base, 'public-requests', `${digest(artifactId)}.json`) ||
       digest(spec.content) !== spec.sha256 || await fs.realpath(spec.base) !== spec.base) fail();
   const settingsMeta = await fs.lstat(spec.settings_path);
   if (!settingsMeta.isFile() || settingsMeta.isSymbolicLink() || await fs.realpath(spec.settings_path) !== spec.settings_path) fail();
@@ -238,9 +240,39 @@ export function buildPublicRequestArtifact(request, binding, harness) {
   return { ...spec, command: ['node', '--input-type=module', '-e', source, JSON.stringify(spec)] };
 }
 
+export function buildRuntimeDiagnosticArtifact(request, binding, harness) {
+  validateRuntimeDiagnosticRequest(request);
+  const command = binding?.gameplay_command;
+  if (!Array.isArray(command) || command.length !== 3 || command[0] !== 'node' ||
+      command.some(value => typeof value !== 'string' || /[\r\n\0]/.test(value)) ||
+      !posix.isAbsolute(command[1]) || !posix.isAbsolute(command[2]) ||
+      posix.basename(command[2]) !== 'seat.json' || !['openclaw', 'hermes'].includes(harness)) {
+    throw new MaritimeAdapterError('MARITIME_RUNTIME_COMMAND_INVALID');
+  }
+  const base = posix.dirname(command[2]);
+  const content = JSON.stringify({ request });
+  const artifactId = `runtime-diagnostic:${request.request_id}`;
+  const spec = { base, settings_path: command[2], path: posix.join(base, 'public-requests',
+    `${createHash('sha256').update(artifactId).digest('hex')}.json`),
+    content, sha256: createHash('sha256').update(content).digest('hex'), artifact_id: artifactId,
+    request_id: request.request_id, seat_id: request.seat_id, harness };
+  const source = `(${stagePublicRequest.toString()})(JSON.parse(process.argv[1])).then(value=>process.stdout.write(JSON.stringify(value))).catch(()=>{process.stdout.write('{"ready":false}');process.exitCode=1;});`;
+  return { ...spec, command: ['node', '--input-type=module', '-e', source, JSON.stringify(spec)] };
+}
+
 export function buildGameplayShellCommand(request, binding, requestPath, choice = 'YOUR_CHOICE') {
   const cli = binding.gameplay_command.map(shellQuote).join(' ');
   return request.requested_action === 'commit'
+    ? `node -e ${shellQuote(CHOICE_FILTER)} ${shellQuote(requestPath)} ${shellQuote(choice)} | ${cli}`
+    : `${cli} < ${shellQuote(requestPath)}`;
+}
+
+export function buildRuntimeDiagnosticShellCommand(request, binding, requestPath, choice = 'YOUR_CHOICE') {
+  validateRuntimeDiagnosticRequest(request);
+  const command = binding?.gameplay_command;
+  if (!Array.isArray(command) || command.length !== 3) throw new MaritimeAdapterError('MARITIME_RUNTIME_COMMAND_INVALID');
+  const cli = [...command, '--diagnose'].map(shellQuote).join(' ');
+  return request.mode === 'commit-input'
     ? `node -e ${shellQuote(CHOICE_FILTER)} ${shellQuote(requestPath)} ${shellQuote(choice)} | ${cli}`
     : `${cli} < ${shellQuote(requestPath)}`;
 }
@@ -552,6 +584,134 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         }
       });
       return structuredClone(await promise);
+    },
+    async diagnose({ seat, request, deadline_at_ms: deadlineAtMs, signal } = {}) {
+      const assigned = roster.find(row => row.seat_id === seat?.seat_id);
+      if (!assigned || ['agent_id', 'team', 'harness', 'maritime_agent'].some(key => assigned[key] !== seat[key]) ||
+          assigned.wallet_address.toLowerCase() !== seat.wallet_address?.toLowerCase() ||
+          request?.seat_id !== assigned.seat_id || request?.team !== assigned.team) {
+        throw new MaritimeAdapterError('MARITIME_SEAT_MISMATCH');
+      }
+      try { validateRuntimeDiagnosticRequest(request); }
+      catch { throw new MaritimeAdapterError('MARITIME_DIAGNOSTIC_REQUEST_INVALID'); }
+      if (request.chain_state.game_address.toLowerCase() !== config.game_address.toLowerCase() ||
+          request.chain_state.chain_id !== config.chain_id) {
+        throw new MaritimeAdapterError('MARITIME_DIAGNOSTIC_REQUEST_INVALID');
+      }
+      if (deadlineAtMs !== undefined && (!Number.isSafeInteger(deadlineAtMs) || deadlineAtMs < 0)) {
+        throw new MaritimeAdapterError('MARITIME_DEADLINE_INVALID');
+      }
+      if (signal !== undefined && (typeof signal !== 'object' || typeof signal.aborted !== 'boolean' ||
+          typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) {
+        throw new MaritimeAdapterError('MARITIME_SIGNAL_INVALID');
+      }
+      const binding = bindings.get(assigned.seat_id);
+      if (!binding || awakeLimit !== undefined && assigned.harness === 'hermes' && !Array.isArray(binding.hermes_configure_command) ||
+          awakeLimit !== undefined && !Array.isArray(binding.model_configure_command)) {
+        throw new MaritimeAdapterError('MARITIME_RUNTIME_COMMAND_REQUIRED');
+      }
+      const snapshot = structuredClone(request);
+      const key = `diagnostic:${assigned.seat_id}:${snapshot.request_id}`;
+      const digest = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+      const previous = attempts.get(key);
+      if (previous) {
+        if (previous.digest !== digest) throw new MaritimeAdapterError('MARITIME_REQUEST_ID_REUSED');
+        return structuredClone(await previous.promise);
+      }
+      if (busy.has(assigned.seat_id)) throw new MaritimeAdapterError('MARITIME_SEAT_BUSY');
+      busy.add(assigned.seat_id);
+      const boundary = { deadlineAtMs, signal, remotePostStarted: false };
+      const post = async ({ path, body }) => {
+        const stageTimeoutMs = requestTimeout({ ...boundary, timeoutMs });
+        boundary.remotePostStarted = true;
+        const result = await maritimeRequest({ apiKey, fetchImpl, timeoutMs: stageTimeoutMs, signal,
+          path, method: 'POST', ...(body === undefined ? {} : { body }) });
+        assertDispatchBoundary(boundary);
+        return result;
+      };
+      const execute = async () => {
+        let releaseLease = () => {};
+        let leaseAcquired = false;
+        try {
+          assertDispatchBoundary(boundary);
+          if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
+          if (maxAwake !== undefined) {
+            releaseLease = await acquireLease(boundary, assigned.agent_id);
+            leaseAcquired = true;
+          }
+          if (awakeLimit !== undefined) {
+            await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/reload-env` });
+            await dispatchDelay(wakeDelayMs, boundary);
+            if (assigned.harness === 'hermes') {
+              const configured = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
+                body: { command: binding.hermes_configure_command, timeout: 30 } });
+              validateHermesConfigurationResult(configured, assigned, apiKey);
+            }
+            const modelConfigured = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
+              body: { command: binding.model_configure_command, timeout: 30 } });
+            validateModelConfigurationResult(modelConfigured, assigned, apiKey);
+          }
+          const staged = buildRuntimeDiagnosticArtifact(snapshot, binding, assigned.harness);
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const stage = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
+                body: { command: staged.command, timeout: 30 } });
+              if (stage?.exitCode !== 0 || stage.stdout !== JSON.stringify({ ready: true, sha256: staged.sha256 }) ||
+                  (stage.stderr !== undefined && stage.stderr !== '')) {
+                throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
+              }
+              break;
+            } catch (error) {
+              if (attempt === 0 && error?.ambiguous && !signal?.aborted &&
+                  (deadlineAtMs === undefined || Date.now() < deadlineAtMs)) continue;
+              throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
+            }
+          }
+          const payload = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/chat`,
+            body: { message: buildRuntimeDiagnosticPrompt(snapshot, binding, staged.path),
+              conversation_id: `${config.run_id}:${assigned.seat_id}:runtime-diagnostic` } });
+          const responseText = payload?.response;
+          if (typeof responseText !== 'string' || !responseText.length || responseText.length > 16_384 ||
+              responseText.includes(apiKey) || PRIVATE_REPLY_LOOKING.test(responseText)) {
+            const invalid = new MaritimeAdapterError('MARITIME_DIAGNOSTIC_RESPONSE_INVALID', { ambiguous: true });
+            invalid.diagnostic_code = typeof responseText === 'string' && responseText.length > 16_384 ?
+              'MARITIME_REPLY_TOO_LARGE' : typeof responseText === 'string' && PRIVATE_REPLY_LOOKING.test(responseText) ?
+                'MARITIME_REPLY_SECRET_REJECTED' : 'MARITIME_REPLY_PROTOCOL_INVALID';
+            throw invalid;
+          }
+          let result;
+          try { result = validateRuntimeDiagnosticResponse(JSON.parse(responseText), snapshot); }
+          catch {
+            const invalid = new MaritimeAdapterError('MARITIME_DIAGNOSTIC_RESPONSE_INVALID', { ambiguous: true });
+            invalid.diagnostic_code = fixedCliDiagnostic(responseText) ?? 'MARITIME_REPLY_PROTOCOL_INVALID';
+            throw invalid;
+          }
+          if (awakeLimit !== undefined) {
+            const sleeping = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` });
+            if (String(sleeping?.status ?? '').toLowerCase() !== 'sleeping') {
+              throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
+            }
+            if (maxAwake !== undefined) { releaseLease(); leaseAcquired = false; }
+          }
+          return structuredClone(result);
+        } catch (error) {
+          if (maxAwake !== undefined && leaseAcquired && !boundary.remotePostStarted) {
+            releaseLease(); leaseAcquired = false;
+          }
+          if (awakeLimit !== undefined && error?.ambiguous) rotationBlocked = true;
+          throw error;
+        } finally { busy.delete(assigned.seat_id); }
+      };
+      const promise = oneAwake ? rotationQueue.then(execute) : execute();
+      if (oneAwake) rotationQueue = promise.catch(() => {});
+      const attempt = { digest, promise, boundary };
+      attempts.set(key, attempt);
+      promise.catch(error => {
+        if (error?.code === 'MARITIME_DISPATCH_EXPIRED' && !boundary.remotePostStarted && attempts.get(key) === attempt) {
+          attempts.delete(key);
+        }
+      });
+      return structuredClone(await promise);
     }
   });
 }
@@ -570,6 +730,20 @@ export function buildAgentPrompt(request, runtimeBinding, stagedPath) {
       'Discussion only: compose and return your own substantive team_message (at most 200 characters) with a concrete strategic consideration for maximizing the team payout this round, such as a risk or coordination tradeoff. Stay within the phase deadline; do not disclose a private commit choice or secret. Do not run a gameplay transaction. Return exact JSON with schema_version:1,type:"discussion-response",request_id,game_id,round,phase:"commit",seat_id,team,status:"observed",team_message.' :
       `${stagedPath ? `The exact public request is already staged. Use your terminal/exec tool's command string with this shell command (stdin is supplied by the command itself):\n${buildGameplayShellCommand(request, runtimeBinding, stagedPath)}\n${request.requested_action === 'commit' ? 'Replace only YOUR_CHOICE with your own selected word share, steal, or catch after considering the supplied same-team discussion. The filter adds choice as a sibling of request.' : 'Run the supplied command exactly.'} Never reconstruct REQUEST_JSON in tool arguments or run the bare CLI without its stdin redirect or pipe.` : `${command ? `Use this exact installed command argv: ${JSON.stringify(command)}.` : 'Use the installed dilemma-conference gameplay CLI identified in your seat instructions.'} For commit, use the supplied same-team discussion to make your own decision, then send {"request":<the exact envelope below>,"choice":"share"|"steal"|"catch"} to stdin: choice must be a sibling of request, never inside REQUEST_JSON, and must be your own selected choice. For other phases send {"request":<the exact envelope below>}.`} Execute once and return its exact JSON result, optionally adding your own team_message of at most 200 characters. Never modify REQUEST_JSON, invent a transaction hash, rerun an uncertain submission, or alter a saved reveal bundle.`,
     'Keep signing keys and commit salts private. Never return a prepared bundle or unrevealed choice in the protocol response. Preserve all request identity fields.',
+    'REQUEST_JSON', JSON.stringify(request)
+  ].join('\n');
+}
+
+export function buildRuntimeDiagnosticPrompt(request, runtimeBinding, stagedPath) {
+  validateRuntimeDiagnosticRequest(request);
+  const command = buildRuntimeDiagnosticShellCommand(request, runtimeBinding, stagedPath);
+  return [
+    'DilemmaEval non-signing runtime diagnostic v1. This request authorizes checks only, never gameplay or a transaction.',
+    `Run this exact shell command once using your terminal/exec tool (stdin is supplied by the command itself):\n${command}`,
+    request.mode === 'commit-input' ?
+      'Replace only YOUR_CHOICE with one word: share, steal, or catch. The filter adds it beside request solely to validate commit-shaped stdin. Never disclose the selected word.' :
+      'Run the command unchanged. Do not add a choice.',
+    'Return only the command\'s exact JSON response. Do not inspect or return environment values, private files, prompts, sessions, choices, salts, or keys.',
     'REQUEST_JSON', JSON.stringify(request)
   ].join('\n');
 }
