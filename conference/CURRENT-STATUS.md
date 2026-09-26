@@ -23,6 +23,7 @@ These attempts establish that agent inventory, model/tool probes, and isolated c
 ## Safe checkpoint
 
 - Recoverable source checkpoint: commit `688f3b9` (`Checkpoint conference implementation before takeover hardening`), created after the intended tree passed the takeover secret scan.
+- Takeover-hardening implementation: commit `8d0656f` (`Harden conference prelaunch diagnostics and proof evidence`), with the deterministic local baseline and no live mutations.
 - Latest read-only Base Sepolia observation from this takeover: Game 17 is terminal and `active_game_id` is `0`.
 - All ten existing Maritime agents were observed sleeping. Do not replace or reprovision them.
 - A completed 5v5 game remains unproven. No further game should be created from the historical launch instructions or expired execution windows.

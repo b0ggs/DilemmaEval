@@ -8,7 +8,7 @@ Everything below is preserved as chronological/historical evidence. Labels such 
 
 No live game, transaction, message, model call, agent wake, or external mutation ran in this implementation pass.
 
-- Checkpoint `688f3b9` preserves the inherited conference tree before hardening. The active tree remains on `codex/converge-demo-2026-09-25`.
+- Checkpoint `688f3b9` preserves the inherited conference tree before hardening. Commit `8d0656f` preserves this verified hardening tranche. The active tree remains on `codex/converge-demo-2026-09-25`.
 - The lifecycle test failure was investigated rather than patched around. The third Hermes configuration is required after the confirmed sleep/reload generation boundary; tests now prove inspection precedes repair, the generation boundary precedes the third write, and a stable rerun makes no fourth write.
 - A dedicated non-signing runtime diagnostic now validates both exact stdin shapes. It derives the seat wallet locally, requires wallet authorization, verifies the pinned checkout/dependencies/wrapper and seat lock, performs confirmed-block chain/contract/idle/cause reads, and confirms sleep before releasing capacity. It never calls gameplay execution or creates a signer journal/bundle.
 - Readiness schema v2 is short-lived (ten-minute maximum), rejects private/decision fields, binds roster/config and the complete diagnostic/runtime source fingerprint, and requires both exact diagnostic results plus sanitized lifecycle/model evidence. The all-ten durable producer is not implemented yet; therefore Phase 3 is not complete and historical evidence cannot satisfy it.
