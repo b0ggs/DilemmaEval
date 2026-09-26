@@ -1,5 +1,11 @@
 # DilemmaEval
 
+For the September 25 conference demo on branch `codex/converge-demo-2026-09-25`, start with the **[conference implementation guide](conference/IMPLEMENTATION-GUIDE.md)** and **[conference run status](conference/RUN-STATUS.md)**. This is a separate, three-agent starting scope with continuous Base Sepolia games, two Telegram spectator rooms, and a small live website. The guide below describes the original tournament work; its build sequence is not the conference checklist.
+
+The [conference runner](integration/conference-runner/README.md) now provides implementation, local fixture preview, preflight, and operating commands. Live completion remains tracked separately in the run status.
+
+## Original tournament implementation
+
 Implementation guide for the five-versus-five Prisoners DAOlemma demo: OpenClaw and Hermes agents use the same OpenAI model path, play on Base Sepolia, and exchange off-chain team messages through orchestrator-owned append-only JSONL logs.
 
 Start here:

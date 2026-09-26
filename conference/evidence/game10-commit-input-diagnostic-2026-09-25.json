@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "game_id": "10",
+  "seat_id": "hs-1",
+  "request_id": "conference:05c4525b937a72e58fc069c28f4047e5",
+  "operation": "commit",
+  "original_transport_code": "MARITIME_AGENT_RESPONSE_INVALID",
+  "original_cli_exit": 1,
+  "original_cli_error_code": "PLAYER_TOOL_FAILED",
+  "matching_operation_journal_count": 0,
+  "input_shape": {
+    "all_required_request_keys_present": true,
+    "top_level_choice_present": false,
+    "request_choice_present": true,
+    "agent_selected_choice_valid": true,
+    "request_validation_passed": false
+  },
+  "cause": "AGENT_NESTED_CHOICE_INSIDE_REQUEST",
+  "fix": "EXPLICIT_SIBLING_CHOICE_PROMPT_AND_FIXED_DIAGNOSTIC",
+  "deployed_actual_input_validation": {
+    "runtime_uid": 10000,
+    "invalid_input_exit": 1,
+    "invalid_input_code": "PLAYER_CHOICE_LOCATION_INVALID",
+    "corrected_shape_validation_passed": true,
+    "signer_available": false,
+    "bridge_execution_disabled": true,
+    "journal_filenames_unchanged": true,
+    "private_choice_returned": false
+  },
+  "validation": {
+    "local_tests_passed": 95,
+    "local_tests_failed": 0,
+    "fresh_live_commit_reveal_proven": false
+  },
+  "telegram_strategy_deliveries": [
+    { "seat_id": "oc-1", "status": "sent", "message_id": 32 },
+    { "seat_id": "oc-2", "status": "sent", "message_id": 33 },
+    { "seat_id": "hs-1", "status": "sent", "message_id": 34 }
+  ],
+  "privacy": "Only fixed safe codes, booleans, counts, public request identity and Telegram message IDs were extracted. No private choice, command, session content, raw journal, secret or provider text was copied."
+}

@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "run_id": "converge-rehearsal-2026-09-24-r8",
+  "mode": "live",
+  "network": "Base Sepolia",
+  "chain_id": 84532,
+  "updated_at": "2026-09-25T10:37:34.191Z",
+  "status": "stopped",
+  "next_game_at": null,
+  "roster": [
+    {
+      "seat_id": "hs-1",
+      "team": "hermes",
+      "harness": "hermes",
+      "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f"
+    },
+    {
+      "seat_id": "oc-1",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "wallet_address": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356"
+    },
+    {
+      "seat_id": "oc-2",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "wallet_address": "0x421bbbc3cc480147b2586f91b1d25b8bc817916b"
+    }
+  ],
+  "counts": {
+    "completed": 1,
+    "cancelled": 0
+  },
+  "current_game": null,
+  "messages": {
+    "openclaw": [
+      {
+        "seat_id": "oc-1",
+        "game_id": "12",
+        "round": 1,
+        "message": "Early round with 3 alive and no signals yet; I’m aiming for a balanced line that preserves upside while avoiding an easy punish if others get too greedy.",
+        "received_at": "2026-09-25T10:27:26.365Z"
+      },
+      {
+        "seat_id": "oc-2",
+        "game_id": "12",
+        "round": 1,
+        "message": "Round 1 with no prior signals: I’m favoring a low-regret line that preserves upside while avoiding obvious punishability. We should stay flexible and update off revealed behavior next round.",
+        "received_at": "2026-09-25T10:28:12.163Z"
+      }
+    ],
+    "hermes": [
+      {
+        "seat_id": "hs-1",
+        "game_id": "12",
+        "round": 1,
+        "message": "Absent contrary signals, I prefer a trust-preserving line that keeps coalition upside high and avoids provoking retaliation early.",
+        "received_at": "2026-09-25T10:26:39.552Z"
+      }
+    ]
+  },
+  "earnings": [
+    {
+      "seat_id": "hs-1",
+      "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f",
+      "awarded_wei": "294030000000000",
+      "claimed_wei": "294030000000000",
+      "refunded_wei": "0"
+    },
+    {
+      "seat_id": "oc-1",
+      "wallet_address": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356",
+      "awarded_wei": "0",
+      "claimed_wei": "0",
+      "refunded_wei": "0"
+    },
+    {
+      "seat_id": "oc-2",
+      "wallet_address": "0x421bbbc3cc480147b2586f91b1d25b8bc817916b",
+      "awarded_wei": "0",
+      "claimed_wei": "0",
+      "refunded_wei": "0"
+    }
+  ],
+  "latest_result": {
+    "game_id": "12",
+    "outcome": "completed",
+    "transaction_hash": "0xdcf74283d4dfff12244a971cda714692d6b09e62a1bd77eb9cd6bc518621d28f",
+    "transaction_url": "https://sepolia.basescan.org/tx/0xdcf74283d4dfff12244a971cda714692d6b09e62a1bd77eb9cd6bc518621d28f",
+    "choices": [
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f",
+        "choice": "Share",
+        "defaulted": false,
+        "eliminated": false
+      },
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356",
+        "choice": "Catch",
+        "defaulted": false,
+        "eliminated": true
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421bbbc3cc480147b2586f91b1d25b8bc817916b",
+        "choice": "Catch",
+        "defaulted": false,
+        "eliminated": true
+      }
+    ],
+    "awards": [
+      {
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "award_wei": "294030000000000"
+      }
+    ]
+  },
+  "links": {
+    "contract": "https://sepolia.basescan.org/address/0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "telegram": {
+      "openclaw": null,
+      "hermes": null
+    }
+  },
+  "health": {
+    "ok": true,
+    "issues": []
+  }
+}

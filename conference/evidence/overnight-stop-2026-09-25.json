@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T02:54:50.909209+00:00",
+  "reason": "USER_REQUESTED_OVERNIGHT_STOP",
+  "new_game_launched": false,
+  "prepared_directory": "/private/tmp/hermes-game11-2026-09-25",
+  "prepared_only": true,
+  "launch_fuse_exists": false,
+  "runner_runtime_exists": false,
+  "operator_port_8791_listening": false,
+  "last_confirmed_active_game_id": "0",
+  "read_only_chain_funding_nonce_preflight_passed": true,
+  "recorded_deployment_matches_current_code": true,
+  "maritime_roster_ready": true,
+  "lighter_worker": "gpt-5.6-luna",
+  "worker_result": "NO_ADDITIONAL_DETERMINISTIC_BLOCKER_FOUND",
+  "worker_mutations": false,
+  "next_session_must_prepare_fresh_schedule": true
+}

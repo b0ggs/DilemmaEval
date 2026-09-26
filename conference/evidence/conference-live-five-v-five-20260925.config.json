@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "run_id": "converge-live-five-v-five-20260925",
+  "mode": "live",
+  "chain_id": 84532,
+  "rpc_url": "https://sepolia.base.org",
+  "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+  "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+  "identity_registry_address": "0x7177a6867296406881E20d6647232314736Dd09A",
+  "expected_owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+  "start_block": "47285744",
+  "start_time": "2026-09-25T16:46:14Z",
+  "stop_time": "2026-09-25T19:16:14Z",
+  "intermission_ms": 20000,
+  "poll_interval_ms": 5000,
+  "confirmations": 2,
+  "agent_timeout_ms": 180000,
+  "telegram": {
+    "hermes": {
+      "chat_id": "-1004202252236",
+      "invite_url": "https://t.me/+MwfRJ1jcmutiMWNh"
+    },
+    "openclaw": {
+      "chat_id": "-1004378812354",
+      "invite_url": "https://t.me/+V36r6bQ7u0BmZjYx"
+    }
+  },
+  "roster": [
+    {
+      "seat_id": "hs-1",
+      "team": "hermes",
+      "harness": "hermes",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-hs-1",
+      "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f",
+      "cause_id": 2,
+      "agent_id": "a0977c67-268a-4859-b88b-8df556ce9910"
+    },
+    {
+      "seat_id": "hs-2",
+      "team": "hermes",
+      "harness": "hermes",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-hs-2",
+      "wallet_address": "0xe1cc471e2b1736ce99fb2b5b996d8c33663e973d",
+      "cause_id": 2,
+      "agent_id": "3078a919-7445-4ea9-8f0d-273051cec4a4"
+    },
+    {
+      "seat_id": "hs-3",
+      "team": "hermes",
+      "harness": "hermes",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-hs-3",
+      "wallet_address": "0xc017b209745d18d1125bc56cbf9e7a1839bc46bd",
+      "cause_id": 2,
+      "agent_id": "15bf5c4a-193c-4aa7-b483-0c7f5a50c0a5"
+    },
+    {
+      "seat_id": "hs-4",
+      "team": "hermes",
+      "harness": "hermes",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-hs-4",
+      "wallet_address": "0xb4b27a75cae4167a849dbe87585f165f3a81af44",
+      "cause_id": 2,
+      "agent_id": "1d5100da-092e-4085-ab27-bde826f6729e"
+    },
+    {
+      "seat_id": "hs-5",
+      "team": "hermes",
+      "harness": "hermes",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-hs-5",
+      "wallet_address": "0x77b468c94965557fdf59c15f132555bb128392a6",
+      "cause_id": 2,
+      "agent_id": "d66e9e61-f17f-4b0b-80e6-556c4ebfc536"
+    },
+    {
+      "seat_id": "oc-1",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-1",
+      "wallet_address": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356",
+      "cause_id": 1,
+      "agent_id": "d56a1993-feb6-44a1-9f98-3a38ec16d78d"
+    },
+    {
+      "seat_id": "oc-2",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-2",
+      "wallet_address": "0x421bbbc3cc480147b2586f91b1d25b8bc817916b",
+      "cause_id": 1,
+      "agent_id": "b9f4a333-b665-4802-8e3d-a69fa097e835"
+    },
+    {
+      "seat_id": "oc-3",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-3",
+      "wallet_address": "0xad689b9d285593decd62b3a016ae91808f01228c",
+      "cause_id": 1,
+      "agent_id": "e7f909b8-d08f-40bd-84d9-19d1f7410052"
+    },
+    {
+      "seat_id": "oc-4",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-4",
+      "wallet_address": "0x538f2aad18639ee4f479a54969c97767087cc794",
+      "cause_id": 1,
+      "agent_id": "7e4f564f-3d9e-4f7e-83d5-93e00769394e"
+    },
+    {
+      "seat_id": "oc-5",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-5",
+      "wallet_address": "0xf979f1d771b762e177fb1c86e9d8c4dff05982da",
+      "cause_id": 1,
+      "agent_id": "3c776ddb-bbc1-46d3-8ed4-5a5c5dc6eb6b"
+    }
+  ]
+}

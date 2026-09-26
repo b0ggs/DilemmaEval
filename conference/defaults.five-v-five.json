@@ -1,0 +1,11 @@
+{
+  "entryFeeWei": "100000000000000",
+  "creatorFeeBps": "100",
+  "causeFeeBps": "100",
+  "joinDurationSeconds": "300",
+  "commitDurationBlocks": "300",
+  "revealDurationBlocks": "180",
+  "minPlayers": "10",
+  "maxPlayers": "10",
+  "maxCauses": "2"
+}

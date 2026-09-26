@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-25T00:11:46.907Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "seat_id": "hs-1",
+      "operation": "claim",
+      "game_id": "7",
+      "round": 0,
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "PLAYER_SETTLEMENT_STATE_UNVERIFIED",
+      "has_team_message": false
+    },
+    {
+      "seat_id": "hs-1",
+      "operation": "join",
+      "game_id": "8",
+      "round": 0,
+      "status": "submitted",
+      "transaction_hash": "0x3ca6902ccdfd47e32d5a3a376c1d5dd9d867654a4fe60dc427b47840b2ccbac5",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "seat_id": "oc-1",
+      "operation": "join",
+      "game_id": "8",
+      "round": 0,
+      "status": "submitted",
+      "transaction_hash": "0xc842c74a5e83cb7e81fe6d2a7903769102437799a645483470dd392b22e5ef33",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "seat_id": "oc-2",
+      "operation": "join",
+      "game_id": "8",
+      "round": 0,
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "COMMAND_FAILED",
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0x47c8604f448069434a411636d5aea70ce002e0f34b3b5a961ace5f8f5aa80bb4"
+    }
+  },
+  "latest": {
+    "game_id": "8",
+    "phase": "join",
+    "round": 0,
+    "joined": 2,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "seat_id": "oc-2",
+    "operation": "join",
+    "game_id": "8",
+    "round": 0,
+    "status": "error",
+    "transaction_hash": null,
+    "error_code": "COMMAND_FAILED",
+    "has_team_message": false
+  },
+  "final_chain": {
+    "game_id": "8",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 2,
+    "block_number": "47263588"
+  },
+  "runner_stopped": true,
+  "finished_at": "2026-09-25T00:17:48.863Z",
+  "resumed_at": "2026-09-25T00:14:35.183Z",
+  "events": [
+    {
+      "id": "0x47c8604f448069434a411636d5aea70ce002e0f34b3b5a961ace5f8f5aa80bb4:97",
+      "game_id": "8",
+      "round": 0,
+      "block_number": "47263415",
+      "transaction_hash": "0x47c8604f448069434a411636d5aea70ce002e0f34b3b5a961ace5f8f5aa80bb4",
+      "log_index": 97,
+      "kind": "created",
+      "data": {
+        "join_deadline": "1790295418",
+        "entry_fee_wei": "100000000000000"
+      }
+    },
+    {
+      "id": "0x3ca6902ccdfd47e32d5a3a376c1d5dd9d867654a4fe60dc427b47840b2ccbac5:28",
+      "game_id": "8",
+      "round": 0,
+      "block_number": "47263513",
+      "transaction_hash": "0x3ca6902ccdfd47e32d5a3a376c1d5dd9d867654a4fe60dc427b47840b2ccbac5",
+      "log_index": 28,
+      "kind": "joined",
+      "data": {
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "cause_id": 2
+      }
+    },
+    {
+      "id": "0xc842c74a5e83cb7e81fe6d2a7903769102437799a645483470dd392b22e5ef33:0",
+      "game_id": "8",
+      "round": 0,
+      "block_number": "47263542",
+      "transaction_hash": "0xc842c74a5e83cb7e81fe6d2a7903769102437799a645483470dd392b22e5ef33",
+      "log_index": 0,
+      "kind": "joined",
+      "data": {
+        "wallet_address": "0xb9DAb46BCD953eb2a3AB4D49A11f800E6BE5f356",
+        "cause_id": 1
+      }
+    },
+    {
+      "id": "0x6ac1171247d9d0ad0d510143ab19c46fb023521486f6371e911f1c79bee7328d:266",
+      "game_id": "8",
+      "round": 0,
+      "block_number": "47263588",
+      "transaction_hash": "0x6ac1171247d9d0ad0d510143ab19c46fb023521486f6371e911f1c79bee7328d",
+      "log_index": 266,
+      "kind": "cancelled",
+      "data": {}
+    }
+  ],
+  "cancellation": {
+    "id": "0x6ac1171247d9d0ad0d510143ab19c46fb023521486f6371e911f1c79bee7328d:266",
+    "game_id": "8",
+    "round": 0,
+    "block_number": "47263588",
+    "transaction_hash": "0x6ac1171247d9d0ad0d510143ab19c46fb023521486f6371e911f1c79bee7328d",
+    "log_index": 266,
+    "kind": "cancelled",
+    "data": {}
+  },
+  "oc2_failure_timing": {
+    "tool_error_at": "2026-09-25T00:17:14.129Z",
+    "join_deadline": "1790295418"
+  },
+  "telegram": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 4,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  }
+}

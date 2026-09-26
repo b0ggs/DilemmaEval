@@ -1,0 +1,23 @@
+{
+  "observed_at": "2026-09-25T02:21:16.340Z",
+  "agents": [
+    {
+      "seat_id": "hs-1",
+      "agent_id": "a0977c67-268a-4859-b88b-8df556ce9910",
+      "found": true,
+      "status": "sleeping"
+    },
+    {
+      "seat_id": "oc-1",
+      "agent_id": "d56a1993-feb6-44a1-9f98-3a38ec16d78d",
+      "found": true,
+      "status": "sleeping"
+    },
+    {
+      "seat_id": "oc-2",
+      "agent_id": "b9f4a333-b665-4802-8e3d-a69fa097e835",
+      "found": true,
+      "status": "sleeping"
+    }
+  ]
+}

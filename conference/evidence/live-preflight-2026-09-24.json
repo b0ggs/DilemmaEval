@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-24T15:09:08.810Z",
+  "evidence_kind": "read-only live RPC; no transactions submitted",
+  "preflight": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47247127",
+    "block_hash": "0xe2d3c460e42011a2335b0e4b70b28f1165a99db40e56106c0ebb85b19f31322b",
+    "block_timestamp": "1790262542",
+    "owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+    "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+    "active_game_id": "0",
+    "code_hash": "0x0229b422ca8d4c8262ac3aab7fffc68e9a556c4f5a4fdeae36bc5d395cb90742",
+    "config": {
+      "entryFeeWei": "1000000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "32",
+      "maxPlayers": "32",
+      "maxCauses": "2"
+    },
+    "players": [
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9DAb46BCD953eb2a3AB4D49A11f800E6BE5f356",
+        "admitted": true,
+        "agent_key": "0x2760eb06c51071f467184650724e2ad5ede779245a464d367e1c472b7ecf56b1",
+        "balance_wei": "1789486345508961",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421BbBC3cC480147b2586f91b1d25B8bc817916b",
+        "admitted": true,
+        "agent_key": "0x926d384de81d84927e7c6a9167024f99fe6966df8eedb6cc577940d79fe9dead",
+        "balance_wei": "15923001346412793",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "admitted": true,
+        "agent_key": "0xed564c7e99bad152fb4f8c65276a2ba587c292173aee76967551362a18282656",
+        "balance_wei": "15925037563163909",
+        "cause_whitelisted": true
+      }
+    ]
+  },
+  "snapshot": {
+    "schema_version": 1,
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "game_id": "1",
+    "active_game_id": "0",
+    "round": 5,
+    "phase": "terminal",
+    "outcome": "completed",
+    "block_number": "47247127",
+    "block_hash": "0xe2d3c460e42011a2335b0e4b70b28f1165a99db40e56106c0ebb85b19f31322b",
+    "block_timestamp": "1790262542",
+    "alive_count": 12,
+    "committed_count": 12,
+    "revealed_count": 12,
+    "clock": null,
+    "players": [
+      {
+        "wallet_address": "0xc5AB7152c9ea027c753589D343934c4E5CD5d305",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xC52D960200545832167756854c178fD724A5565b",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xd5B820002455D9E19044b2830Bb30eD813bf3424",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xbae5f91Cca261A85b7f2BCCb02b1de5F6cE88384",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x99026D4196D093F6a315408775b00312Fc1F5797",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xE88E974c584aE6F222371f4f4D68564D534cc29d",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x1d0E244a40D59eB6eCF9c62ec0c07Ed77723a35c",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x373c73a96C40F82D8E684448527E78Aa90572AaA",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xBD592997601d44dfC40B7fD3B7FA5b506392B6A7",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xfE2A2d2cD4d423Df9b60ddad5BCA09b262428975",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x4A5eFa2B26015F277b00233E3893D0E92131780d",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xf8A384913Aa0895e37A11E469EAD1C7Fc1db57F7",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x41Aa374bBF153E755e32A8d6a3f865ff047A9FaB",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x75c0B76AdC78eb2Ca867BbecDaFF2EB31f18c492",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x1899BD66aF9b1C98cc243aC5537b8D73eae950cF",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x4E228BE0901a7c274Ba16d0499f320F796a3c9BF",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x5326aAB2630aD92dd19485643075632E5856B621",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xc1E95Db1F919f6381F77CC1F73F88D2867bE251B",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xddDcf99A3dB347F8464D12541D7A4207694C6515",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x03b8D945FD329B8fFf754F7821fd479e5f3D899b",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xb3ac4868F83beE82d2993C580B1D4B7717652709",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xcC383467a2DBE08Ad0d71A5EE82ffe99c544085E",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x55c4b7E46A01D7023929359126ab04a5Da6c045B",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x405891A535E1802bC3b9B02Bd808AE32DB4570df",
+        "joined": true,
+        "alive": true,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "2613600000000000",
+        "claimed_wei": "2613600000000000",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xdb7bAca89282130D98dfD125b4CBC1188310C635",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x3D47Ed4b80bb9331c99F7DD6f7d18456Aed48Dd2",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xe033310Dd4DBD32C011B0DB1E5f636594E33050f",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x86772124fe3e21069FC72dC8345d0465c0492563",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0xd7cF069cE508aF03C8D4611679Db3ff50B92709f",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x5b6BA41AC71e2201609eC81BaaE4f876aabb303E",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x5f24946dfaaa238255F759bdD774505BbA4C5D8E",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      },
+      {
+        "wallet_address": "0x5032bD27718a3d0Ba9098EfED91de48b17dc4915",
+        "joined": true,
+        "alive": false,
+        "committed": true,
+        "revealed": true,
+        "award_wei": "0",
+        "claimed_wei": "0",
+        "refunded_wei": "0"
+      }
+    ],
+    "config": {
+      "entryFeeWei": "1000000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "32",
+      "maxPlayers": "32",
+      "maxCauses": "2"
+    },
+    "transaction_hash": null
+  }
+}

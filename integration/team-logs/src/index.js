@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 const TEAMS = new Set(["openclaw", "hermes"]);
 const PHASES = new Set(["join", "commit", "reveal", "claim"]);
 const STATUSES = new Set(["submitted", "observed", "skipped", "error"]);
-const SEAT_PATTERN = /^(oc|hs)-[1-5]$/;
+const SEAT_PATTERN = /^(oc|hs)-(?:[1-9]|10)$/;
 const TX_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 const SAFE_GAME_ID = /^[A-Za-z0-9._-]+$/;
 

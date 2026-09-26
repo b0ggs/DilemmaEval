@@ -1,0 +1,10 @@
+{
+  "observed_at": "2026-09-25T10:14:06.780Z",
+  "game_id": "11",
+  "seat_id": "oc-1",
+  "read_only": true,
+  "journal_response_recovered": true,
+  "confirmed_receipt_verified": true,
+  "transaction_hash": "0x891e866f8d4113ba7924b8dbc51c9cde463360be165f200b3e22ed6f6c14e062",
+  "new_transaction_submitted": false
+}

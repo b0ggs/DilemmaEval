@@ -1,0 +1,227 @@
+{
+  "transaction_hash": "0xc6764c449f9e6697e0f7e64329bb5ca9670a84131e951c3be615c66b8fd143a7",
+  "before": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47291528",
+    "block_hash": "0x9c1cd248fbe7358e5f21f6974a165d185137a9f8c8479bffe08fedfc8a329526",
+    "block_timestamp": "1790351344",
+    "owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+    "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+    "identity_registry_address": "0x7177a6867296406881E20d6647232314736Dd09A",
+    "active_game_id": "0",
+    "code_hash": "0x0229b422ca8d4c8262ac3aab7fffc68e9a556c4f5a4fdeae36bc5d395cb90742",
+    "config": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "180",
+      "revealDurationBlocks": "120",
+      "minPlayers": "10",
+      "maxPlayers": "10",
+      "maxCauses": "2"
+    },
+    "player_funding": {
+      "fee_model": "pinned-ethers-5",
+      "base_fee_per_gas_wei": "5000000",
+      "max_fee_per_gas_wei": "1510000000",
+      "reserve_gas_units": "1000000",
+      "minimum_balance_wei": "1610000000000000"
+    },
+    "players": [
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "admitted": true,
+        "agent_key": "0xed564c7e99bad152fb4f8c65276a2ba587c292173aee76967551362a18282656",
+        "balance_wei": "10837215564757454",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-2",
+        "wallet_address": "0xE1Cc471E2B1736Ce99fb2B5b996d8c33663e973D",
+        "admitted": true,
+        "agent_key": "0xeacb2b25876f456017bd3b6b9a1f5327d062463789c02315d7e8ebddfe589e73",
+        "balance_wei": "15823037400221631",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-3",
+        "wallet_address": "0xc017b209745d18d1125BC56cBf9e7a1839Bc46BD",
+        "admitted": true,
+        "agent_key": "0xf7a9144d841dba68f3da1ae86c3c8a5e6c88f3933a68d0de83407b67f7b9b886",
+        "balance_wei": "15913037403134914",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-4",
+        "wallet_address": "0xB4b27A75Cae4167A849Dbe87585f165f3A81aF44",
+        "admitted": true,
+        "agent_key": "0x8f45a506d86f73a1996eb0e54dbfd6ca08a6b8d9707699a8c0db056e990375ca",
+        "balance_wei": "15833037821587368",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-5",
+        "wallet_address": "0x77B468c94965557FDf59C15f132555bb128392a6",
+        "admitted": true,
+        "agent_key": "0x79972b7eecca6b60208cc8dc122d7687848cfa0981e4c56c797a9d9fa4f49c62",
+        "balance_wei": "15923169347000271",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9DAb46BCD953eb2a3AB4D49A11f800E6BE5f356",
+        "admitted": true,
+        "agent_key": "0x2760eb06c51071f467184650724e2ad5ede779245a464d367e1c472b7ecf56b1",
+        "balance_wei": "12023538128628821",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421BbBC3cC480147b2586f91b1d25B8bc817916b",
+        "admitted": true,
+        "agent_key": "0x926d384de81d84927e7c6a9167024f99fe6966df8eedb6cc577940d79fe9dead",
+        "balance_wei": "12964420081921246",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-3",
+        "wallet_address": "0xAD689B9D285593deCd62b3a016ae91808f01228C",
+        "admitted": true,
+        "agent_key": "0x670f62a58e9f456f22011c672e5dce3f714ce378a0b3e6d72568e180df770959",
+        "balance_wei": "16023001852611229",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-4",
+        "wallet_address": "0x538f2Aad18639ee4f479a54969c97767087Cc794",
+        "admitted": true,
+        "agent_key": "0xea07902f28de4ce2bb7b39472fbb630b4bc83b9498d4fcfb586fb331c75c25a4",
+        "balance_wei": "15923133325129879",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-5",
+        "wallet_address": "0xf979F1D771b762E177Fb1c86e9D8c4dff05982DA",
+        "admitted": true,
+        "agent_key": "0x42e385978c74d20251a0cf5cd5ef376d7ee72adea5c68dad39ba02dd6310028c",
+        "balance_wei": "16023133325129879",
+        "cause_whitelisted": true
+      }
+    ]
+  },
+  "after": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47291535",
+    "block_hash": "0xce5f4bae0af0e768178700888e1c250de08ea4c7670cf4d8d74169106f08001d",
+    "block_timestamp": "1790351358",
+    "owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+    "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+    "identity_registry_address": "0x7177a6867296406881E20d6647232314736Dd09A",
+    "active_game_id": "0",
+    "code_hash": "0x0229b422ca8d4c8262ac3aab7fffc68e9a556c4f5a4fdeae36bc5d395cb90742",
+    "config": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "300",
+      "revealDurationBlocks": "180",
+      "minPlayers": "10",
+      "maxPlayers": "10",
+      "maxCauses": "2"
+    },
+    "player_funding": {
+      "fee_model": "pinned-ethers-5",
+      "base_fee_per_gas_wei": "5000000",
+      "max_fee_per_gas_wei": "1510000000",
+      "reserve_gas_units": "1000000",
+      "minimum_balance_wei": "1610000000000000"
+    },
+    "players": [
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "admitted": true,
+        "agent_key": "0xed564c7e99bad152fb4f8c65276a2ba587c292173aee76967551362a18282656",
+        "balance_wei": "10837215564757454",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-2",
+        "wallet_address": "0xE1Cc471E2B1736Ce99fb2B5b996d8c33663e973D",
+        "admitted": true,
+        "agent_key": "0xeacb2b25876f456017bd3b6b9a1f5327d062463789c02315d7e8ebddfe589e73",
+        "balance_wei": "15823037400221631",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-3",
+        "wallet_address": "0xc017b209745d18d1125BC56cBf9e7a1839Bc46BD",
+        "admitted": true,
+        "agent_key": "0xf7a9144d841dba68f3da1ae86c3c8a5e6c88f3933a68d0de83407b67f7b9b886",
+        "balance_wei": "15913037403134914",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-4",
+        "wallet_address": "0xB4b27A75Cae4167A849Dbe87585f165f3A81aF44",
+        "admitted": true,
+        "agent_key": "0x8f45a506d86f73a1996eb0e54dbfd6ca08a6b8d9707699a8c0db056e990375ca",
+        "balance_wei": "15833037821587368",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-5",
+        "wallet_address": "0x77B468c94965557FDf59C15f132555bb128392a6",
+        "admitted": true,
+        "agent_key": "0x79972b7eecca6b60208cc8dc122d7687848cfa0981e4c56c797a9d9fa4f49c62",
+        "balance_wei": "15923169347000271",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9DAb46BCD953eb2a3AB4D49A11f800E6BE5f356",
+        "admitted": true,
+        "agent_key": "0x2760eb06c51071f467184650724e2ad5ede779245a464d367e1c472b7ecf56b1",
+        "balance_wei": "12023538128628821",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421BbBC3cC480147b2586f91b1d25B8bc817916b",
+        "admitted": true,
+        "agent_key": "0x926d384de81d84927e7c6a9167024f99fe6966df8eedb6cc577940d79fe9dead",
+        "balance_wei": "12964420081921246",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-3",
+        "wallet_address": "0xAD689B9D285593deCd62b3a016ae91808f01228C",
+        "admitted": true,
+        "agent_key": "0x670f62a58e9f456f22011c672e5dce3f714ce378a0b3e6d72568e180df770959",
+        "balance_wei": "16023001852611229",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-4",
+        "wallet_address": "0x538f2Aad18639ee4f479a54969c97767087Cc794",
+        "admitted": true,
+        "agent_key": "0xea07902f28de4ce2bb7b39472fbb630b4bc83b9498d4fcfb586fb331c75c25a4",
+        "balance_wei": "15923133325129879",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-5",
+        "wallet_address": "0xf979F1D771b762E177Fb1c86e9D8c4dff05982DA",
+        "admitted": true,
+        "agent_key": "0x42e385978c74d20251a0cf5cd5ef376d7ee72adea5c68dad39ba02dd6310028c",
+        "balance_wei": "16023133325129879",
+        "cause_whitelisted": true
+      }
+    ]
+  }
+}

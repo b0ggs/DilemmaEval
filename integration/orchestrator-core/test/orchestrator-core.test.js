@@ -126,6 +126,21 @@ test("join advances only after its timestamp deadline", () => {
   assert.equal(result.reason, "join-deadline-reached");
 });
 
+test("an empty joining game uses its real zero-player count and strict deadline", () => {
+  const empty = snapshot({ phase: "join", alive_count: 0 });
+  assert.equal(normalizeChainSnapshot(empty).alive_count, 0);
+  assert.equal(evaluateChainSnapshot(empty).status, "wait");
+  assert.equal(evaluateChainSnapshot({ ...empty, clock: {unit: "timestamp", current: "111", deadline: "110"} }).status, "advance-eligible");
+  assert.throws(() => normalizeChainSnapshot(snapshot({alive_count: 0})), /alive player/);
+});
+
+test("terminal rounds retain acted counts from before final elimination", () => {
+  const terminal = snapshot({ phase: "terminal", alive_count: 1, committed_count: 3, revealed_count: 3 });
+  assert.equal(normalizeChainSnapshot(terminal).committed_count, 3);
+  assert.equal(evaluateChainSnapshot(terminal).status, "terminal");
+  assert.throws(() => normalizeChainSnapshot(snapshot({alive_count: 1, committed_count: 3})), /Acted counts/);
+});
+
 test("commit advances when all alive players committed", () => {
   const result = evaluateChainSnapshot(snapshot({ committed_count: 10 }));
   assert.equal(result.status, "advance-eligible");
@@ -605,6 +620,68 @@ test("atomic request claim distinguishes duplicate from conflict", async () => {
   );
 });
 
+test("request validation accepts seat 10 for both teams and persists it safely", async () => {
+  const core = coreWith();
+  const tenthSeats = [
+    request({
+      request_id: "game-12-round-1-commit-oc-10",
+      seat_id: "oc-10"
+    }),
+    request({
+      request_id: "game-12-round-1-commit-hs-10",
+      seat_id: "hs-10"
+    })
+  ];
+
+  for (const poke of tenthSeats) {
+    assert.equal((await core.recordRequest(poke)).status, "recorded");
+  }
+
+  const resumed = await core.resume();
+  assert.deepEqual(
+    resumed.pending_requests.map(({ seat_id }) => seat_id).sort(),
+    ["hs-10", "oc-10"]
+  );
+});
+
+test("request validation rejects seat 11, zero, leading zero, and malformed IDs", async () => {
+  const core = coreWith();
+  const invalidSeatIds = [
+    "oc-11",
+    "hs-11",
+    "oc-0",
+    "hs-0",
+    "oc-01",
+    "hs-010",
+    "oc-",
+    "hs-one"
+  ];
+
+  for (const seatId of invalidSeatIds) {
+    await assert.rejects(
+      core.recordRequest(
+        request({
+          request_id: `invalid-${seatId}`,
+          seat_id: seatId
+        })
+      ),
+      /request\.seat_id is unsupported/
+    );
+  }
+});
+
+test("tenth-seat requests retain strict team isolation", async () => {
+  const core = coreWith();
+  await assert.rejects(
+    core.recordRequest(request({ seat_id: "oc-10", team: "hermes" })),
+    /does not match request\.team/
+  );
+  await assert.rejects(
+    core.recordRequest(request({ seat_id: "hs-10", team: "openclaw" })),
+    /does not match request\.team/
+  );
+});
+
 test("response acknowledgement rejects orphan and deduplicates", async () => {
   const core = coreWith();
   const poke = request();
@@ -616,6 +693,41 @@ test("response acknowledgement rejects orphan and deduplicates", async () => {
   assert.equal(
     (await core.recordResponse({ ...response, status: "observed" })).status,
     "conflict"
+  );
+});
+
+test("response validation accepts seat 10 and rejects IDs beyond the strict range", async () => {
+  const core = coreWith();
+  for (const seatId of ["oc-10", "hs-10"]) {
+    const poke = request({
+      request_id: `game-12-round-1-commit-${seatId}`,
+      seat_id: seatId
+    });
+    await core.recordRequest(poke);
+    assert.equal((await core.recordResponse(responseFor(poke))).status, "recorded");
+  }
+
+  for (const seatId of ["oc-11", "hs-11", "oc-0", "hs-00", "oc-010", "bad-1"]) {
+    await assert.rejects(
+      core.recordResponse(responseFor(request(), { seat_id: seatId })),
+      /response\.seat_id is unsupported/
+    );
+  }
+
+  const resumed = await core.resume();
+  assert.deepEqual(resumed.pending_requests, []);
+});
+
+test("tenth-seat responses remain bound to the persisted request identity", async () => {
+  const core = coreWith();
+  const poke = request({
+    request_id: "game-12-round-1-commit-oc-10",
+    seat_id: "oc-10"
+  });
+  await core.recordRequest(poke);
+  await assert.rejects(
+    core.recordResponse(responseFor(poke, { seat_id: "hs-10" })),
+    /RESPONSE_IDENTITY_MISMATCH/
   );
 });
 

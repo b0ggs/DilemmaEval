@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-25T15:31:45.957Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "started_at": "2026-09-25T15:32:04.128Z",
+      "request_id": "conference:f618a274e7591be95ff7330cbf98d16f",
+      "seat_id": "hs-2",
+      "operation": "join",
+      "game_id": "15",
+      "round": 0,
+      "finished_at": "2026-09-25T15:33:16.844Z",
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "INVALID_REPOSITORY",
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0xb95ec2439160d02d3b15f5c0492a6e01df3a32abd5092e93fe8434f7bb81e8dd"
+    }
+  },
+  "latest": {
+    "game_id": "15",
+    "phase": "join",
+    "round": 0,
+    "joined": 1,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "started_at": "2026-09-25T15:32:04.128Z",
+    "request_id": "conference:f618a274e7591be95ff7330cbf98d16f",
+    "seat_id": "hs-2",
+    "operation": "join",
+    "game_id": "15",
+    "round": 0,
+    "finished_at": "2026-09-25T15:33:16.844Z",
+    "status": "error",
+    "transaction_hash": null,
+    "error_code": "INVALID_REPOSITORY",
+    "has_team_message": false
+  },
+  "final_chain": {
+    "game_id": "15",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 1,
+    "block_number": "47291185"
+  },
+  "runner_stopped": true,
+  "finished_at": "2026-09-25T15:33:20.421Z",
+  "cancellation": {
+    "confirmed": true,
+    "transaction_hash": "0xda22ea5bd0b8679ee73ee70bf1ef38f0031c0bff7177baeac9786759eaca1fbe"
+  },
+  "telegram": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 3,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  },
+  "refund": {
+    "seat_id": "hs-1",
+    "transaction_hash": "0x41ead9de3ea333e3fdc16f27c75c5d856cc9078df2814d404ae72d466950b8a9",
+    "confirmed": true
+  }
+}

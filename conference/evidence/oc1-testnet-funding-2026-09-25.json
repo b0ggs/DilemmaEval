@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "chain_id": 84532,
+  "seat_id": "oc-1",
+  "started_at": "2026-09-25T00:50:50.948Z",
+  "from": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+  "to": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356",
+  "amount_wei": "14756737679997852",
+  "before_balance_wei": "243262320002148",
+  "target_balance_wei": "15000000000000000",
+  "transaction_hash": "0xa52e9a26054a528b5fc756458fd2b7f5b13f2008b978173d5781086afb27eefa",
+  "owner_nonce": 415,
+  "status": "confirmed",
+  "block_number": 47264586,
+  "after_balance_wei": "15000000000000000",
+  "readiness": {
+    "ready": true,
+    "issues": [],
+    "target": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "60",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "3",
+      "maxPlayers": "3",
+      "maxCauses": "2"
+    }
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "at": "2026-09-25T17:12:31.668882+00:00",
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "verified_at": "2026-09-25T17:21:03.130Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "4edddedbe892191226b96380599d5547dc90554d7e9fce93954e7cb9a83cd494",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "hs-1",
+        "harness": "hermes",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "hs-2",
+      "verified_at": "2026-09-25T17:20:52.045Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "681637df65e1959e6e1af06d4255833a77d8685719b51b3d2fd9120d0c1a2aac",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "hs-2",
+        "harness": "hermes",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "hs-3",
+      "verified_at": "2026-09-25T17:21:03.098Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "b9b1922d324aae4fdb91b05d39c4ec4e8501eb6c11747f89581e10c6e90211cb",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "hs-3",
+        "harness": "hermes",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "hs-4",
+      "verified_at": "2026-09-25T17:21:03.130Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "5b94e3a276bcf4fe5e334f985b2c16e26dc04ebae477ac608b6bbb7f6bc2f293",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "hs-4",
+        "harness": "hermes",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "hs-5",
+      "verified_at": "2026-09-25T17:20:55.369Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "ad70d489e176bb16d5004f96bdcf4e0b5f4b7785845787e88365be64d51fb9ea",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "hs-5",
+        "harness": "hermes",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "oc-1",
+      "verified_at": "2026-09-25T17:24:10.763Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "1bf0166cd3fa1aa96a1d50c296e315a7788c0da5fe34764696a68d11b1a34990",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "oc-1",
+        "harness": "openclaw",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "oc-2",
+      "verified_at": "2026-09-25T17:23:55.032Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "24600f5fadb3a99c1f173e9e2c8dc7275b585b60368b13b849968823ce16508e",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "oc-2",
+        "harness": "openclaw",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "oc-3",
+      "verified_at": "2026-09-25T17:24:10.762Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "175368fef19e44245ccbe058e58ba9c405dd776ef08531f5d8ec87eb156e0f50",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "oc-3",
+        "harness": "openclaw",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "oc-4",
+      "verified_at": "2026-09-25T17:24:10.762Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "d4137bef0cdacb7a9bb0f3d9785f81dae7104bcb9545baecd5d673dc868320ce",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "oc-4",
+        "harness": "openclaw",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    },
+    {
+      "seat_id": "oc-5",
+      "verified_at": "2026-09-25T17:23:52.929Z",
+      "actual_read_only_command_passed": true,
+      "artifact_sha256": "ae57e1d98a5d450e5cadbe5589e92b12134b87d1e3ab83f1e0ebc436180e5497",
+      "model_configuration": {
+        "schema_version": 1,
+        "seat_id": "oc-5",
+        "harness": "openclaw",
+        "configured": true,
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low",
+        "max_output_tokens": 2048,
+        "automatic_fallback": false,
+        "fallback_model": null,
+        "response_metadata_required": true
+      }
+    }
+  ],
+  "paid_model_probes_reused": true,
+  "all_ten_actual_commands_passed": true,
+  "team_objective_deployed_in_player_md_and_native_call_prompts": true,
+  "chain_read_retry_deployed": true,
+  "updated_at": "2026-09-25T17:24:44.841410+00:00"
+}

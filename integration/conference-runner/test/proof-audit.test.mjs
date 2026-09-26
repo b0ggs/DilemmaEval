@@ -1,0 +1,222 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { Interface } from 'ethers';
+import { auditControlledProof } from '../src/proof-audit.mjs';
+import { GAME_ABI } from '../src/chain/abi.mjs';
+import { FROZEN_NETWORK } from '../../game-bridge/src/index.js';
+
+const abi = new Interface([...GAME_ABI,
+  'event Committed(uint256 indexed gameId,uint32 indexed round,address indexed wallet,bytes32 commitment)',
+  'event Revealed(uint256 indexed gameId,uint32 indexed round,address indexed wallet,uint8 choice)']);
+const H = value => `0x${value.toString(16).padStart(64, '0')}`;
+const hash = value => createHash('sha256').update(value).digest('hex');
+const PRIVATE_TEXT = 'fixture-only discussion text never included in audit output';
+const config = {
+  chain_id: 84532, game_address: FROZEN_NETWORK.game, run_id: 'controlled-proof-fixture',
+  start_block: '100', confirmations: 2,
+  roster: [
+    { seat_id: 'oc-1', team: 'openclaw', harness: 'openclaw', wallet_address: '0x1111111111111111111111111111111111111111' },
+    { seat_id: 'oc-2', team: 'openclaw', harness: 'openclaw', wallet_address: '0x2222222222222222222222222222222222222222' },
+    { seat_id: 'hs-1', team: 'hermes', harness: 'hermes', wallet_address: '0x3333333333333333333333333333333333333333' },
+  ],
+  telegram: { openclaw: { chat_id: '-100123' }, hermes: { chat_id: '-100123' } },
+};
+
+function log(name, values, blockNumber, index = 0, transactionHash = H(1000 + blockNumber)) {
+  return { ...abi.encodeEventLog(abi.getEvent(name), values), address: config.game_address,
+    blockNumber, blockHash: H(blockNumber), transactionHash, index, removed: false };
+}
+function sent(key, team, text, message_id) {
+  return { key, team, text, digest: hash(text), status: 'sent', message_id,
+    delivered_at: '2026-09-25T12:00:00.000Z' };
+}
+function fixture(roster = config.roster) {
+  const fixtureConfig = { ...config, roster: structuredClone(roster) };
+  const logs = [log('GameCreated', [9, 1000, 100000000000000n, roster.length, roster.length, 2], 100)];
+  for (const [i, seat] of roster.entries()) {
+    const choice = i === roster.length - 1 ? 3 : 1;
+    logs.push(log('PlayerJoined', [9, seat.wallet_address, H(300 + i), 1, i + 1], 101, i));
+    logs.push(log('Committed', [9, 1, seat.wallet_address, H(9000 + i)], 104, i));
+    logs.push(log('Revealed', [9, 1, seat.wallet_address, choice], 107, i));
+    logs.push(log('EffectiveChoiceMaterialized', [9, 1, seat.wallet_address, choice, false, false], 110, i));
+  }
+  logs.push(log('RoundResolved', [9, 1, roster.length - 1, 0, 1, roster.length - 1, 1, 0], 110, roster.length));
+  logs.push(log('GameEnded', [9, 1, 1, 1, 0], 110, roster.length + 1));
+  const receipts = new Map([100, 110].map(number => [H(1000 + number), {
+    status: 1, hash: H(1000 + number), to: config.game_address, blockNumber: number,
+    blockHash: H(number), logs: logs.filter(item => item.blockNumber === number),
+  }]));
+  const calls = [];
+  const provider = {
+    async send(method, params) { assert.equal(method, 'eth_chainId'); assert.deepEqual(params, []); return '0x14a34'; },
+    async getBlockNumber() { return 112; },
+    async getBlock(number) { return { number, hash: H(number) }; },
+    async getTransactionReceipt(tx) { return receipts.get(tx) ?? null; },
+    async getLogs(filter) {
+      calls.push(filter);
+      assert.equal(filter.address, config.game_address);
+      assert.equal(filter.topics[1], H(9));
+      assert.equal(filter.topics[0].length, 8);
+      return logs.filter(item => item.blockNumber >= filter.fromBlock && item.blockNumber <= filter.toBlock);
+    },
+  };
+  const report = { launch_attempts: 1, proof_complete: true, telegram: { ok: true },
+    creation: { status: 'accepted', reference: { kind: 'transaction-hash', value: H(1100) } },
+    dispatches: roster.flatMap(seat => [
+      { game_id: '9', round: 1, seat_id: seat.seat_id, operation: 'discussion', status: 'observed', has_team_message: true },
+      ...['join', 'commit', 'reveal'].map(operation => ({ game_id: '9', round: 1, seat_id: seat.seat_id, operation, status: 'submitted' })),
+    ]) };
+  const outbox = { schema_version: 1, run_id: fixtureConfig.run_id,
+    chats: { openclaw: '-100123', hermes: '-100123' }, entries: roster.map((seat, i) => sent(
+      `message:${seat.team}:9:${i + 1}`, seat.team,
+      `${seat.seat_id} (${seat.team === 'hermes' ? 'Hermes' : 'OpenClaw'}) · Game 9 · Round 1\n${PRIVATE_TEXT}`, 20 + i)),
+  };
+  outbox.entries.push(sent(`event:openclaw:${H(1110)}:${roster.length + 1}`, 'openclaw',
+    `Dealer · Game 9 · Round 1\nGame completed\nhttps://sepolia.basescan.org/tx/${H(1110)}`, 20 + roster.length));
+  return { config: fixtureConfig, gameId: '9', provider, report, outbox, logs, receipts, calls };
+}
+function replaceEvent(f, name, replacement) {
+  const index = f.logs.findIndex(item => abi.parseLog(item).name === name);
+  const original = f.logs[index];
+  f.logs[index] = replacement(original);
+  for (const receipt of f.receipts.values()) receipt.logs = f.logs.filter(item => item.transactionHash === receipt.hash);
+}
+
+test('audits actual confirmed per-seat events and delivered discussion without exposing content', async () => {
+  const f = fixture();
+  const audit = await auditControlledProof(f);
+  assert.equal(audit.proof_complete, true, JSON.stringify(audit));
+  assert.equal(audit.chain_verified, true);
+  assert.equal(audit.telegram_verified, true);
+  assert.equal(audit.joined_count, 3);
+  assert.equal(audit.committed_seat_count, 3);
+  assert.equal(audit.revealed_seat_count, 3);
+  assert.equal(audit.round_count, 1);
+  assert.equal(audit.defaulted_count, 0);
+  assert.equal(audit.discussion_message_count, 3);
+  assert.equal(audit.creation_transaction_hash, H(1100));
+  assert.equal(audit.result_transaction_hash, H(1110));
+  assert.deepEqual(audit.result_message_ids, [{ team: 'openclaw', message_id: 23 }]);
+  assert.ok(audit.seats.every(seat => seat.joined && seat.committed && seat.revealed && seat.discussion_delivered));
+  assert.ok(f.calls.every(call => call.fromBlock >= 100 && call.toBlock <= 111));
+  assert.equal(JSON.stringify(audit).includes(PRIVATE_TEXT), false);
+  assert.equal(JSON.stringify(audit).includes(H(9000)), false);
+});
+
+test('audits a complete five-vs-five roster without weakening per-seat acceptance', async () => {
+  const roster = [];
+  for (const [team, prefix, offset] of [['openclaw', 'oc', 0], ['hermes', 'hs', 5]]) {
+    for (let index = 1; index <= 5; index++) {
+      roster.push({ seat_id: `${prefix}-${index}`, team, harness: team,
+        wallet_address: `0x${(offset + index).toString(16).padStart(40, '0')}` });
+    }
+  }
+  const complete = fixture(roster);
+  const audit = await auditControlledProof(complete);
+  assert.equal(audit.proof_complete, true, JSON.stringify(audit));
+  assert.equal(audit.joined_count, 10);
+  assert.equal(audit.committed_seat_count, 10);
+  assert.equal(audit.revealed_seat_count, 10);
+  assert.equal(audit.discussion_message_count, 10);
+  assert.equal(audit.defaulted_count, 0);
+  assert.equal(audit.seats.length, 10);
+  assert.ok(audit.seats.every(seat => seat.joined && seat.committed && seat.revealed && seat.discussion_delivered));
+
+  const missing = fixture(roster);
+  missing.logs.splice(missing.logs.findIndex(item => abi.parseLog(item).name === 'Revealed'), 1);
+  assert.deepEqual((await auditControlledProof(missing)).issues, ['PROOF_ACTIONS_UNVERIFIED']);
+});
+
+test('old-game dispatches and outbox messages cannot satisfy current-game discussion', async () => {
+  for (const kind of ['dispatch', 'outbox']) {
+    const f = fixture();
+    if (kind === 'dispatch') f.report.dispatches.forEach(row => { row.game_id = '8'; });
+    else f.outbox.entries.filter(row => row.key.startsWith('message:')).forEach(row => {
+      row.key = row.key.replace(':9:', ':8:'); row.text = row.text.replace('Game 9', 'Game 8'); row.digest = hash(row.text);
+    });
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, false);
+    assert.equal(audit.chain_verified, true);
+    assert.deepEqual(audit.issues, ['PROOF_DISCUSSION_UNVERIFIED']);
+  }
+});
+
+test('old-game chain logs cannot satisfy even an agent-reported successful proof', async () => {
+  const f = fixture();
+  replaceEvent(f, 'Committed', original => log('Committed', [8, 1, config.roster[0].wallet_address, H(9000)], original.blockNumber));
+  const audit = await auditControlledProof(f);
+  assert.equal(audit.proof_complete, false);
+  assert.deepEqual(audit.issues, ['PROOF_CHAIN_LOG_INVALID']);
+});
+
+test('submitted acknowledgements cannot replace each seat’s actual commit and reveal', async () => {
+  for (const missing of ['Committed', 'Revealed']) {
+    const f = fixture();
+    f.logs.splice(f.logs.findIndex(item => abi.parseLog(item).name === missing), 1);
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, false);
+    assert.deepEqual(audit.issues, ['PROOF_ACTIONS_UNVERIFIED']);
+  }
+});
+
+test('joined players must be the exact roster and all effective choices must be voluntary', async () => {
+  const wrong = fixture();
+  replaceEvent(wrong, 'PlayerJoined', original => log('PlayerJoined', [9, '0x4444444444444444444444444444444444444444', H(300), 1, 1], original.blockNumber));
+  assert.deepEqual((await auditControlledProof(wrong)).issues, ['PROOF_ROSTER_UNVERIFIED']);
+  for (const flags of [[true, false], [false, true]]) {
+    const f = fixture();
+    replaceEvent(f, 'EffectiveChoiceMaterialized', original => log('EffectiveChoiceMaterialized',
+      [9, 1, config.roster[0].wallet_address, 1, ...flags], original.blockNumber, original.index));
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, false);
+    assert.equal(audit.defaulted_count, 1);
+    assert.deepEqual(audit.issues, ['PROOF_DEFAULTED_ACTIONS']);
+  }
+});
+
+test('pending, inflight, uncertain and rejected Telegram entries fail despite healthy report', async () => {
+  for (const status of ['pending', 'inflight', 'uncertain', 'rejected']) {
+    const f = fixture(); f.outbox.entries[0].status = status;
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.chain_verified, true);
+    assert.equal(audit.proof_complete, false);
+    assert.deepEqual(audit.issues, ['PROOF_TELEGRAM_UNDELIVERED']);
+  }
+});
+
+test('discussion delivery needs integrity and completed result delivery to every distinct chat', async () => {
+  const tampered = fixture(); tampered.outbox.entries[0].text += ' changed';
+  assert.deepEqual((await auditControlledProof(tampered)).issues, ['PROOF_TELEGRAM_UNDELIVERED']);
+  const missing = fixture(); missing.outbox.entries.pop();
+  assert.deepEqual((await auditControlledProof(missing)).issues, ['PROOF_RESULT_DELIVERY_UNVERIFIED']);
+  const separate = fixture(); separate.config.telegram.hermes.chat_id = '-100456'; separate.outbox.chats.hermes = '-100456';
+  assert.deepEqual((await auditControlledProof(separate)).issues, ['PROOF_RESULT_DELIVERY_UNVERIFIED']);
+  const result = separate.outbox.entries.at(-1);
+  separate.outbox.entries.push(sent(result.key.replace('openclaw', 'hermes'), 'hermes', result.text, 23));
+  assert.equal((await auditControlledProof(separate)).proof_complete, true);
+});
+
+test('creation and completed result require successful matching canonical confirmed receipts', async () => {
+  for (const tx of [H(1100), H(1110)]) {
+    const f = fixture(); f.receipts.get(tx).status = 0;
+    assert.deepEqual((await auditControlledProof(f)).issues, ['PROOF_RECEIPT_UNVERIFIED']);
+  }
+  const missing = fixture(); missing.receipts.get(H(1110)).logs = [];
+  assert.deepEqual((await auditControlledProof(missing)).issues, ['PROOF_RESULT_UNVERIFIED']);
+  const unconfirmed = fixture(); unconfirmed.provider.getBlockNumber = async () => 110;
+  assert.equal((await auditControlledProof(unconfirmed)).proof_complete, false);
+  const reorg = fixture(); let reads = 0;
+  reorg.provider.getBlock = async number => ({ number, hash: number === 111 && ++reads > 1 ? H(999) : H(number) });
+  assert.deepEqual((await auditControlledProof(reorg)).issues, ['PROOF_CHAIN_REORG']);
+});
+
+test('scope mismatch and provider failures fail closed without copying secrets', async () => {
+  const wrong = fixture(); wrong.outbox.run_id = 'other-run';
+  assert.deepEqual((await auditControlledProof(wrong)).issues, ['PROOF_TELEGRAM_SCOPE_MISMATCH']);
+  const failure = fixture(); failure.provider.send = async () => { throw new Error('SECRET_RPC_KEY_PRIVATE'); };
+  const audit = await auditControlledProof(failure);
+  assert.equal(audit.proof_complete, false);
+  assert.deepEqual(audit.issues, ['PROOF_AUDIT_UNAVAILABLE']);
+  assert.equal(JSON.stringify(audit).includes('SECRET_RPC_KEY_PRIVATE'), false);
+});

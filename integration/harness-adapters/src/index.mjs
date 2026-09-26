@@ -20,7 +20,8 @@ export const PLAYER_OPERATION_ALLOWLIST = Object.freeze([
   "prepare_commit",
   "commit",
   "reveal",
-  "claim"
+  "claim",
+  "refund"
 ]);
 
 export const READ_ONLY_OPERATION_ALLOWLIST = Object.freeze([
@@ -34,7 +35,8 @@ export const PLAYER_SIGNED_OPERATION_ALLOWLIST = Object.freeze([
   "prepare_commit",
   "commit",
   "reveal",
-  "claim"
+  "claim",
+  "refund"
 ]);
 
 export const UNAVOIDABLE_HARNESS_DIFFERENCES = deepFreeze([
@@ -56,12 +58,12 @@ export const UNAVOIDABLE_HARNESS_DIFFERENCES = deepFreeze([
 const HARNESS_PROFILE = Object.freeze({
   openclaw: Object.freeze({
     team: "openclaw",
-    seatPattern: /^oc-[1-5]$/,
+    seatPattern: /^oc-(?:[1-9]|10)$/,
     renderReference: renderOpenClawReference
   }),
   hermes: Object.freeze({
     team: "hermes",
-    seatPattern: /^hs-[1-5]$/,
+    seatPattern: /^hs-(?:[1-9]|10)$/,
     renderReference: renderHermesReference
   })
 });

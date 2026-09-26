@@ -1,0 +1,29 @@
+{
+  "observed_at": "2026-09-25T00:36:24.772Z",
+  "block_number": "47264145",
+  "active_game_id": "0",
+  "player_funding": {
+    "fee_model": "pinned-ethers-5",
+    "base_fee_per_gas_wei": "5000000",
+    "max_fee_per_gas_wei": "1510000000",
+    "reserve_gas_units": "1000000",
+    "minimum_balance_wei": "1610000000000000"
+  },
+  "readiness": {
+    "ready": false,
+    "issues": [
+      "oc-1:INSUFFICIENT_BALANCE"
+    ],
+    "target": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "60",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "3",
+      "maxPlayers": "3",
+      "maxCauses": "2"
+    }
+  }
+}

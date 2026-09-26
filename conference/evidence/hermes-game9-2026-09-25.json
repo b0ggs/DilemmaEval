@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-25T00:23:21.206Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "seat_id": "hs-1",
+      "operation": "claim",
+      "game_id": "8",
+      "round": 0,
+      "status": "submitted",
+      "transaction_hash": "0xf180fcf9c59549f177ee473cb1ec2a7863604caade2eac9e99e6f74015992574",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "seat_id": "oc-1",
+      "operation": "claim",
+      "game_id": "8",
+      "round": 0,
+      "status": "submitted",
+      "transaction_hash": "0x8b1b319eb600e890b72fdde5c13b04ff7f1d9486a7e4a34ae900306f54b1fc4f",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "seat_id": "hs-1",
+      "operation": "join",
+      "game_id": "9",
+      "round": 0,
+      "status": "submitted",
+      "transaction_hash": "0xdf4f4d3d4cf9a3c7bec263b67618a442c806f95a2a3d4cf80b8c764387273447",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "seat_id": "oc-1",
+      "operation": "join",
+      "game_id": "9",
+      "round": 0,
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "COMMAND_FAILED",
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0x30f1dc97bbe891e3637db3d4b799bbb5ea74a0eb777a0c73c52e5563c965f1b8"
+    }
+  },
+  "latest": {
+    "game_id": "9",
+    "phase": "join",
+    "round": 0,
+    "joined": 1,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "seat_id": "oc-1",
+    "operation": "join",
+    "game_id": "9",
+    "round": 0,
+    "status": "error",
+    "transaction_hash": null,
+    "error_code": "COMMAND_FAILED",
+    "has_team_message": false
+  },
+  "final_chain": {
+    "game_id": "9",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 1,
+    "block_number": "47263983"
+  },
+  "runner_stopped": true,
+  "finished_at": "2026-09-25T00:27:27.387Z",
+  "cancellation": {
+    "confirmed": true,
+    "transaction_hash": "0x2eba607e35039e3a8dcb94fd9946fbd61cce94866d382c91abcf8779a90a9749"
+  },
+  "telegram": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 5,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  }
+}

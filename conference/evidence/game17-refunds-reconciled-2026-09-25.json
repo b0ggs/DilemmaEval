@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-25T17:47:10.318Z",
+  "game_id": "17",
+  "active_game_id": "0",
+  "players": 9,
+  "refunds_confirmed": 9,
+  "rows": [
+    {
+      "seat_id": "oc-2",
+      "request_id": "cleanup:game17:oc-2:refund:v2",
+      "status": "submitted",
+      "transaction_hash": "0xea34dbe1c606f22c604994efca2af6f901f7714a3103c202a45f73ff9186f9df",
+      "error_code": null,
+      "confirmed": true
+    }
+  ]
+}

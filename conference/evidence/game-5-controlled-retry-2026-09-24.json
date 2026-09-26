@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "test_scope": "one fresh controlled three-agent game with Hermes retained",
+  "game_id": "5",
+  "start_block": "47261531",
+  "creation": {
+    "transaction_hash": "0xa2e4c19278f3059f999042e7ea14573d5724b924bdd69f959a6c8ecdcf3d9f89",
+    "telegram_message_id": 14
+  },
+  "hermes_join": {
+    "seat_id": "hs-1",
+    "state": "acknowledged",
+    "status": "error",
+    "transaction_hash": null,
+    "replayed": false
+  },
+  "post_stop_chain_read": {
+    "block_number": "47261646",
+    "phase": "join",
+    "alive_count": 0,
+    "players": []
+  },
+  "openclaw_dispatches": {
+    "oc-1": "phase-ended",
+    "oc-2": "phase-ended"
+  },
+  "discussion_started": false,
+  "commit_started": false,
+  "reveal_started": false,
+  "cancellation": {
+    "transaction_hash": "0x2a1cc2734faabcb0c0e9210a77ca81632660833766f1993968937fb99a7fcdf8",
+    "confirmed": true,
+    "contract_idle_after": true,
+    "telegram_delivery": "uncertain-not-replayed"
+  },
+  "additional_game_started": false,
+  "runner_stopped": true,
+  "operator_stopped": true,
+  "proof_complete": false,
+  "secrets_exposed": false
+}

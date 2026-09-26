@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "run_id": "converge-rehearsal-2026-09-24-r8",
+  "mode": "live",
+  "chain_id": 84532,
+  "rpc_url": "https://sepolia.base.org",
+  "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+  "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+  "identity_registry_address": "0x7177a6867296406881E20d6647232314736Dd09A",
+  "expected_owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+  "start_block": "47258795",
+  "start_time": "2026-09-24T21:38:00Z",
+  "stop_time": "2026-09-24T21:42:00Z",
+  "intermission_ms": 20000,
+  "poll_interval_ms": 5000,
+  "confirmations": 2,
+  "agent_timeout_ms": 180000,
+  "telegram": {
+    "openclaw": {
+      "chat_id": "-1004364922269",
+      "invite_url": null
+    },
+    "hermes": {
+      "chat_id": "-1004364922269",
+      "invite_url": null
+    }
+  },
+  "roster": [
+    {
+      "seat_id": "hs-1",
+      "team": "hermes",
+      "harness": "hermes",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-hs-1",
+      "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f",
+      "cause_id": 2,
+      "agent_id": "a0977c67-268a-4859-b88b-8df556ce9910"
+    },
+    {
+      "seat_id": "oc-1",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-1",
+      "wallet_address": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356",
+      "cause_id": 1,
+      "agent_id": "d56a1993-feb6-44a1-9f98-3a38ec16d78d"
+    },
+    {
+      "seat_id": "oc-2",
+      "team": "openclaw",
+      "harness": "openclaw",
+      "maritime_agent": "dilemmaeval-converge-2026-09-25-oc-2",
+      "wallet_address": "0x421bbbc3cc480147b2586f91b1d25b8bc817916b",
+      "cause_id": 1,
+      "agent_id": "b9f4a333-b665-4802-8e3d-a69fa097e835"
+    }
+  ]
+}

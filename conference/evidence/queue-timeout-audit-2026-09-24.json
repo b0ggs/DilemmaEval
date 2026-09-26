@@ -1,0 +1,41 @@
+{
+  "mode": "local-fixture-only-no-network",
+  "actual_runner_and_maritime_adapter": true,
+  "agent_timeout_ms": 50,
+  "wake_delay_ms": 60,
+  "calls": [
+    {
+      "seat_id": "oc-1",
+      "elapsed_since_dispatch_ms": 134,
+      "outer_timeout_ms": 50
+    },
+    {
+      "seat_id": "oc-2",
+      "elapsed_since_dispatch_ms": 60,
+      "outer_timeout_ms": 50
+    },
+    {
+      "seat_id": "hs-1",
+      "elapsed_since_dispatch_ms": 62,
+      "outer_timeout_ms": 50
+    }
+  ],
+  "expired_dispatches_reached_chat": 3,
+  "health": [
+    {
+      "code": "AGENT_ACTION_UNCERTAIN",
+      "seat_id": "oc-1",
+      "game_id": "1"
+    },
+    {
+      "code": "AGENT_ACTION_UNCERTAIN",
+      "seat_id": "oc-2",
+      "game_id": "1"
+    },
+    {
+      "code": "AGENT_ACTION_UNCERTAIN",
+      "seat_id": "hs-1",
+      "game_id": "1"
+    }
+  ]
+}

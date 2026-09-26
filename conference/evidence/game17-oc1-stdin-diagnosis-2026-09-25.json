@@ -1,0 +1,33 @@
+{
+  "at": "2026-09-25T17:37:24.399Z",
+  "game_id": "17",
+  "seat_id": "oc-1",
+  "operation": "join",
+  "reported_failure": "MARITIME_REPLY_INVALID_JSON",
+  "native_model": "gpt-5.4-mini",
+  "native_status": "success",
+  "native_timed_out": false,
+  "native_exec_schema_accepts_stdin": false,
+  "native_exec_argument_names": [
+    "command",
+    "workdir",
+    "timeout",
+    "yieldMs",
+    "pty"
+  ],
+  "native_command_includes_player_cli": true,
+  "native_command_length": 137,
+  "stdin_redirect_present": false,
+  "pipe_present": false,
+  "printf_present": false,
+  "echo_present": false,
+  "runtime_join_journal_present": false,
+  "confirmed_join": false,
+  "diagnosis": "The native agent invoked the player CLI without supplying the request on stdin. It failed before the runtime journal/signing boundary.",
+  "remediation_in_progress": false,
+  "remediation": "Coordinator stages the exact per-seat public request and provides a short stdin shell command; commit choice stays agent-selected.",
+  "targeted_transport_tests_passed": 29,
+  "independent_review_passed": true,
+  "live_cached_probe_evidence": "staged-stdin-delivery-proof-2026-09-25.json",
+  "live_cached_probe_passed": true
+}

@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-09-25T01:57:23.343Z",
+  "operation": "read-only-inventory",
+  "http_status": 200,
+  "expected_agents": [
+    {
+      "agent_id": "b9f4a333-b665-4802-8e3d-a69fa097e835",
+      "status": "sleeping",
+      "framework": "openclaw"
+    },
+    {
+      "agent_id": "d56a1993-feb6-44a1-9f98-3a38ec16d78d",
+      "status": "sleeping",
+      "framework": "openclaw"
+    },
+    {
+      "agent_id": "a0977c67-268a-4859-b88b-8df556ce9910",
+      "status": "sleeping",
+      "framework": "hermes"
+    }
+  ]
+}

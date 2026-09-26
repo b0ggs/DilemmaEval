@@ -1,0 +1,4 @@
+import{readFile}from'node:fs/promises';
+import{createChainReader,makeProvider}from'/Users/wade/Documents/DilemmaEval/integration/conference-runner/src/chain/reader.mjs';
+const c=JSON.parse(await readFile(process.argv[2],'utf8')),p=makeProvider(c.rpc_url);
+try{const s=await createChainReader({config:c,provider:p}).readSnapshot();console.log(JSON.stringify({game_id:s.game_id,active_game_id:s.active_game_id,phase:s.phase,round:s.round,block_number:s.block_number,block_timestamp:s.block_timestamp,clock:s.clock,players:c.roster.map(seat=>{const player=s.players.find(p=>p.wallet_address.toLowerCase()===seat.wallet_address.toLowerCase());return{seat_id:seat.seat_id,joined:!!player?.joined,committed:!!player?.committed,revealed:!!player?.revealed,alive:!!player?.alive}})}))}catch{console.log('{"error_code":"CHAIN_STATUS_READ_FAILED"}');process.exitCode=1}finally{p.destroy()}

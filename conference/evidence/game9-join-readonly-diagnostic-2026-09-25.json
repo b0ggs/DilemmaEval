@@ -1,0 +1,49 @@
+{
+  "observed_at": "2026-09-25T00:29:14.730Z",
+  "block_number": 47263932,
+  "timestamp": 1790296152,
+  "join_deadline": 1790296230,
+  "entry_fee_wei": "100000000000000",
+  "max_fee_per_gas": "11000000",
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "balance_wei": "14301599525635855",
+      "latest_nonce": 6,
+      "pending_nonce": 6
+    },
+    {
+      "seat_id": "oc-1",
+      "balance_wei": "243262320002148",
+      "latest_nonce": 36,
+      "pending_nonce": 36,
+      "static_call": "ok",
+      "estimated_gas": "244605",
+      "pinned_max_required_wei": "469353550000000",
+      "enough_for_pinned_max_fee": false
+    },
+    {
+      "seat_id": "oc-2",
+      "balance_wei": "15147444361371768",
+      "latest_nonce": 4,
+      "pending_nonce": 4,
+      "static_call": "ok",
+      "estimated_gas": "244605",
+      "pinned_max_required_wei": "469353550000000",
+      "enough_for_pinned_max_fee": true
+    }
+  ],
+  "pinned_tooling_fees": {
+    "ethers_version": "ethers/5.7.2",
+    "max_fee_per_gas": "1510000000",
+    "max_priority_fee_per_gas": "1500000000",
+    "hermes_join_max_fee_per_gas": "1510000000",
+    "hermes_join_gas_limit": "296312"
+  },
+  "historical_pinned_fee_estimate": {
+    "status": "error",
+    "error_code": "CALL_EXCEPTION",
+    "insufficient_funds": false,
+    "historical_state_unavailable": false
+  }
+}

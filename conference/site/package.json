@@ -1,0 +1,11 @@
+{
+  "name": "conference-spectator-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/state.test.mjs",
+    "test:browser": "node test/browser.mjs",
+    "preview": "node test/preview.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

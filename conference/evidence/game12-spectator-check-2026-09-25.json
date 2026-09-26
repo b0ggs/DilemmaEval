@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "game_id": "12",
+  "source": "confirmed real-game public snapshot",
+  "viewer": "http://127.0.0.1:8787",
+  "read_only": true,
+  "browser_verified": true,
+  "mobile_width": 390,
+  "completed_count": 1,
+  "roster": "2 OpenClaw vs 1 Hermes",
+  "saved_proof_label_visible": true,
+  "horizontal_overflow": false,
+  "result_link_verified": true,
+  "javascript_errors": 0,
+  "site_state_tests_passed": 9,
+  "operator_stopped": true,
+  "contract_idle": true
+}

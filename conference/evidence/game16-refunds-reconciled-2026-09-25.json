@@ -1,0 +1,33 @@
+{
+  "at": "2026-09-25T17:26:28.167Z",
+  "game_id": "16",
+  "active_game_id": "0",
+  "players": 8,
+  "refunds_confirmed": 8,
+  "rows": [
+    {
+      "seat_id": "hs-4",
+      "request_id": "cleanup:game16:hs-4:refund:v2",
+      "status": "submitted",
+      "transaction_hash": "0xe0f8bc74af16539aaa13b2a965497333bb8af3b3d13450d6c0af0eb155361dfe",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-2",
+      "request_id": "cleanup:game16:hs-2:refund:v2",
+      "status": "submitted",
+      "transaction_hash": "0x115c9e7fa42e4bc4c540b1dbf1bb0e90ab9aa152b8267ed456bb03c68bf65221",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "oc-1",
+      "request_id": "cleanup:game16:oc-1:refund:v2",
+      "status": "submitted",
+      "transaction_hash": "0x552a9225cf3e12c07f52769708f30e9cddd2650f683488b8ce6c767ae20ad325",
+      "error_code": null,
+      "confirmed": true
+    }
+  ]
+}

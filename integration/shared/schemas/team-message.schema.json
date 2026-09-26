@@ -22,7 +22,7 @@
     "round": { "type": "integer", "minimum": 0 },
     "phase": { "enum": ["join", "commit", "reveal", "claim"] },
     "team": { "enum": ["openclaw", "hermes"] },
-    "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+    "seat_id": { "type": "string", "pattern": "^(oc|hs)-(?:[1-9]|10)$" },
     "sequence": { "type": "integer", "minimum": 1 },
     "received_at": { "type": "string", "format": "date-time" },
     "request_id": { "type": "string", "minLength": 1 },
@@ -31,11 +31,11 @@
   "allOf": [
     {
       "if": { "properties": { "team": { "const": "openclaw" } } },
-      "then": { "properties": { "seat_id": { "pattern": "^oc-[1-5]$" } } }
+      "then": { "properties": { "seat_id": { "pattern": "^oc-(?:[1-9]|10)$" } } }
     },
     {
       "if": { "properties": { "team": { "const": "hermes" } } },
-      "then": { "properties": { "seat_id": { "pattern": "^hs-[1-5]$" } } }
+      "then": { "properties": { "seat_id": { "pattern": "^hs-(?:[1-9]|10)$" } } }
     }
   ]
 }

@@ -1,7 +1,7 @@
 const PHASES = new Set(["join", "commit", "reveal", "claim"]);
 const TEAMS = new Set(["openclaw", "hermes"]);
 const STATUSES = new Set(["submitted", "observed", "skipped", "error"]);
-const SEAT_PATTERN = /^(oc|hs)-[1-5]$/;
+const SEAT_PATTERN = /^(oc|hs)-(?:[1-9]|10)$/;
 const TRANSACTION_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 const PHASE_ORDER = new Map([
   ["join", 0],
@@ -319,7 +319,7 @@ function nonNegativeInteger(value, path) {
 
 function seatId(value, path) {
   if (typeof value !== "string" || !SEAT_PATTERN.test(value)) {
-    fail(path, "must match ^(oc|hs)-[1-5]$");
+    fail(path, "must match ^(oc|hs)-(1-10)$ without leading zeroes");
   }
 }
 

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-24T15:14:59.712Z",
+  "kind": "live-read-only-local-bridge-auth-status",
+  "exit_code": null,
+  "error": {
+    "code": "FORBIDDEN_ENV_FILE",
+    "message": "The pinned checkout must not contain packages/foundry/.env."
+  },
+  "parsed": null
+}

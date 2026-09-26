@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T00:21:15.355Z",
+  "scope": "public bridge registry patch and read-only settlement validation; no gameplay submission",
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "files": [
+        {
+          "path": "/opt/data/dilemma-conference/hs-1/code/integration/game-bridge/src/index.js",
+          "sha256": "15d025b65addaab84370a65ce3a7386391970e93861e580df6e4a31a6ad7a6a2"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 10000,
+      "lock_released": true,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "lock_released": true,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    },
+    {
+      "seat_id": "oc-1",
+      "files": [
+        {
+          "path": "/data/dilemma-conference/oc-1/code/integration/game-bridge/src/index.js",
+          "sha256": "15d025b65addaab84370a65ce3a7386391970e93861e580df6e4a31a6ad7a6a2"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 0,
+      "lock_released": true,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "lock_released": true,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    },
+    {
+      "seat_id": "oc-2",
+      "files": [
+        {
+          "path": "/data/dilemma-conference/oc-2/code/integration/game-bridge/src/index.js",
+          "sha256": "15d025b65addaab84370a65ce3a7386391970e93861e580df6e4a31a6ad7a6a2"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 0,
+      "lock_released": true,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "lock_released": true,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    }
+  ],
+  "root_cause": {
+    "operation": "state",
+    "provided_registry": "authRegistry",
+    "incorrect_expected_registry": "identityRegistry",
+    "reproduced_error_code": "INVALID_ARGUMENT",
+    "execution_started": false
+  }
+}

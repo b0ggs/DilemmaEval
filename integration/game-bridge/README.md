@@ -18,7 +18,7 @@ pinned game checkout remains the gameplay implementation authority.
    `read-only`. Their operation sets are disjoint.
 5. Give each player process exactly one disposable Base Sepolia key as
    `GAMEPLAY_WALLET_PRIVATE_KEY`. Only `join`, `prepare_commit`, `commit`,
-   `reveal`, `claim`, and player-local `register` receive that value.
+   `reveal`, `claim`, `refund`, and player-local `register` receive that value.
 6. Give the non-player phase-advancer process a separate disposable Base
    Sepolia key as `PHASE_ADVANCER_PRIVATE_KEY`. Only `advance` receives its
    value, mapped to the pinned CLI's `GAMEPLAY_WALLET_PRIVATE_KEY` child
@@ -63,8 +63,11 @@ replacement is a trusted in-process primitive: it necessarily receives the
 private key, must not make a remote call, and must never log, persist, or
 return the key. `register --wallet`, when supplied, must match the same derived
 and manifest-bound player address. Player and phase manifest wallets may not
-coincide. The phase wallet must also differ from the runtime owner and every
-caller-supplied privileged public address.
+coincide, and the owner cannot occupy a player seat. For the legacy `phase-advancer`
+signing role, the phase wallet must differ from the runtime owner and every
+caller-supplied privileged public address. Player operations may reference the
+owner as the public operator address; the conference uses one separate owner
+operator process for creation and advancement, without passing its key to players.
 
 Every operation must explicitly supply the frozen `network`, `chainId`,
 `rpcUrl`, tournament game address, and the operation-specific frozen registry
@@ -142,8 +145,9 @@ const joined = await bridge.run("join", {
 | `reveal` | `yarn game:reveal` | Transaction |
 | `advance` | `yarn game:advance` | Transaction |
 | `claim` | `yarn game:claim` | Transaction |
+| `refund` | `yarn game:refund` | Player-local cancelled-game refund |
 
-The bridge exposes nine command families. All commands include the pinned
+The bridge exposes ten command families. All commands include the pinned
 CLI's `--json` flag. `commit` and `reveal`
 accept only prepared bundle paths; the bridge deliberately does not accept
 choice/salt reveal material for those operations. Raw private-key and

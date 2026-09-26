@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-25T09:52:15.501Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "started_at": "2026-09-25T09:52:22.258Z",
+      "request_id": "conference:7c8f0cedbc1e1f6326aeb1474515aca9",
+      "seat_id": "hs-1",
+      "operation": "claim",
+      "game_id": "10",
+      "round": 3,
+      "finished_at": "2026-09-25T09:53:25.575Z",
+      "status": "submitted",
+      "transaction_hash": "0x4c81228e961a92a7ba517b193ffd4ea928f9550e230c7da403ca6599b27b4021",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T09:52:22.305Z",
+      "request_id": "conference:e5bf02880e87f71dc45a9606ce9b1dab",
+      "seat_id": "oc-1",
+      "operation": "claim",
+      "game_id": "10",
+      "round": 3,
+      "finished_at": "2026-09-25T09:54:31.387Z",
+      "status": "submitted",
+      "transaction_hash": "0xfd253e52cad35f2a43b01b9cc944470680c5663b6dbbc1b48c91349e16a4b9cc",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T09:52:22.346Z",
+      "request_id": "conference:f3ee565117d767c1ebb9b32d3f4793ff",
+      "seat_id": "oc-2",
+      "operation": "claim",
+      "game_id": "10",
+      "round": 3,
+      "finished_at": "2026-09-25T09:55:37.492Z",
+      "status": "submitted",
+      "transaction_hash": "0x0e7cf068bdfbc3491d02a49466ebefd7be90fa5a0135b3a8f1b5b01d2b6f9742",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T09:55:56.351Z",
+      "request_id": "conference:b498b9763bcb34f8e313e2626050419e",
+      "seat_id": "hs-1",
+      "operation": "join",
+      "game_id": "11",
+      "round": 0,
+      "finished_at": "2026-09-25T09:56:43.676Z",
+      "status": "submitted",
+      "transaction_hash": "0x6e901635fd48b06794619379de3a03d8f7a778dec1eaa5e522079c3b06fba28b",
+      "error_code": null,
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0x9b00b28c0c5852cff326f1a9d0ce9a7bcc2be1a8086b3464bf1d77316f1a3bc9"
+    }
+  },
+  "latest": {
+    "game_id": "11",
+    "phase": "join",
+    "round": 0,
+    "joined": 2,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "started_at": "2026-09-25T09:55:56.393Z",
+    "request_id": "conference:294e74397018f62dfc7004e5b6fca725",
+    "seat_id": "oc-1",
+    "operation": "join",
+    "game_id": "11",
+    "round": 0,
+    "status": "transport-error",
+    "error_code": "MARITIME_AGENT_RESPONSE_INVALID",
+    "diagnostic_code": null
+  },
+  "final_chain": {
+    "game_id": "11",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 2,
+    "block_number": "47281101"
+  },
+  "runner_stopped": true,
+  "finished_at": "2026-09-25T09:57:45.536Z",
+  "cancellation": {
+    "confirmed": true,
+    "transaction_hash": "0xaa231a4edfd153b418bc63c178d00cf9f26b76258c68044050481c9cffe62e3d"
+  },
+  "telegram": {
+    "ok": false,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 6,
+    "uncertain": 1,
+    "rejected": 0,
+    "issues": [
+      "TELEGRAM_DELIVERY_UNCERTAIN"
+    ],
+    "retry_at": null
+  },
+  "operator_stopped": true
+}

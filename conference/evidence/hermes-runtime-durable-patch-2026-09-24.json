@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-24T23:57:35.893Z",
+  "scope": "public runtime patch and read-only bridge validation; no gameplay submission",
+  "before": {
+    "journal_stage": "submitting",
+    "operation": "join",
+    "response_status": null,
+    "error_code": null,
+    "runtime_uid": 10000,
+    "checkout_uid": 0,
+    "git_exit": 128,
+    "git_dubious_ownership": true,
+    "reproduced_bridge_error": "REVISION_CHECK_FAILED"
+  },
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "files": [
+        {
+          "path": "/opt/data/dilemma-conference/hs-1/code/integration/conference-runner/src/maritime/diagnostics.mjs",
+          "sha256": "590911f1ed95a138bb633229f7846f6bee6e98ba8389710e89d23944fb5b6537"
+        },
+        {
+          "path": "/opt/data/dilemma-conference/hs-1/code/integration/conference-runner/src/maritime/player-runtime.mjs",
+          "sha256": "321ef2f48f5e10448b4c3f94fb954ff920b71c9d1b4a3abe8feca0ed2166af69"
+        },
+        {
+          "path": "/opt/data/dilemma-conference/hs-1/code/integration/conference-runner/src/maritime/player-cli.mjs",
+          "sha256": "f84611f2b8c42ad4b778bd95d350a50685d20a6d1b125e98ae20a036b963023c"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 10000,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    },
+    {
+      "seat_id": "oc-1",
+      "files": [
+        {
+          "path": "/data/dilemma-conference/oc-1/code/integration/conference-runner/src/maritime/diagnostics.mjs",
+          "sha256": "590911f1ed95a138bb633229f7846f6bee6e98ba8389710e89d23944fb5b6537"
+        },
+        {
+          "path": "/data/dilemma-conference/oc-1/code/integration/conference-runner/src/maritime/player-runtime.mjs",
+          "sha256": "321ef2f48f5e10448b4c3f94fb954ff920b71c9d1b4a3abe8feca0ed2166af69"
+        },
+        {
+          "path": "/data/dilemma-conference/oc-1/code/integration/conference-runner/src/maritime/player-cli.mjs",
+          "sha256": "f84611f2b8c42ad4b778bd95d350a50685d20a6d1b125e98ae20a036b963023c"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 0,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    },
+    {
+      "seat_id": "oc-2",
+      "files": [
+        {
+          "path": "/data/dilemma-conference/oc-2/code/integration/conference-runner/src/maritime/diagnostics.mjs",
+          "sha256": "590911f1ed95a138bb633229f7846f6bee6e98ba8389710e89d23944fb5b6537"
+        },
+        {
+          "path": "/data/dilemma-conference/oc-2/code/integration/conference-runner/src/maritime/player-runtime.mjs",
+          "sha256": "321ef2f48f5e10448b4c3f94fb954ff920b71c9d1b4a3abe8feca0ed2166af69"
+        },
+        {
+          "path": "/data/dilemma-conference/oc-2/code/integration/conference-runner/src/maritime/player-cli.mjs",
+          "sha256": "f84611f2b8c42ad4b778bd95d350a50685d20a6d1b125e98ae20a036b963023c"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 0,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    }
+  ]
+}

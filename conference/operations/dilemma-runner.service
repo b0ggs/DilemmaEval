@@ -1,0 +1,22 @@
+[Unit]
+Description=Dilemma conference coordinator and spectator website
+After=network-online.target dilemma-launcher.service
+Wants=network-online.target dilemma-launcher.service
+
+[Service]
+Type=simple
+User=dilemma
+WorkingDirectory=/opt/dilemmaeval/integration/conference-runner
+EnvironmentFile=/etc/dilemma/coordinator.env
+ExecStart=/usr/bin/node src/cli.mjs run --config /etc/dilemma/conference.json --runtime-dir /var/lib/dilemma/run --readiness /etc/dilemma/verified-harnesses.json --port 8787
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=180
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dilemma/run
+
+[Install]
+WantedBy=multi-user.target

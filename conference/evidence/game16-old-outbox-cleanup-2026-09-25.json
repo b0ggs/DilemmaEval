@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-25T17:10:10.873Z",
+  "health": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 10,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  }
+}

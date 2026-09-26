@@ -84,6 +84,29 @@ test("paired adapters expose identical gameplay, model, schema, and policy contr
   );
 });
 
+test("both harness adapters and shared envelopes accept seat 10 and reject an eleventh seat", () => {
+  for (const [factory, team, acceptedSeat, rejectedSeat] of [
+    [createOpenClawAdapter, "openclaw", "oc-10", "oc-11"],
+    [createHermesAdapter, "hermes", "hs-10", "hs-11"]
+  ]) {
+    const playerBridge = createBridgeSpy().bridge;
+    const readOnlyBridge = createBridgeSpy().bridge;
+    const adapter = factory({ seatId: acceptedSeat, playerBridge, readOnlyBridge });
+    assert.equal(adapter.seatId, acceptedSeat);
+    const poke = validPoke({ seatId: acceptedSeat, team });
+    poke.team_chat.messages[0].seat_id = acceptedSeat;
+    assert.equal(adapter.acceptPoke(poke).seat_id, acceptedSeat);
+    assert.equal(
+      adapter.acceptResponse(poke, validResponse(poke)).seat_id,
+      acceptedSeat
+    );
+    assert.throws(
+      () => factory({ seatId: rejectedSeat, playerBridge, readOnlyBridge }),
+      /seatId must match/
+    );
+  }
+});
+
 test("the difference register contains only identity routing and config encoding", () => {
   assert.deepEqual(
     UNAVOIDABLE_HARNESS_DIFFERENCES.map((entry) => entry.field),
@@ -128,7 +151,7 @@ test("every allowed player operation forwards unchanged and validates the shared
     );
     assert.deepEqual(
       player.calls.map(({ operation }) => operation),
-      ["register", "join", "prepare_commit", "commit", "reveal", "claim"]
+      ["register", "join", "prepare_commit", "commit", "reveal", "claim", "refund"]
     );
   }
 });

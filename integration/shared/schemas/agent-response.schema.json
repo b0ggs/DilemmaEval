@@ -19,7 +19,7 @@
     "game_id": { "type": "string", "minLength": 1 },
     "round": { "type": "integer", "minimum": 0 },
     "phase": { "enum": ["join", "commit", "reveal", "claim"] },
-    "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+    "seat_id": { "type": "string", "pattern": "^(oc|hs)-([1-9]|10)$" },
     "status": { "enum": ["submitted", "observed", "skipped", "error"] },
     "transaction_hash": {
       "type": ["string", "null"],

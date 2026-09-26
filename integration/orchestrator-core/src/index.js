@@ -11,7 +11,7 @@ const REQUEST_STATUSES = Object.freeze(
 const TEAMS = Object.freeze(new Set(["openclaw", "hermes"]));
 const DECIMAL_UINT = /^(0|[1-9][0-9]*)$/;
 const BLOCK_HASH = /^0x[0-9a-fA-F]{64}$/;
-const SEAT_ID = /^(oc|hs)-[1-5]$/;
+const SEAT_ID = /^(oc|hs)-(?:[1-9]|10)$/;
 const TRANSACTION_HASH = /^0x[0-9a-fA-F]{64}$/;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const SAFE_REQUEST_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -182,12 +182,12 @@ export function normalizeChainSnapshot(snapshot) {
   requireInteger(snapshot.committed_count, "snapshot.committed_count");
   requireInteger(snapshot.revealed_count, "snapshot.revealed_count");
 
-  if (ACTIVE_PHASES.has(snapshot.phase) && snapshot.alive_count === 0) {
-    throw new TypeError("An active-phase snapshot must have an alive player.");
+  if (["commit", "reveal"].includes(snapshot.phase) && snapshot.alive_count === 0) {
+    throw new TypeError("A commit/reveal snapshot must have an alive player.");
   }
   if (
-    snapshot.committed_count > snapshot.alive_count ||
-    snapshot.revealed_count > snapshot.alive_count ||
+    (snapshot.phase !== "terminal" && snapshot.committed_count > snapshot.alive_count) ||
+    (snapshot.phase !== "terminal" && snapshot.revealed_count > snapshot.alive_count) ||
     snapshot.revealed_count > snapshot.committed_count
   ) {
     throw new TypeError(

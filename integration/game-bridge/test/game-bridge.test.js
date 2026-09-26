@@ -56,6 +56,7 @@ const PLAYER_OPERATIONS = Object.freeze([
   "commit",
   "reveal",
   "claim",
+  "refund",
 ]);
 const TEST_SEAT_MANIFEST = Object.freeze({
   schema_version: 1,
@@ -90,6 +91,38 @@ const TEST_OPERATIONS_MANIFEST = Object.freeze({
   }),
   gas_ceiling_wei: "1000000000000000",
 });
+
+function scaledSeat(team, index) {
+  const prefix = team === "openclaw" ? "oc" : "hs";
+  const walletNumber =
+    team === "openclaw" && index === 1
+      ? null
+      : (team === "openclaw" ? 0x100 : 0x200) + index;
+  return {
+    seat_id: `${prefix}-${index}`,
+    team,
+    harness: team,
+    maritime_agent: `${prefix}-fixture-${index}`,
+    wallet_address:
+      walletNumber === null
+        ? TEST_GAMEPLAY_ADDRESS
+        : `0x${walletNumber.toString(16).padStart(40, "0")}`,
+  };
+}
+
+function scaledSeatManifest(openclawCount, hermesCount) {
+  return {
+    ...TEST_SEAT_MANIFEST,
+    seats: [
+      ...Array.from({ length: openclawCount }, (_, index) =>
+        scaledSeat("openclaw", index + 1)
+      ),
+      ...Array.from({ length: hermesCount }, (_, index) =>
+        scaledSeat("hermes", index + 1)
+      ),
+    ],
+  };
+}
 
 const BASE_OPTIONS = Object.freeze({
   network: FROZEN_NETWORK.name,
@@ -248,7 +281,7 @@ const CASES = {
   state: {
     options: {
       ...BASE_OPTIONS,
-      registry: FROZEN_NETWORK.identityRegistry,
+      registry: FROZEN_NETWORK.authRegistry,
       chat: FROZEN_NETWORK.chat,
     },
     script: "query:summary",
@@ -318,6 +351,10 @@ const CASES = {
       ...BASE_OPTIONS,
     },
     script: "game:claim",
+  },
+  refund: {
+    options: { ...BASE_OPTIONS },
+    script: "game:refund",
   },
 };
 
@@ -462,7 +499,7 @@ test("JSON-RPC chain verifier timeout covers fetch and stalled body reads", asyn
   }
 });
 
-test("operation inventory is frozen to the nine required pinned command families", () => {
+test("operation inventory includes the pinned player refund command", () => {
   assert.deepEqual(SUPPORTED_OPERATIONS, Object.keys(CASES));
 });
 
@@ -596,6 +633,48 @@ test("signed operations require valid unique public seat and operations manifest
   }
 });
 
+test("public seat manifests accept 10 OpenClaw plus 10 Hermes identities", async (t) => {
+  const root = await makeCheckout(t);
+  const calls = [];
+  const result = await createGameBridge({
+    env: bridgeEnv(root),
+    seatManifest: scaledSeatManifest(10, 10),
+    runner: fakeRunner({ root, capture: calls }),
+  }).run("join", CASES.join.options);
+
+  assert.equal(result.error, null);
+  assert.equal(calls.length, 3);
+});
+
+test("public seat manifests reject an eleventh team seat, more than 20 seats, and a missing team", async (t) => {
+  const root = await makeCheckout(t);
+  const invalidManifests = [
+    scaledSeatManifest(11, 1),
+    scaledSeatManifest(1, 11),
+    {
+      ...scaledSeatManifest(10, 10),
+      seats: [
+        ...scaledSeatManifest(10, 10).seats,
+        scaledSeat("openclaw", 11),
+      ],
+    },
+    scaledSeatManifest(10, 0),
+  ];
+
+  for (const seatManifest of invalidManifests) {
+    let processCalled = false;
+    const result = await createGameBridge({
+      env: bridgeEnv(root),
+      seatManifest,
+      runner: async () => {
+        processCalled = true;
+      },
+    }).run("join", CASES.join.options);
+    assert.equal(result.error.code, "SEAT_MANIFEST_INVALID");
+    assert.equal(processCalled, false);
+  }
+});
+
 test("public manifests reject every schema-unknown field before any process", async (t) => {
   const root = await makeCheckout(t);
   const cases = [
@@ -651,6 +730,37 @@ test("public manifests reject every schema-unknown field before any process", as
     assert.equal(result.error.code, current.code);
     assert.equal(processCalled, false);
   }
+});
+
+test("player can reference the owner operator publicly while signing with its own key", async (t) => {
+  const root = await makeCheckout(t);
+  const calls = [];
+  const result = await createGameBridge({
+    env: bridgeEnv(root),
+    runner: fakeRunner({ root, capture: calls }),
+    operationsManifest: {
+      ...TEST_OPERATIONS_MANIFEST,
+      phase_advancer: { ...TEST_OPERATIONS_MANIFEST.phase_advancer, wallet_address: FROZEN_NETWORK.owner },
+    },
+    expectedPhaseAdvancerWallet: FROZEN_NETWORK.owner,
+  }).run("join", CASES.join.options);
+  assert.equal(result.error, null);
+  assert.deepEqual(calls.at(-1).env, { [GAMEPLAY_PRIVATE_KEY_ENV]: TEST_GAMEPLAY_KEY });
+});
+
+test("owner remains forbidden in the player roster", async (t) => {
+  const root = await makeCheckout(t);
+  let processCalled = false;
+  const result = await createGameBridge({
+    env: bridgeEnv(root),
+    runner: async () => { processCalled = true; },
+    seatManifest: {
+      ...TEST_SEAT_MANIFEST,
+      seats: TEST_SEAT_MANIFEST.seats.map((seat, index) => index === 1 ? { ...seat, wallet_address: FROZEN_NETWORK.owner } : seat),
+    },
+  }).run("join", CASES.join.options);
+  assert.equal(result.error.code, "SIGNER_ROLE_COLLISION");
+  assert.equal(processCalled, false);
 });
 
 test("phase manifest must match expected address, seats, owner, and privileged exclusions", async (t) => {
@@ -759,7 +869,7 @@ for (const [operation, expected] of Object.entries(CASES)) {
       cwd: root,
       env: operation === "advance"
         ? { [GAMEPLAY_PRIVATE_KEY_ENV]: TEST_ADVANCER_KEY }
-        : ["register", "join", "prepare_commit", "commit", "reveal", "claim"].includes(operation)
+        : ["register", "join", "prepare_commit", "commit", "reveal", "claim", "refund"].includes(operation)
           ? { [GAMEPLAY_PRIVATE_KEY_ENV]: TEST_GAMEPLAY_KEY }
           : {},
     });
@@ -883,6 +993,7 @@ test("wrong network, chain, RPC, or tournament addresses fail before any process
     { rpcUrl: "https://mainnet.example.invalid" },
     { game: "0x0000000000000000000000000000000000000001" },
     { registry: "0x0000000000000000000000000000000000000001" },
+    { registry: FROZEN_NETWORK.identityRegistry },
     { chat: "0x0000000000000000000000000000000000000001" },
   ];
   for (const override of invalidCases) {
@@ -1156,7 +1267,7 @@ test("artifact directory must be real and disjoint from the pinned checkout", as
   assert.equal(linkedResult.error.code, "ARTIFACT_DIRECTORY_INVALID");
 });
 
-test("all six player signer operations receive only their gameplay key", async (t) => {
+test("all seven player signer operations receive only their gameplay key", async (t) => {
   const root = await makeCheckout(t);
   const gameplayKey = `0x${"11".repeat(32)}`;
   const advancerKey = `0x${"22".repeat(32)}`;

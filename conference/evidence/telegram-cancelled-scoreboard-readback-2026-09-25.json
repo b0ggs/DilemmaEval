@@ -1,0 +1,22 @@
+{
+  "at": "2026-09-25T17:53:11.592Z",
+  "game_id": "17",
+  "outcome": "cancelled",
+  "pins": [
+    {
+      "team": "hermes",
+      "chat_id": "-1004202252236",
+      "message_id": 3,
+      "matches": true,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5"
+    },
+    {
+      "team": "openclaw",
+      "chat_id": "-1004378812354",
+      "message_id": 3,
+      "matches": true,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5"
+    }
+  ],
+  "verified": true
+}

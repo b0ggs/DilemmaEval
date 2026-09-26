@@ -1,0 +1,90 @@
+{
+  "at": "2026-09-25T17:16:27.941Z",
+  "game_id": "16",
+  "active_game_id": "0",
+  "players": 8,
+  "refunds_confirmed": 5,
+  "rows": [
+    {
+      "seat_id": "hs-4",
+      "request_id": "cleanup:game16:hs-4:refund:v1",
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "CHAIN_VERIFICATION_FAILED"
+    },
+    {
+      "seat_id": "hs-2",
+      "request_id": "cleanup:game16:hs-2:refund:v1",
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "CHAIN_VERIFICATION_FAILED"
+    },
+    {
+      "seat_id": "hs-3",
+      "request_id": "cleanup:game16:hs-3:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xb1903d52ed09bffb54ebd5b37fbb0c463e9b23116bcb23087f4e0eca43b7cdcc",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-5",
+      "request_id": "cleanup:game16:hs-5:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xbce1656a76cbfeabdfd97cc59925912588fd475887d9297a0f39b175c17215f4",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-1",
+      "request_id": "cleanup:game16:hs-1:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xccc6f2df249a7fd6d130de280a24c3bb9744354133d69f793c9bede0abd63450",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "oc-1",
+      "status": "uncertain",
+      "code": "MARITIME_AGENT_RESPONSE_INVALID"
+    },
+    {
+      "seat_id": "oc-2",
+      "request_id": "cleanup:game16:oc-2:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0x9c0b000559e15bfb82fcb2ce584706c89768a48eb01d5ba103776dfb6694862f",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "oc-3",
+      "request_id": "cleanup:game16:oc-3:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0x17814eab56b3e2552764a56b147a1425d7ea6af458bd0f4edb03be9b18561563",
+      "error_code": null,
+      "confirmed": true
+    }
+  ],
+  "pre_signing_reconciliation": {
+    "hs-2": {
+      "journal_preserved": true,
+      "at": "2026-09-25T17:22:22.620Z",
+      "code": "CHAIN_VERIFICATION_FAILED",
+      "player_command_never_invoked": true
+    },
+    "hs-4": {
+      "journal_preserved": true,
+      "at": "2026-09-25T17:22:21.977Z",
+      "code": "CHAIN_VERIFICATION_FAILED",
+      "player_command_never_invoked": true
+    },
+    "oc-1": {
+      "refund_journal_present": false,
+      "latest_nonce": 50,
+      "pending_nonce": 50,
+      "at": "2026-09-25T17:19:15Z",
+      "no_refund_confirmed": true,
+      "agent_restarted_after_completed_invalid_response": true
+    }
+  }
+}

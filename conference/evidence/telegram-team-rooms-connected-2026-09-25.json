@@ -1,0 +1,48 @@
+{
+  "at": "2026-09-25T16:49:22.514Z",
+  "groups": [
+    {
+      "team": "hermes",
+      "chat_id": "-1004202252236",
+      "invite_url": "https://t.me/+MwfRJ1jcmutiMWNh",
+      "status_message_id": 5,
+      "read_only": true,
+      "pinned_message_id": 3
+    },
+    {
+      "team": "openclaw",
+      "chat_id": "-1004378812354",
+      "invite_url": "https://t.me/+V36r6bQ7u0BmZjYx",
+      "status_message_id": 5,
+      "read_only": true,
+      "pinned_message_id": 3
+    }
+  ],
+  "outbox": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 0,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  },
+  "verification": {
+    "ok": true,
+    "issues": [],
+    "groups": [
+      {
+        "team": "openclaw",
+        "ok": true,
+        "issues": []
+      },
+      {
+        "team": "hermes",
+        "ok": true,
+        "issues": []
+      }
+    ]
+  }
+}

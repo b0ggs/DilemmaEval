@@ -21,7 +21,7 @@
     "game_id": { "type": "string", "minLength": 1 },
     "round": { "type": "integer", "minimum": 0 },
     "phase": { "enum": ["join", "commit", "reveal", "claim"] },
-    "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+    "seat_id": { "type": "string", "pattern": "^(oc|hs)-(?:[1-9]|10)$" },
     "team": { "enum": ["openclaw", "hermes"] },
     "chain_state": { "type": "object" },
     "team_chat": {
@@ -43,11 +43,11 @@
   "allOf": [
     {
       "if": { "properties": { "team": { "const": "openclaw" } } },
-      "then": { "properties": { "seat_id": { "pattern": "^oc-[1-5]$" } } }
+      "then": { "properties": { "seat_id": { "pattern": "^oc-(?:[1-9]|10)$" } } }
     },
     {
       "if": { "properties": { "team": { "const": "hermes" } } },
-      "then": { "properties": { "seat_id": { "pattern": "^hs-[1-5]$" } } }
+      "then": { "properties": { "seat_id": { "pattern": "^hs-(?:[1-9]|10)$" } } }
     },
     {
       "if": { "properties": { "phase": { "const": "join" } } },

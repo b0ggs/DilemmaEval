@@ -8,7 +8,7 @@ live or paid call.
 ## Boundary
 
 - Both harnesses use `https://api.maritime.sh/api/llm/v1`.
-- Primary model is `gpt-5.4-mini`; fallback is `gpt-4o`.
+- Primary model is `gpt-5.4-mini`; automatic fallback is disabled.
 - Native `api.openai.com` routes and unequal parity-sensitive settings fail
   closed.
 - The runtime policy is locked to the same frozen profile for both harnesses:

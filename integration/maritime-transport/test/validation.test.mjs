@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -9,6 +10,13 @@ import {
   validatePoke
 } from "../src/index.mjs";
 import { validPoke, validResponse } from "./fixtures.mjs";
+
+function validPokeForSeat(seatId, team) {
+  const poke = validPoke({ seat_id: seatId, team });
+  poke.team_chat.messages[0].seat_id = seatId;
+  poke.team_chat.messages[0].team = team;
+  return poke;
+}
 
 test("valid poke serializes without modifying message text", () => {
   const poke = validPoke();
@@ -33,6 +41,57 @@ test("response identity must match the poke", () => {
     () => assertResponseIdentity(poke, { ...response, seat_id: "oc-2" }),
     /RESPONSE_IDENTITY_MISMATCH: seat_id/
   );
+});
+
+test("seat 10 is accepted for both teams in poke and response paths", () => {
+  for (const [seatId, team] of [
+    ["oc-10", "openclaw"],
+    ["hs-10", "hermes"]
+  ]) {
+    const poke = validPokeForSeat(seatId, team);
+    const response = validResponse(poke);
+
+    assert.equal(validatePoke(poke), poke);
+    assert.equal(validateAgentResponse(response), response);
+    assert.equal(assertResponseIdentity(poke, response), true);
+  }
+});
+
+test("shared agent-response schema accepts seat 10 and rejects seat 11", () => {
+  const schema = JSON.parse(
+    readFileSync(
+      new URL("../../shared/schemas/agent-response.schema.json", import.meta.url),
+      "utf8"
+    )
+  );
+  const seatPattern = new RegExp(schema.properties.seat_id.pattern);
+
+  assert.equal(seatPattern.test("oc-10"), true);
+  assert.equal(seatPattern.test("hs-10"), true);
+  assert.equal(seatPattern.test("oc-11"), false);
+  assert.equal(seatPattern.test("hs-11"), false);
+});
+
+test("out-of-range, zero, leading-zero, and malformed seat IDs are rejected", () => {
+  for (const seatId of [
+    "oc-11",
+    "hs-11",
+    "oc-0",
+    "hs-0",
+    "oc-01",
+    "hs-010",
+    "oc-",
+    "hs-ten"
+  ]) {
+    const team = seatId.startsWith("oc-") ? "openclaw" : "hermes";
+    const poke = validPokeForSeat(seatId, team);
+
+    assert.throws(() => validatePoke(poke), /without leading zeroes/);
+    assert.throws(
+      () => validateAgentResponse(validResponse(poke)),
+      /without leading zeroes/
+    );
+  }
 });
 
 test("optional team_message may be absent, empty, or preserved verbatim", () => {

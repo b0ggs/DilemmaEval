@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-24T20:37:14.232Z",
+  "mode": "independent-read-only-handoff-audit",
+  "external_mutations": false,
+  "r8_evidence": {
+    "verified_at": "2026-09-24T20:18:21.631Z",
+    "controlled_gate_passes": true,
+    "normal_gate_passes": false,
+    "current_recipe_digests_match": true,
+    "normal_error": "RUNTIME_CODE_HASH_REQUIRED"
+  },
+  "schedule": {
+    "run_id": "converge-rehearsal-2026-09-24-r8",
+    "start_time": "2026-09-24T15:20:00-04:00",
+    "stop_time": "2026-09-24T20:00:00-04:00",
+    "cutoff_passed": false
+  },
+  "maritime": {
+    "account_agent_count": 3,
+    "agents": [
+      {
+        "id": "b9f4a333-b665-4802-8e3d-a69fa097e835",
+        "status": "sleeping",
+        "framework": "openclaw",
+        "matched_seat": "oc-2"
+      },
+      {
+        "id": "d56a1993-feb6-44a1-9f98-3a38ec16d78d",
+        "status": "sleeping",
+        "framework": "openclaw",
+        "matched_seat": "oc-1"
+      },
+      {
+        "id": "a0977c67-268a-4859-b88b-8df556ce9910",
+        "status": "sleeping",
+        "framework": "hermes",
+        "matched_seat": "hs-1"
+      }
+    ],
+    "same_roster_ids": true
+  },
+  "chain": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47256972",
+    "block_hash": "0x556a64813ab9f80d58867bd37662ea991c72b6746b707f110d7c70a1d6cf43ea",
+    "block_timestamp": "1790282232",
+    "owner": "0xDb463b29c82138188d5e425EDe5E0Fcbb09f1408",
+    "auth_adapter_address": "0xc893Ca037b796e7710a4948Bbb6fBfb94539b806",
+    "identity_registry_address": "0x7177a6867296406881E20d6647232314736Dd09A",
+    "active_game_id": "0",
+    "code_hash": "0x0229b422ca8d4c8262ac3aab7fffc68e9a556c4f5a4fdeae36bc5d395cb90742",
+    "config": {
+      "entryFeeWei": "1000000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "32",
+      "maxPlayers": "32",
+      "maxCauses": "2"
+    },
+    "players": [
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9DAb46BCD953eb2a3AB4D49A11f800E6BE5f356",
+        "admitted": true,
+        "agent_key": "0x2760eb06c51071f467184650724e2ad5ede779245a464d367e1c472b7ecf56b1",
+        "balance_wei": "1789486345508961",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421BbBC3cC480147b2586f91b1d25B8bc817916b",
+        "admitted": true,
+        "agent_key": "0x926d384de81d84927e7c6a9167024f99fe6966df8eedb6cc577940d79fe9dead",
+        "balance_wei": "15923001346412793",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "admitted": true,
+        "agent_key": "0xed564c7e99bad152fb4f8c65276a2ba587c292173aee76967551362a18282656",
+        "balance_wei": "15925037563163909",
+        "cause_whitelisted": true
+      }
+    ],
+    "current_game_id": "1"
+  },
+  "chain_readiness": {
+    "ready": false,
+    "issues": [
+      "DEFAULT_entryFeeWei_MISMATCH",
+      "DEFAULT_minPlayers_MISMATCH",
+      "DEFAULT_maxPlayers_MISMATCH"
+    ],
+    "target": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "60",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "3",
+      "maxPlayers": "3",
+      "maxCauses": "2"
+    }
+  },
+  "wallet_nonces": [
+    {
+      "seat_id": "operator",
+      "latest": 398,
+      "pending": 398
+    },
+    {
+      "seat_id": "oc-1",
+      "latest": 32,
+      "pending": 32
+    },
+    {
+      "seat_id": "oc-2",
+      "latest": 2,
+      "pending": 2
+    },
+    {
+      "seat_id": "hs-1",
+      "latest": 2,
+      "pending": 2
+    }
+  ],
+  "local_processes": []
+}

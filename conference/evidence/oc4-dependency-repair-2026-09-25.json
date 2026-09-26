@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-25T17:09:01.432Z",
+  "seat_id": "oc-4",
+  "root_error_code": "ERR_INVALID_PACKAGE_CONFIG",
+  "invalid_manifest_count": 9,
+  "zero_byte_manifests": true,
+  "preserved_directory": "/data/dilemma-conference/oc-4/node_modules-preserved-before-repair-20260925",
+  "runtime_reinstalled": true,
+  "actual_command_verified": true,
+  "persistence_verified": true,
+  "scope": "Existing public dependency installation only; no agent replacement or provisioning.",
+  "verified_at": "2026-09-25T17:10:16.590Z",
+  "persistence_verified_at": "2026-09-25T17:12:28.284Z"
+}

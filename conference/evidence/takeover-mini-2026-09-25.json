@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T15:31:00Z",
+  "scope": "read-only takeover readiness",
+  "roster": {"total": 10, "openclaw": 5, "hermes": 5, "preserved": true},
+  "openclaw": {
+    "seats": ["oc-1", "oc-2", "oc-3", "oc-4", "oc-5"],
+    "tool_execution_verified": true,
+    "model": "gpt-5.4-mini",
+    "reasoning_effort": "low",
+    "max_output_tokens": 2048,
+    "automatic_fallback": false,
+    "actual_usage_verified": true,
+    "oc_1_usage": {"timestamp": "2026-09-25T14:57:16.949Z", "input_tokens": 13575, "output_tokens": 119},
+    "other_seat_usage_saved": true,
+    "runtime_paths_verified": true,
+    "session_model_pinning_verified": true
+  },
+  "hermes": {
+    "tool_execution_verified": true,
+    "verified_at": "2026-09-25T15:30:44Z",
+    "model": "gpt-5.4-mini",
+    "fix": "low agent.reasoning_effort; public vendor mini transform; native codex_responses before transport cache",
+    "chat_kwargs_workaround": "removed",
+    "full_model_or_harness_replacement": false
+  },
+  "runtime_evidence": {"ten_rows": true, "source": "private takeover runtime evidence"},
+  "defaults": {"minPlayers": "10", "maxPlayers": "10", "readback_confirmed": true, "transaction_prefix": "0xbe80", "transaction_suffix": "5319"},
+  "controlled_game": {"game_id": "15", "status": "failed_invalid_repository_hs2", "joined_count": 1, "creation_transaction": "0xb95ec2439160d02d3b15f5c0492a6e01df3a32abd5092e93fe8434f7bb81e8dd", "cancel_transaction": "0xda22ea5bd0b8679ee73ee70bf1ef38f0031c0bff7177baeac9786759eaca1fbe", "hs1_refund_transaction": "0x41ead9de3ea333e3fdc16f27c75c5d856cc9078df2814d404ae72d466950b8a9", "completed": false},
+  "next_game": {"authorized": true, "created": false, "proof_directory": "/private/tmp/dilemma-proof-five-v-five-mini-20260925b", "operator_stopped": true, "defaults": {"joinDurationSeconds": "300", "commitDurationBlocks": "300", "revealDurationBlocks": "180"}},
+  "hermes_runtime": {"new_checkouts_missing": 4, "missing_or_lost": "unknown", "restore_blocker": "NODE_22_REQUIRED", "isolated_node": "official Node 22.23.3 checksum verified", "new_seats_tool_and_postwake_checkout_passed": 4, "oc_valid_checkouts": ["oc-1", "oc-2", "oc-4"], "oc3_status": "dirty_repository_repair_in_progress"},
+  "chain": {
+    "chain_id": 84532,
+    "active_game_id": "0",
+    "last_read_at": "2026-09-25T14:31:00Z",
+    "defaults": {"minPlayers": "3", "maxPlayers": "3"},
+    "game_launched": false
+  },
+  "validation": {
+    "targeted": {"tests": 115, "status": "passed"},
+    "prior_broad_maritime": {"passed": 116, "failed": 1, "fixture_call_count": "recorded", "used_for_controller_acceptance": false}
+  },
+  "ready_for_five_v_five": "runtime and configuration gates passed; game outcome pending"
+}

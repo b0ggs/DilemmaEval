@@ -63,7 +63,7 @@ const KECCAK_ROUND_CONSTANTS = Object.freeze([
   0x0000000080000001n, 0x8000000080008008n
 ]);
 const PLAYER_SIGNER_OPERATIONS = Object.freeze(
-  new Set(["register", "join", "prepare_commit", "commit", "reveal", "claim"])
+  new Set(["register", "join", "prepare_commit", "commit", "reveal", "claim", "refund"])
 );
 const PHASE_ADVANCER_OPERATIONS = Object.freeze(new Set(["advance"]));
 const READ_ONLY_OPERATIONS = Object.freeze(
@@ -173,6 +173,11 @@ const OPERATION_SPECS = Object.freeze({
   },
   claim: {
     script: "game:claim",
+    options: { ...GAME_OPTIONS },
+    required: ["rpcUrl", "game", "gameId"]
+  },
+  refund: {
+    script: "game:refund",
     options: { ...GAME_OPTIONS },
     required: ["rpcUrl", "game", "gameId"]
   }
@@ -490,7 +495,8 @@ function assertFrozenProfile(operation, options, allowedRpcUrl) {
   assertSafeRpcUrl(options.rpcUrl, allowedRpcUrl);
   assertExactAddress(options.game, FROZEN_NETWORK.game, "game");
   if (operation === "state") {
-    assertExactAddress(options.registry, FROZEN_NETWORK.identityRegistry, "registry");
+    // query:summary resolves the identity registry through this auth adapter.
+    assertExactAddress(options.registry, FROZEN_NETWORK.authRegistry, "registry");
     assertExactAddress(options.chat, FROZEN_NETWORK.chat, "chat");
   }
   if (operation === "wallet_auth_status" || operation === "register") {
@@ -681,7 +687,7 @@ function parseOutput(stdout) {
   }
 }
 
-async function verifyCheckout(repoPath, runner, env) {
+export async function verifyCheckout(repoPath, runner, env) {
   if (typeof repoPath !== "string" || repoPath.length === 0) {
     return {
       ok: false,
@@ -999,7 +1005,7 @@ function validatePublicManifests({
     seatManifest.game_id.length === 0 ||
     !Array.isArray(seatManifest.seats) ||
     seatManifest.seats.length < 2 ||
-    seatManifest.seats.length > 10
+    seatManifest.seats.length > 20
   ) {
     return { ok: false, code: "SEAT_MANIFEST_INVALID" };
   }
@@ -1012,11 +1018,11 @@ function validatePublicManifests({
     const hermes = seat?.team === "hermes";
     if (
       !hasExactOwnKeys(seat, seatKeys) ||
-      !/^(oc|hs)-[1-5]$/.test(seat.seat_id) ||
+      !/^(oc|hs)-(?:[1-9]|10)$/.test(seat.seat_id) ||
       (!openClaw && !hermes) ||
       seat.harness !== seat.team ||
-      (openClaw && !/^oc-[1-5]$/.test(seat.seat_id)) ||
-      (hermes && !/^hs-[1-5]$/.test(seat.seat_id)) ||
+      (openClaw && !/^oc-(?:[1-9]|10)$/.test(seat.seat_id)) ||
+      (hermes && !/^hs-(?:[1-9]|10)$/.test(seat.seat_id)) ||
       typeof seat.maritime_agent !== "string" ||
       seat.maritime_agent.length === 0 ||
       typeof seat.wallet_address !== "string" ||
@@ -1035,6 +1041,12 @@ function validatePublicManifests({
     seatIds.add(seat.seat_id);
     agents.add(seat.maritime_agent);
     seatWallets.add(wallet);
+  }
+  if (
+    !seatManifest.seats.some((seat) => seat.team === "openclaw") ||
+    !seatManifest.seats.some((seat) => seat.team === "hermes")
+  ) {
+    return { ok: false, code: "SEAT_MANIFEST_INVALID" };
   }
 
   const phaseAddress = operationsManifest?.phase_advancer?.wallet_address;
@@ -1060,7 +1072,10 @@ function validatePublicManifests({
     !ETHEREUM_ADDRESS.test(expectedPhaseAdvancerWallet) ||
     expectedPhaseAdvancerWallet.toLowerCase() !== normalizedPhase ||
     seatWallets.has(normalizedPhase) ||
-    normalizedPhase === FROZEN_NETWORK.owner.toLowerCase()
+    // Conference players may refer to the owner/operator's public address.
+    // The legacy phase signer still cannot use the owner key.
+    (!playerSigner && normalizedPhase === FROZEN_NETWORK.owner.toLowerCase()) ||
+    seatWallets.has(FROZEN_NETWORK.owner.toLowerCase())
   ) {
     return { ok: false, code: "SIGNER_ROLE_COLLISION" };
   }

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "scope": "local simulated contract tests, not live Maritime proof",
+  "repository": "https://github.com/botnotstrawberry/prisoners-daolemma",
+  "revision": "955ce16a59b0efecf6ccdf2d391ede83de8902a8",
+  "isolated_directory": "/private/tmp/dilemma-forge-local-check",
+  "forge_version": "1.8.3",
+  "forge_archive_sha256": "1b469229681b31e3c66a07132811b99460b2874a0a48de3b29500234454f47b8",
+  "solc_version": "0.8.23",
+  "suites": [
+    {
+      "file": "PrisonersDAOlemma.t.sol",
+      "passed": 62,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "AgentAuthRegistry.t.sol",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "excludes": [
+    "Maritime model/tool execution",
+    "snapshot durability",
+    "actual player funding",
+    "Telegram delivery",
+    "public-chain execution"
+  ]
+}

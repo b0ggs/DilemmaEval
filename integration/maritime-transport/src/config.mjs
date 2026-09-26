@@ -2,7 +2,7 @@ import { stableStringify } from "./serialization.mjs";
 
 export const MARITIME_PROXY_ENDPOINT = "https://api.maritime.sh/api/llm/v1";
 export const PRIMARY_MODEL = "gpt-5.4-mini";
-export const FALLBACK_MODEL = "gpt-4o";
+export const FALLBACK_MODEL = null;
 
 const paritySettings = {
   temperature: 0,
@@ -25,8 +25,8 @@ export const FROZEN_PROXY_CONFIG = deepFreeze({
   primary_model: PRIMARY_MODEL,
   fallback_model: FALLBACK_MODEL,
   fallback_policy: {
-    order: [PRIMARY_MODEL, FALLBACK_MODEL],
-    fallback_only_on: ["model_not_found", "model_unavailable"]
+    order: [PRIMARY_MODEL],
+    fallback_only_on: []
   },
   settings: paritySettings
 });

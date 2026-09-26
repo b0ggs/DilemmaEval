@@ -1,0 +1,18 @@
+{
+  "observed_at": "2026-09-25T00:57:44.202Z",
+  "operation": "read-only-existing-agent-status",
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "error_code": "READ_FAILED"
+    },
+    {
+      "seat_id": "oc-1",
+      "error_code": "READ_FAILED"
+    },
+    {
+      "seat_id": "oc-2",
+      "error_code": "READ_FAILED"
+    }
+  ]
+}

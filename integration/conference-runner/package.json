@@ -1,0 +1,21 @@
+{
+  "name": "@dilemmaeval/conference-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/cli.mjs run",
+    "preflight": "node src/cli.mjs preflight",
+    "fixture": "node src/cli.mjs fixture",
+    "maritime:plan": "node src/provision-cli.mjs plan",
+    "maritime:launch": "node src/provision-cli.mjs launch"
+  },
+  "dependencies": {
+    "ethers": "6.16.0",
+    "maritime-sdk": "0.6.0"
+  }
+}

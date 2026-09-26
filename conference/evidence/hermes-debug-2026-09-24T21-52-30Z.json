@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "observed_from": "2026-09-24T21:52:30Z",
+  "observed_through": "2026-09-24T21:59:31Z",
+  "time_limit_minutes": 45,
+  "agent": {
+    "seat_id": "hs-1",
+    "harness": "hermes",
+    "agent_id": "a0977c67-268a-4859-b88b-8df556ce9910",
+    "runtime_identity": {
+      "uid": 10000,
+      "gid": 10000
+    }
+  },
+  "checks": {
+    "direct_player_inspect": {
+      "passed": true,
+      "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f",
+      "chain_id": 84532,
+      "persistent_storage_writable": true
+    },
+    "normal_profile_terminal_inspect": {
+      "passed": true,
+      "entrypoint": "/opt/hermes/.venv/bin/hermes",
+      "toolset": "terminal"
+    },
+    "isolated_profile_terminal_inspect": {
+      "passed": true,
+      "temporary_profile_removed": true
+    },
+    "terminal_environment": {
+      "passed": true,
+      "uid": 10000,
+      "node_path": "/usr/bin/node",
+      "wrapper_executable": true,
+      "wallet_variable_present": true,
+      "wallet_value_exposed": false
+    },
+    "maritime_gateway_chat": {
+      "passed": true,
+      "terminal_invocation_passed": true
+    },
+    "telegram_delivery": {
+      "passed": true,
+      "chat_id": "-1004364922269",
+      "message_id": 12,
+      "label": "Hermes debug — not a game result",
+      "agent_authored_text": "Hermes terminal and gateway debug checks passed successfully."
+    }
+  },
+  "conclusion": "Hermes runtime and chat-to-terminal execution pass. The earlier Game 4 turn remains an unreplayed invalid or ambiguous protocol response with no player journal and no transaction; no complete game is proven.",
+  "secrets_exposed": false
+}

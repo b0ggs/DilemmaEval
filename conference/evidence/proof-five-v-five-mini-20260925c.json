@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-25T17:27:24.186Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "started_at": "2026-09-25T17:27:53.287Z",
+      "request_id": "conference:bc81d44d564c172ea5b3fda1c817ef6c",
+      "seat_id": "hs-2",
+      "operation": "join",
+      "game_id": "17",
+      "round": 0,
+      "finished_at": "2026-09-25T17:28:49.932Z",
+      "status": "submitted",
+      "transaction_hash": "0xcea50eaff802567aaffeee0b8224c942c201f246afcf6b7f9e7e50eb02bde59b",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T17:27:53.370Z",
+      "request_id": "conference:f21184e41fab2b9db59fcc19b99c7e20",
+      "seat_id": "hs-4",
+      "operation": "join",
+      "game_id": "17",
+      "round": 0,
+      "finished_at": "2026-09-25T17:29:11.944Z",
+      "status": "submitted",
+      "transaction_hash": "0x9f534da0c28d579ab73ae34ea715970732ca4d378372421cb315e041f931f8fb",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T17:27:53.208Z",
+      "request_id": "conference:c838f1c61d35ad657b40e50fc7bb10a4",
+      "seat_id": "hs-1",
+      "operation": "join",
+      "game_id": "17",
+      "round": 0,
+      "finished_at": "2026-09-25T17:29:11.952Z",
+      "status": "submitted",
+      "transaction_hash": "0x73342a157aa112f104d8d242a2ba0e41b99e340d48d946cde92e98e0876f83fe",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T17:27:53.330Z",
+      "request_id": "conference:471ffebff89b8cd85ee98fe4dca02ef1",
+      "seat_id": "hs-3",
+      "operation": "join",
+      "game_id": "17",
+      "round": 0,
+      "finished_at": "2026-09-25T17:29:12.213Z",
+      "status": "submitted",
+      "transaction_hash": "0xaf8be41aa812528eeac6fa3eb3b520aafd15c57ff9976149a7e015a4b122fbc2",
+      "error_code": null,
+      "has_team_message": false
+    },
+    {
+      "started_at": "2026-09-25T17:27:53.412Z",
+      "request_id": "conference:aaafbb960a6cd11040d070b188ebdbbd",
+      "seat_id": "hs-5",
+      "operation": "join",
+      "game_id": "17",
+      "round": 0,
+      "finished_at": "2026-09-25T17:29:33.875Z",
+      "status": "submitted",
+      "transaction_hash": "0xfc24d33c6388080d50eccd99049e5bd0d605d4745a0c3c31b9d61d80c1c6f411",
+      "error_code": null,
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0xcc6bece17eec222867aaaf59f5b0d3bbb22cc353bd98c82a94538cdf4b1d43cc"
+    }
+  },
+  "latest": {
+    "game_id": "17",
+    "phase": "join",
+    "round": 0,
+    "joined": 5,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "started_at": "2026-09-25T17:27:53.453Z",
+    "request_id": "conference:911d20edd36b93c1c155c43fb48af116",
+    "seat_id": "oc-1",
+    "operation": "join",
+    "game_id": "17",
+    "round": 0,
+    "status": "transport-error",
+    "error_code": "MARITIME_AGENT_RESPONSE_INVALID",
+    "diagnostic_code": "MARITIME_REPLY_INVALID_JSON"
+  },
+  "final_chain": {
+    "game_id": "17",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 9,
+    "block_number": "47294678"
+  },
+  "awaiting_independent_audit": false,
+  "runner_stopped": true,
+  "finished_at": "2026-09-25T17:30:26.545Z",
+  "cancellation": {
+    "confirmed": true,
+    "transaction_hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e"
+  },
+  "telegram": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 40,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null,
+    "scoreboard": {
+      "ok": true,
+      "series_id": "five-v-five-mini-20260925",
+      "first_game_id": "17",
+      "wins": {
+        "openclaw": 0,
+        "hermes": 0
+      },
+      "ties": 0,
+      "awards_wei": {
+        "openclaw": "0",
+        "hermes": "0"
+      },
+      "completed": 0,
+      "cancelled": 1,
+      "defaulted_games": 0,
+      "rejected_results": [],
+      "pins": {
+        "openclaw": {
+          "chat_id": "-1004378812354",
+          "message_id": 3,
+          "status": "sent",
+          "updated_at": "2026-09-25T17:38:00.718Z"
+        },
+        "hermes": {
+          "chat_id": "-1004202252236",
+          "message_id": 3,
+          "status": "sent",
+          "updated_at": "2026-09-25T17:38:00.719Z"
+        }
+      },
+      "issues": []
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "mode": "live-owner-configuration-with-confirmed-readback",
+  "observed_at": "2026-09-24T21:00:52Z",
+  "transaction_hash": "0x6074981aa352829a8ea389582361533f0647c4007e1ffa4dad1be988dacb641e",
+  "transaction_url": "https://sepolia.basescan.org/tx/0x6074981aa352829a8ea389582361533f0647c4007e1ffa4dad1be988dacb641e",
+  "before": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47257676",
+    "block_hash": "0x8ada2d96542a7e96d1194b35853e3b09b4472f149843b757fc0ccae05f8a082f",
+    "active_game_id": "0",
+    "config": {
+      "entryFeeWei": "1000000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "60",
+      "revealDurationBlocks": "40",
+      "minPlayers": "32",
+      "maxPlayers": "32",
+      "maxCauses": "2"
+    }
+  },
+  "after": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47257682",
+    "block_hash": "0xc0d9e50909ef4633caa51bdd157d94c233c016bb10a4ee9a7eda255ed89b6943",
+    "active_game_id": "0",
+    "config": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "180",
+      "revealDurationBlocks": "120",
+      "minPlayers": "3",
+      "maxPlayers": "3",
+      "maxCauses": "2"
+    },
+    "players": [
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9DAb46BCD953eb2a3AB4D49A11f800E6BE5f356",
+        "admitted": true,
+        "balance_wei": "1789486345508961",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421BbBC3cC480147b2586f91b1d25B8bc817916b",
+        "admitted": true,
+        "balance_wei": "15923001346412793",
+        "cause_whitelisted": true
+      },
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241E69650C08c505eE19668cc251052E23056F",
+        "admitted": true,
+        "balance_wei": "15925037563163909",
+        "cause_whitelisted": true
+      }
+    ]
+  }
+}

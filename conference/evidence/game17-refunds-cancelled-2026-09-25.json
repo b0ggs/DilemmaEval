@@ -1,0 +1,80 @@
+{
+  "at": "2026-09-25T17:41:32.049Z",
+  "game_id": "17",
+  "active_game_id": "0",
+  "players": 9,
+  "refunds_confirmed": 8,
+  "rows": [
+    {
+      "seat_id": "hs-5",
+      "request_id": "cleanup:game17:hs-5:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0x2525c9f2365e6b8b187de536a4be32084b9ffafe0fbd643cbe70409e00ef1ec7",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-2",
+      "request_id": "cleanup:game17:hs-2:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xe0c79828f85b904c9dc21c1d6c7cb042c443396f8da76830cdeac3c0cf1c730e",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-4",
+      "request_id": "cleanup:game17:hs-4:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0x4c1903ad0ec5e1bbe510e1c96ed21caaa2c67c4eed3200fde493c390b974ccba",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-3",
+      "request_id": "cleanup:game17:hs-3:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0x3e65ac85f062e2ab11cb6c5f07457e5e7ec81c25bb88f90b28225c558fd245cc",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "hs-1",
+      "request_id": "cleanup:game17:hs-1:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xcbd9067e1a62f7c796d27b25ea14c3747d26fb6fa3919b022a445ae3c1d98938",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "oc-2",
+      "request_id": "cleanup:game17:oc-2:refund:v1",
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "CHAIN_VERIFICATION_FAILED"
+    },
+    {
+      "seat_id": "oc-3",
+      "request_id": "cleanup:game17:oc-3:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0x46e5f4ea5784597bc33f0ce09beddbca6208f3e211e6ec68373587fe8f4a1642",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "oc-5",
+      "request_id": "cleanup:game17:oc-5:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xee05da33330d912f9875e733488dde43e5884723a4bc0c569fabee0a9afff100",
+      "error_code": null,
+      "confirmed": true
+    },
+    {
+      "seat_id": "oc-4",
+      "request_id": "cleanup:game17:oc-4:refund:v1",
+      "status": "submitted",
+      "transaction_hash": "0xeed2023f51d06b6802b1396c0c2ba345f39f81e3e711c2b7e6891bf4f6e2f4dc",
+      "error_code": null,
+      "confirmed": true
+    }
+  ]
+}

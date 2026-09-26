@@ -10,9 +10,9 @@ make a network call.
 `createOpenClawAdapter` and `createHermesAdapter` expose the same:
 
 - player operation allowlist: `state`, `wallet_auth_status`, `register`,
-  `join`, `prepare_commit`, `commit`, `reveal`, and `claim`;
+  `join`, `prepare_commit`, `commit`, `reveal`, `claim`, and `refund`;
 - disjoint bridge routing: `state`/`wallet_auth_status` use a credential-free
-  read-only bridge; the six player-local operations use a distinct player
+  read-only bridge; the seven player-local operations use a distinct player
   bridge; one object cannot fill both roles;
 - pinned game revision and shared command-result contract;
 - Maritime proxy endpoint, primary/fallback model, prompt/tool/settings

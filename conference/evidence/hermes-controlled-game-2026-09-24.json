@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-24T23:32:15.271Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "seat_id": "hs-1",
+      "operation": "join",
+      "game_id": "6",
+      "round": 0,
+      "status": "error",
+      "transaction_hash": null,
+      "error_code": "PLAYER_TOOL_FAILED",
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0xa98fefb9e93f78e1fbda322d16b7878fecb8b528e837654195488c43fff63c5e"
+    }
+  },
+  "latest": {
+    "game_id": "6",
+    "phase": "join",
+    "round": 0,
+    "joined": 0,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "seat_id": "hs-1",
+    "operation": "join",
+    "game_id": "6",
+    "round": 0,
+    "status": "error",
+    "transaction_hash": null,
+    "error_code": "PLAYER_TOOL_FAILED",
+    "has_team_message": false
+  },
+  "final_chain": {
+    "game_id": "6",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 0,
+    "block_number": "47262770"
+  },
+  "runner_stopped": true,
+  "finished_at": "2026-09-24T23:33:34.527Z",
+  "operator_stopped": true,
+  "additional_game_started": false,
+  "creation_telegram_message_id": 15,
+  "post_failure_journal": {
+    "game_id": "6",
+    "exists": false
+  },
+  "post_failure_private_directory_metadata": {
+    "uid": 10000,
+    "gid": 10000,
+    "mode": "0700"
+  },
+  "cancellation": {
+    "confirmed": true,
+    "transaction_hash": "0xf411ea910f90bd6f0bcf8857edf0a2e7d1035ae3a3b9d031e3744a1c5982fd2f",
+    "authorized_on_followup": true
+  },
+  "openclaw_dispatches": {
+    "oc-1": "unknown",
+    "oc-2": "rejected-before-submit"
+  },
+  "all_three_agents_sleeping": true,
+  "known_secret_scan_passed": true,
+  "telegram": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 2,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  }
+}

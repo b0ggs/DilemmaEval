@@ -106,6 +106,98 @@ test("paired teams append verbatim with isolated per-team sequence and cursor", 
   );
 });
 
+test("seat 10 is accepted for both teams and remains valid across restart", async () => {
+  const expandedSeats = Object.freeze(
+    Array.from({ length: 10 }, (_, index) => index + 1).flatMap((number) => [
+      { seat_id: `oc-${number}`, team: "openclaw" },
+      { seat_id: `hs-${number}`, team: "hermes" }
+    ])
+  );
+  const { root, store } = await fixture({ seats: expandedSeats });
+  const open = expected({
+    request_id: "game-12-round-1-commit-oc-10",
+    seat_id: "oc-10"
+  });
+  const hermes = expected({
+    request_id: "game-12-round-1-commit-hs-10",
+    seat_id: "hs-10",
+    team: "hermes"
+  });
+
+  assert.equal(
+    (await store.acceptResponse(response(open, { team_message: "open ten" }), open))
+      .accepted,
+    true
+  );
+  assert.equal(
+    (
+      await store.acceptResponse(
+        response(hermes, { team_message: "hermes ten" }),
+        hermes
+      )
+    ).accepted,
+    true
+  );
+
+  const restarted = new TeamLogStore({
+    runtimeRoot: root,
+    gameId: "12",
+    seats: expandedSeats
+  });
+  await restarted.initialize();
+  assert.deepEqual(
+    (await restarted.buildSnapshot({ seat_id: "oc-10", team: "openclaw" }))
+      .messages.map((entry) => entry.message),
+    ["open ten"]
+  );
+  assert.deepEqual(
+    (await restarted.buildSnapshot({ seat_id: "hs-10", team: "hermes" }))
+      .messages.map((entry) => entry.message),
+    ["hermes ten"]
+  );
+  await assert.rejects(
+    restarted.buildSnapshot({ seat_id: "oc-10", team: "hermes" }),
+    /immutable assignment/
+  );
+});
+
+test("seat ids above 10, zero, leading-zero, and malformed ids are rejected", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "dilemma-team-logs-"));
+  const invalidSeats = [
+    ["oc-11", "openclaw"],
+    ["hs-11", "hermes"],
+    ["oc-0", "openclaw"],
+    ["hs-0", "hermes"],
+    ["oc-01", "openclaw"],
+    ["hs-010", "hermes"],
+    ["oc-ten", "openclaw"],
+    ["hs-", "hermes"]
+  ];
+
+  for (const [seat_id, team] of invalidSeats) {
+    assert.throws(
+      () =>
+        new TeamLogStore({
+          runtimeRoot: root,
+          gameId: "12",
+          seats: [{ seat_id, team }]
+        }),
+      /invalid seat\/team assignment/,
+      seat_id
+    );
+  }
+
+  const { store } = await fixture();
+  for (const seat_id of ["oc-11", "hs-11", "oc-0", "hs-01"]) {
+    const context = expected({ request_id: `invalid-${seat_id}`, seat_id });
+    assert.equal(
+      (await store.acceptResponse(response(context), context)).reason,
+      "MALFORMED_RESPONSE",
+      seat_id
+    );
+  }
+});
+
 test("missing and empty team_message are valid, nonblocking, and ledger-only", async () => {
   const { store } = await fixture();
   const one = await store.acceptResponse(response(), expected());

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "observation_kind": "read-only public RPC; no transaction submitted",
+  "decoded_at_utc": "2026-09-24T14:45:46Z",
+  "rpc_endpoint": "https://sepolia.base.org",
+  "chain_id": 84532,
+  "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+  "block_number": 47246396,
+  "block_hash": "0xdb7ddda533aa91ea89b7b7d38257dd5b4f25e86902f2f5d2d8e9e47eeb8d7279",
+  "block_time_utc": "2026-09-24T14:44:40+00:00",
+  "runtime_code_bytes": 20922,
+  "default_config": {
+    "entryFeeWei": 1000000000000000,
+    "creatorFeeBps": 100,
+    "causeFeeBps": 100,
+    "joinDurationSeconds": 300,
+    "commitDurationBlocks": 60,
+    "revealDurationBlocks": 40,
+    "minPlayers": 32,
+    "maxPlayers": 32,
+    "maxCauses": 2
+  },
+  "owner": "0xdb463b29c82138188d5e425ede5e0fcbb09f1408",
+  "active_game_id": 0,
+  "current_game_id": 1,
+  "auth_registry": "0xc893ca037b796e7710a4948bbb6fbfb94539b806",
+  "block_cadence_sample": {
+    "start_block": 47246366,
+    "end_block": 47246396,
+    "start_hash": "0x9fda222f9d0919df7f372d7171a1d41690c96b674d9d8c3f6e6af110f0870c1d",
+    "elapsed_seconds": 60,
+    "seconds_per_block": 2.0
+  },
+  "interface_source": {
+    "repository": "https://github.com/botnotstrawberry/prisoners-daolemma",
+    "revision": "955ce16a59b0efecf6ccdf2d391ede83de8902a8",
+    "path": "packages/foundry/contracts/PrisonersDAOlemma.sol"
+  },
+  "raw_eth_call_results": {
+    "getDefaultConfig()": "0x00000000000000000000000000000000000000000000000000038d7ea4c6800000000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000012c000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002",
+    "owner()": "0x000000000000000000000000db463b29c82138188d5e425ede5e0fcbb09f1408",
+    "activeGameId()": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "authRegistry()": "0x000000000000000000000000c893ca037b796e7710a4948bbb6fbfb94539b806",
+    "currentGameId()": "0x0000000000000000000000000000000000000000000000000000000000000001"
+  },
+  "verification_limits": [
+    "Values are observations at the recorded block; refresh before configuration or launching.",
+    "Owner address readback does not establish access to its signer.",
+    "Code presence and ABI-compatible reads do not establish exact source/bytecode equivalence.",
+    "Agent health, account capacity, player admission, balances, and Telegram/website operation were not checked.",
+    "current_game_id is a lifetime identifier, not a count of completed conference games."
+  ]
+}

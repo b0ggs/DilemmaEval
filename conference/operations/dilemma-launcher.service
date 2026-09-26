@@ -1,0 +1,22 @@
+[Unit]
+Description=Dilemma conference owner operator (create and advance)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dilemma
+WorkingDirectory=/opt/dilemmaeval/integration/conference-runner
+EnvironmentFile=/etc/dilemma/launcher.env
+ExecStart=/usr/bin/node src/chain/cli.mjs operator /etc/dilemma/conference.json /var/lib/dilemma/launcher 8791
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=120
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dilemma/launcher
+
+[Install]
+WantedBy=multi-user.target

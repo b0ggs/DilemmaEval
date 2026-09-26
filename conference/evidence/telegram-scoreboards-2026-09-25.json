@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T16:33:38.405Z",
+  "series_id": "five-v-five-mini-20260925",
+  "bot_username": "DilemmaDealer2026Bot",
+  "text": "DilemmaEval · 5 vs 5 · Scoreboard\n\nOpenClaw 0 — Hermes 0\nTies: 0 · Completed games: 0\n\nTotal prize awards (Base Sepolia test ETH)\nOpenClaw: 0 ETH\nHermes: 0 ETH\n\nA game win goes to the team with the higher combined confirmed prize payout. Equal payouts are a tie.\nWallet funding, refunds, cancelled games and earlier 3-player rehearsals do not count.\n\nStatus: Preparing the 5v5 demo. No game is running.\nWork in progress · Scores will change only after confirmed results.",
+  "automatic_updates_enabled": false,
+  "groups": [
+    {
+      "team": "hermes",
+      "chat_id": "-1004202252236",
+      "title": "DilemmaEval — Hermes",
+      "status": "pinned-and-verified",
+      "message_id": 3,
+      "message_url": "https://t.me/c/4202252236/3",
+      "verified_at": "2026-09-25T16:33:39.116Z"
+    },
+    {
+      "team": "openclaw",
+      "chat_id": "-1004378812354",
+      "title": "DilemmaEval — OpenClaw",
+      "status": "pinned-and-verified",
+      "message_id": 3,
+      "message_url": "https://t.me/c/4378812354/3",
+      "verified_at": "2026-09-25T16:33:40.168Z"
+    }
+  ],
+  "complete": true
+}

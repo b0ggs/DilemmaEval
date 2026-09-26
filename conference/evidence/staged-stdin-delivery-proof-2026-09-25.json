@@ -1,0 +1,28 @@
+{
+  "at": "2026-09-25T17:45:51.921Z",
+  "rows": [
+    {
+      "seat_id": "oc-1",
+      "status": "submitted",
+      "error_code": null,
+      "transaction_hash": "0x552a9225cf3e12c07f52769708f30e9cddd2650f683488b8ce6c767ae20ad325",
+      "returned_original_confirmed_transaction": true,
+      "request_identity_matched": true,
+      "nonce_before": 51,
+      "nonce_after": 51,
+      "no_new_transaction": true
+    },
+    {
+      "seat_id": "hs-1",
+      "status": "submitted",
+      "error_code": null,
+      "transaction_hash": "0xccc6f2df249a7fd6d130de280a24c3bb9744354133d69f793c9bede0abd63450",
+      "returned_original_confirmed_transaction": true,
+      "request_identity_matched": true,
+      "nonce_before": 29,
+      "nonce_after": 29,
+      "no_new_transaction": true
+    }
+  ],
+  "passed": true
+}

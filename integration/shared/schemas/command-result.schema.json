@@ -28,7 +28,8 @@
         "commit",
         "reveal",
         "advance",
-        "claim"
+        "claim",
+        "refund"
       ]
     },
     "command": { "type": "string", "minLength": 1 },

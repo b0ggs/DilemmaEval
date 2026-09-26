@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "game_id": "13",
+  "restart_kind": "graceful after confirmed joins; no dispatch in flight",
+  "checkpoint": {
+    "game_id": "13",
+    "phase": "join",
+    "joined": 3,
+    "request_ids": [
+      "conference:c4abd9d928891cd3d76daf443e9a6242",
+      "conference:b7c92b3bd83b3a325d269f8885b5f1e4",
+      "conference:fdc6ae997d0a8803d5ca2db389f24354"
+    ],
+    "time": "2026-09-25T11:11:45.816Z"
+  },
+  "operator_stopped_cleanly": true,
+  "operator_restarted_with_same_journal": true,
+  "runner_resumed_with_same_runtime": true,
+  "creation_fuse_preserved": true,
+  "verification_complete": true,
+  "passed": true,
+  "launch_attempts": 1,
+  "joined_count": 3,
+  "duplicate_dispatch_ids": 0,
+  "game_proof_complete": true,
+  "game_evidence": "reliability-20260925a.json",
+  "result_transaction_hash": "0xb3b4026585bd5e4237e74af53bdba822b7e2bf6df6ab2f2cde78bce0884f5556"
+}

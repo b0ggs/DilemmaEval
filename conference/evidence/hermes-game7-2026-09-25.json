@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-24T23:59:49.992Z",
+  "maximum_fresh_games": 1,
+  "launch_attempts": 1,
+  "dispatches": [
+    {
+      "seat_id": "hs-1",
+      "operation": "join",
+      "game_id": "7",
+      "round": 0,
+      "status": "submitted",
+      "transaction_hash": "0x4b2fbed5acbb1015f07f50874a54fef78c4adc88273bad3cc6146b448f776db1",
+      "error_code": null,
+      "has_team_message": false
+    }
+  ],
+  "proof_complete": false,
+  "creation": {
+    "status": "accepted",
+    "reference": {
+      "kind": "transaction-hash",
+      "value": "0x2beda446d6636795be941e0af13d9de1c1707fda9ff80f7a6ac35dbf849cd670"
+    }
+  },
+  "latest": {
+    "game_id": "7",
+    "phase": "join",
+    "round": 0,
+    "joined": 1,
+    "committed": 0,
+    "revealed": 0
+  },
+  "failure": {
+    "seat_id": "oc-1",
+    "operation": "join",
+    "game_id": "7",
+    "round": 0,
+    "status": "transport-error",
+    "error_code": "MARITIME_AGENT_RESPONSE_INVALID"
+  },
+  "final_chain": {
+    "game_id": "7",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 1,
+    "block_number": "47263277"
+  },
+  "runner_stopped": true,
+  "finished_at": "2026-09-25T00:02:11.617Z",
+  "cancellation": {
+    "confirmed": true,
+    "transaction_hash": "0xa992d0768fc029bf2f9b18179d1e1addf410e63693aa43492a73a04bb15bfe7b"
+  },
+  "telegram": {
+    "ok": false,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 2,
+    "uncertain": 1,
+    "rejected": 0,
+    "issues": [
+      "TELEGRAM_DELIVERY_UNCERTAIN"
+    ],
+    "retry_at": null
+  }
+}

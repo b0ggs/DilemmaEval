@@ -1,0 +1,44 @@
+# Conference Telegram mirror
+
+`createTelegramMirror({config,runtimeDir,token,fetchImpl?,now?,scoreboard?})` exposes async `publish({messages,events,snapshot})`, `flush()`, and `health()`. The snapshot may describe a scoreboard's last observed stage; only normalized confirmed events produce results. The runtime belongs to one coordinator holding its process lock. The bot token is injected privately and is never persisted. For the controlled first-game proof, `telegram.openclaw.chat_id` and `telegram.hermes.chat_id` may identify one shared room. The final conference configuration uses distinct team rooms and their spectator invite URLs.
+
+The accepted team log remains the source of agent text. Every outgoing message includes the seat, team, game, and round, followed by the exact accepted text. No Markdown/HTML parser is enabled. Oversize messages fail explicitly instead of being shortened; configure the agent and team-log message limit to 200 characters. This adapter has no chat updates/history reader and supplies no Telegram content to agents.
+
+Delivery state lives in `runtimeDir/telegram/outbox.json`, mode 0600, with atomic replacement and file/directory fsync. Each run is bound to its configured destinations. A repeated message sequence or event ID deduplicates durably; changed text under an existing ID is rejected. Do not copy an outbox into a different run or change its chat IDs. `health()` returns counts and fixed diagnostic codes without provider replies or token-bearing URLs.
+
+Each flush sends at most one message to each physical room, in parallel across distinct rooms, within a ten-second network budget including response-body reading. Calls from the same process are serialized. When both logical teams use one controlled proof room, their clearly labeled agent messages share that physical send queue and each Dealer event is queued only once. A 1.1-second room gap and persisted retry-after cooldown prevent immediate repeat sends. Completed/cancelled results precede round results, claim/refund notices, join notices and agent backlog. The coordinator should continue calling `publish()` or `flush()` during recovery; there is no background timer or blocking retry sleep.
+
+An explicit API rejection may be retried after its backoff; a forbidden/bad request is retained as rejected. A timeout, unknown HTTP response or process exit during a send is retained as uncertain and is never automatically resent. An operator can inspect the actual group and the private outbox to reconcile it. Do not delete an uncertain entry to force a retry: Telegram does not provide this mirror an idempotency key, so delivery cannot promise exactly once. Other queued messages and games continue. Disabling credentials preserves the queue. Fixture mode cannot publish through the default real transport.
+
+## Existing pinned scoreboards
+
+Opt in at composition with `scoreboard: { seriesId, firstGameId, messageIds: { hermes: 3, openclaw: 3 }, runtimeDir }`. Chat IDs come from the existing `config.telegram` bindings, which must be distinct for scoreboards. The operator must verify the existing pins and provide their actual IDs. This adapter only calls `editMessageText` for scoreboards; it never creates, pins, deletes, or replaces a message.
+
+The independent series ledger is `scoreboard.runtimeDir/telegram/scoreboard.json`, atomically persisted with mode 0600. Reuse that directory across proof attempts with new run IDs and fresh outboxes. It is bound to the series ID, inclusive first game ID, contract/network, roster wallets/teams, chat IDs and message IDs. Changing one of those bindings fails closed. One coordinator owns both the run and series directories; concurrent series writers are unsupported.
+
+Only the existing confirmed chain-event pipeline supplies accounting. A completed result must provide exactly one nonnegative integer `award_wei` for every configured wallet, including zero awards. Missing, duplicate, foreign, conflicting or explicitly unconfirmed evidence is recorded as rejected and does not add another result. Wins compare each team's summed awards; equal sums are ties. Historical games before `firstGameId`, funding, refunds and claims do not add awards. Cancelled games add no wins. Each applied result retains its game ID, canonical transaction/log identity, block and per-wallet awards. Repeat observations, even from another run or with a changed observation ID, cannot add another win or award.
+
+Confirmed default flags are retained across observations and restarts, including flags received after completion. Zero-award outcomes and observed defaults are labeled explicitly. Neither a payout nor an absence of observed default flags is treated as proof of healthy gameplay. The pin shows the most recent five transaction links; every result's full evidence remains in the ledger.
+
+Changed score or stage text is edited during `publish()`/`flush()` before queued messages, sharing the existing room cooldown. Edits have an additional five-second per-pin gap, persisted service backoff, and Telegram `retry_after` handling. A network-uncertain edit or interrupted process can safely repeat the edit to that same message; Telegram's `message is not modified` reply also confirms success. Permanent API rejection is retained, with no replacement message. Raw errors, provider replies and tokens are never written to health or state. There is no independent timer.
+
+When enabled, the existing outbox health fields retain their meaning, with a nested `scoreboard` field containing wins, ties, exact team `awards_wei`, completed/cancelled/defaulted game counts, rejected evidence diagnostics and each pin's status. Consumers should inspect `health.scoreboard.ok` separately from `health.ok`; a successful ordinary outbox does not prove scoreboard delivery or healthy gameplay. No scoreboard field is added when the option is absent.
+
+## Setup and read-only verification
+
+The designated live operator performs service changes within the user's authorized scope:
+
+1. For the controlled first-game proof, reuse one designated shared demo group and configure both team chat IDs to that group. For the final conference setup, reuse or create two distinct groups named OpenClaw and Hermes. Set suitable team pictures and place the bot in every configured group as an administrator allowed to post. Store its token in the host's secret environment, outside Git, public configuration, and agent environments.
+2. Disable ordinary members' text, media, polls, other messages and link-preview posting permissions in each group. Keep spectator accounts as ordinary members. Generate the intended spectator invite URLs and add the public IDs/links to the run configuration.
+3. Run `verifyTelegramGroups({config,token})`. It makes only `getMe`, `getChat`, and `getChatMember` requests, checks group type, bot admin status and default spectator send restrictions, and returns sanitized per-team evidence. It cannot verify a human's ability to follow an invite or the visual layout on a phone. It never changes permissions or reads group conversations.
+4. Join every configured invite link with a non-admin spectator account on a phone. Confirm that the account can read but cannot send. Ensure that no spectator has an administrator or individual posting exemption. Confirm all actual agent tools cannot browse any public spectator group or opposing team logs; this restriction belongs to the agent runtime, not Telegram delivery.
+5. During the authorized live rehearsal, verify the shared proof room receives all clearly labeled real agent words and one copy of each confirmed Dealer event. In the final two-room setup, verify each room receives its own real agent words and both receive the confirmed game result, correct defaults/eliminations, actual awards, claim/refund notices and the corresponding Base Sepolia transaction links. Record the timestamp and sanitized evidence in `conference/RUN-STATUS.md`.
+6. Exercise a Telegram outage and a coordinator restart while real games continue. Record any uncertain messages honestly and confirm the website still shows canonical accepted text. Open both groups over cellular.
+
+API reference: [sendMessage](https://core.telegram.org/bots/api#sendmessage), [retry_after](https://core.telegram.org/bots/api#responseparameters), [group permissions](https://core.telegram.org/bots/api#chatpermissions).
+
+## Evidence boundary
+
+Local tests use injected fixture transports only. They cover durable deduplication/recovery, rate limits, explicit rejection, bounded timeouts, ambiguous delivery, team isolation, exact text, and Dealer formatting. No bot, groups, permissions, messages, or invite links have been provisioned or verified live by this implementation lane. The lead must record actual verification separately.
+
+Run from `integration/conference-runner`: `node --test test/telegram/*.test.mjs`.

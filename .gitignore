@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 pilot-secrets-local
+conference-secrets-local
 *.key
 *.pem
 *.p12

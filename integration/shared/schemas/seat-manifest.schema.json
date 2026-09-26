@@ -12,8 +12,24 @@
     "seats": {
       "type": "array",
       "minItems": 2,
-      "maxItems": 10,
+      "maxItems": 20,
       "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": ["team"],
+            "properties": { "team": { "const": "openclaw" } }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": ["team"],
+            "properties": { "team": { "const": "hermes" } }
+          }
+        }
+      ],
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -25,7 +41,7 @@
           "wallet_address"
         ],
         "properties": {
-          "seat_id": { "type": "string", "pattern": "^(oc|hs)-[1-5]$" },
+          "seat_id": { "type": "string", "pattern": "^(oc|hs)-(?:[1-9]|10)$" },
           "team": { "enum": ["openclaw", "hermes"] },
           "harness": { "enum": ["openclaw", "hermes"] },
           "maritime_agent": { "type": "string", "minLength": 1 },
@@ -39,7 +55,7 @@
             "if": { "properties": { "team": { "const": "openclaw" } } },
             "then": {
               "properties": {
-                "seat_id": { "pattern": "^oc-[1-5]$" },
+                "seat_id": { "pattern": "^oc-(?:[1-9]|10)$" },
                 "harness": { "const": "openclaw" }
               }
             }
@@ -48,7 +64,7 @@
             "if": { "properties": { "team": { "const": "hermes" } } },
             "then": {
               "properties": {
-                "seat_id": { "pattern": "^hs-[1-5]$" },
+                "seat_id": { "pattern": "^hs-(?:[1-9]|10)$" },
                 "harness": { "const": "hermes" }
               }
             }

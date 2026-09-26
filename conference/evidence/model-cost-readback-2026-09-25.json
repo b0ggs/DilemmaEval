@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T12:22:10.640192+00:00",
+  "read_only": true,
+  "new_inference_calls": 0,
+  "model_changed": false,
+  "recipe_primary_model": "gpt-5.4-mini",
+  "recipe_fallback_model": "gpt-4o",
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "configured_model": "gpt-5.4",
+      "provider": "openai",
+      "base_host": "api.maritime.sh",
+      "inference_model_env": "gpt-5.4"
+    },
+    {
+      "seat_id": "oc-1",
+      "configured_model": "openai/gpt-5.4",
+      "fallbacks": [],
+      "agent_overrides": []
+    },
+    {
+      "seat_id": "oc-2",
+      "configured_model": "openai/gpt-5.4",
+      "fallbacks": [],
+      "agent_overrides": []
+    }
+  ],
+  "proxy_model_catalog_http": 404,
+  "limitations": [
+    "Configuration readback is not a per-request billing reconciliation.",
+    "Mini/nano support through the Maritime proxy has not been validated by an inference call.",
+    "Recipe values alone did not establish the actual deployed model."
+  ],
+  "sources": [
+    "https://maritime.sh/docs/billing",
+    "https://developers.openai.com/api/docs/models/gpt-5.4",
+    "https://developers.openai.com/api/docs/models/gpt-5.4-mini",
+    "https://developers.openai.com/api/docs/models/gpt-5.4-nano",
+    "https://ai.google.dev/gemini-api/docs/pricing"
+  ]
+}

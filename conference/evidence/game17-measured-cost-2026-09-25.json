@@ -1,0 +1,255 @@
+{
+  "at": "2026-09-25T17:51:12.827Z",
+  "game_id": "17",
+  "outcome": "cancelled",
+  "joined": 9,
+  "strategy_messages": 0,
+  "requested_period": {
+    "from": "2026-09-25T17:27:24.186Z",
+    "to": "2026-09-25T17:34:03.000Z"
+  },
+  "returned_period": {
+    "from": "2026-09-25T17:27:24.186000Z",
+    "to": "2026-09-25T17:34:03Z"
+  },
+  "period_exact": true,
+  "llm_cost_cents": 10.6605,
+  "hosting_cost_cents": 0,
+  "total_cost_cents": 10.6605,
+  "seats": [
+    {
+      "seat_id": "oc-4",
+      "llm_cost_cents": 1.671,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 1.671,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "oc-3",
+      "llm_cost_cents": 1.5939,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 1.5939,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "oc-2",
+      "llm_cost_cents": 1.5336,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 1.5336,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "hs-3",
+      "llm_cost_cents": 1.3621,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 1.3621,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "oc-5",
+      "llm_cost_cents": 1.3378,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 1.3378,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "hs-5",
+      "llm_cost_cents": 0.7753,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 0.7753,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "hs-1",
+      "llm_cost_cents": 0.7292,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 0.7292,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "hs-2",
+      "llm_cost_cents": 0.6531,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 0.6531,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "hs-4",
+      "llm_cost_cents": 0.6227,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 0.6227,
+      "compute_minutes": 0
+    },
+    {
+      "seat_id": "oc-1",
+      "llm_cost_cents": 0.3818,
+      "hosting_cost_cents": 0,
+      "total_cost_cents": 0.3818,
+      "compute_minutes": 0
+    }
+  ],
+  "scope": "Game17 creation through confirmed cancellation; excludes later refund/repair probes and Codex development usage. This failed join attempt is not a completed-game cost benchmark.",
+  "gas_scope": "Confirmed Game17 transaction receipt components through all refunds. Receipt fields may not enumerate every network fee component.",
+  "gas": [
+    {
+      "transaction_hash": "0xcc6bece17eec222867aaaf59f5b0d3bbb22cc353bd98c82a94538cdf4b1d43cc",
+      "event_kinds": [
+        "created"
+      ],
+      "execution_fee_wei": "942318000000",
+      "l1_fee_wei": "15273270793"
+    },
+    {
+      "transaction_hash": "0xcea50eaff802567aaffeee0b8224c942c201f246afcf6b7f9e7e50eb02bde59b",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "440695605000000",
+      "l1_fee_wei": "16190507549"
+    },
+    {
+      "transaction_hash": "0x9f534da0c28d579ab73ae34ea715970732ca4d378372421cb315e041f931f8fb",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "16190507549"
+    },
+    {
+      "transaction_hash": "0x73342a157aa112f104d8d242a2ba0e41b99e340d48d946cde92e98e0876f83fe",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "16190507549"
+    },
+    {
+      "transaction_hash": "0xaf8be41aa812528eeac6fa3eb3b520aafd15c57ff9976149a7e015a4b122fbc2",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "16190507549"
+    },
+    {
+      "transaction_hash": "0xfc24d33c6388080d50eccd99049e5bd0d605d4745a0c3c31b9d61d80c1c6f411",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "16190507549"
+    },
+    {
+      "transaction_hash": "0x6a4becc3114313de6793068707118ba5107a105439de6a87c0cdd5b0db669f73",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "363489105000000",
+      "l1_fee_wei": "17672569760"
+    },
+    {
+      "transaction_hash": "0x12ab4b46c1275efba6f0d3962148a2e597fd2ef100eaa3379378a7925c19fa75",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "17672569760"
+    },
+    {
+      "transaction_hash": "0x60e1506011ce8f2088e3ab54c268d66ff2eb1927a3d1f3a31025dd9a852fb2e8",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "17672569760"
+    },
+    {
+      "transaction_hash": "0xbc1076170b07dae3639e354d395bf5f2b88bf9174950ed237433011015707626",
+      "event_kinds": [
+        "joined"
+      ],
+      "execution_fee_wei": "287771050000000",
+      "l1_fee_wei": "17672569760"
+    },
+    {
+      "transaction_hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e",
+      "event_kinds": [
+        "cancelled"
+      ],
+      "execution_fee_wei": "642390000000",
+      "l1_fee_wei": "14591974328"
+    },
+    {
+      "transaction_hash": "0x2525c9f2365e6b8b187de536a4be32084b9ffafe0fbd643cbe70409e00ef1ec7",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10881514028"
+    },
+    {
+      "transaction_hash": "0xe0c79828f85b904c9dc21c1d6c7cb042c443396f8da76830cdeac3c0cf1c730e",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10881514028"
+    },
+    {
+      "transaction_hash": "0x3e65ac85f062e2ab11cb6c5f07457e5e7ec81c25bb88f90b28225c558fd245cc",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10399203431"
+    },
+    {
+      "transaction_hash": "0x4c1903ad0ec5e1bbe510e1c96ed21caaa2c67c4eed3200fde493c390b974ccba",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10399203431"
+    },
+    {
+      "transaction_hash": "0xcbd9067e1a62f7c796d27b25ea14c3747d26fb6fa3919b022a445ae3c1d98938",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10399203431"
+    },
+    {
+      "transaction_hash": "0xeed2023f51d06b6802b1396c0c2ba345f39f81e3e711c2b7e6891bf4f6e2f4dc",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10214014013"
+    },
+    {
+      "transaction_hash": "0x46e5f4ea5784597bc33f0ce09beddbca6208f3e211e6ec68373587fe8f4a1642",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10214014013"
+    },
+    {
+      "transaction_hash": "0xee05da33330d912f9875e733488dde43e5884723a4bc0c569fabee0a9afff100",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "10214014013"
+    },
+    {
+      "transaction_hash": "0xea34dbe1c606f22c604994efca2af6f901f7714a3103c202a45f73ff9186f9df",
+      "event_kinds": [
+        "refunded"
+      ],
+      "execution_fee_wei": "101306065000000",
+      "l1_fee_wei": "13991868680"
+    }
+  ]
+}

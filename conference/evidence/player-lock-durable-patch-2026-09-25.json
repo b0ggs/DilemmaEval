@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T00:09:25.519Z",
+  "scope": "public runtime patch and read-only bridge validation; no gameplay submission",
+  "before": {
+    "journal_stage": "submitting",
+    "operation": "join",
+    "response_status": null,
+    "error_code": null,
+    "runtime_uid": 10000,
+    "checkout_uid": 0,
+    "git_exit": 128,
+    "git_dubious_ownership": true,
+    "reproduced_bridge_error": "REVISION_CHECK_FAILED"
+  },
+  "seats": [
+    {
+      "seat_id": "hs-1",
+      "files": [
+        {
+          "path": "/opt/data/dilemma-conference/hs-1/code/integration/conference-runner/src/maritime/player-runtime.mjs",
+          "sha256": "96a44919c7e9dff9e22561d4ef8c45287dcbc974ac007bd0210a303ee34d7665"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 10000,
+      "lock_released": true,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "lock_released": true,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    },
+    {
+      "seat_id": "oc-1",
+      "files": [
+        {
+          "path": "/data/dilemma-conference/oc-1/code/integration/conference-runner/src/maritime/player-runtime.mjs",
+          "sha256": "96a44919c7e9dff9e22561d4ef8c45287dcbc974ac007bd0210a303ee34d7665"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 0,
+      "lock_released": true,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "lock_released": true,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    },
+    {
+      "seat_id": "oc-2",
+      "files": [
+        {
+          "path": "/data/dilemma-conference/oc-2/code/integration/conference-runner/src/maritime/player-runtime.mjs",
+          "sha256": "96a44919c7e9dff9e22561d4ef8c45287dcbc974ac007bd0210a303ee34d7665"
+        }
+      ],
+      "exec_exit": 0,
+      "child_exit": 0,
+      "uid": 0,
+      "lock_released": true,
+      "files_verified": true,
+      "bridge_exit": 0,
+      "error_code": null,
+      "after_sleep_wake": {
+        "exec_exit": 0,
+        "child_exit": 0,
+        "lock_released": true,
+        "files_verified": true,
+        "bridge_exit": 0,
+        "error_code": null
+      }
+    }
+  ]
+}

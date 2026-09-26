@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-25T00:36:15.130Z",
+  "scope": "Game 9 confirmed cancellation refund only; no game creation",
+  "dispatches": [
+    {
+      "seat_id": "hs-1",
+      "game_id": "9",
+      "status": "submitted",
+      "transaction_hash": "0x922e47dc163153b15dac700574ec4d565f47bc671bec3d21fbf949d5bd08ba27",
+      "error_code": null
+    }
+  ],
+  "stage": "settlement",
+  "refund_confirmed": true,
+  "telegram": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 5,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null
+  },
+  "final_chain": {
+    "game_id": "9",
+    "active_game_id": "0",
+    "phase": "terminal",
+    "players": 1,
+    "block_number": "47264173"
+  },
+  "player_nonces": [
+    {
+      "seat_id": "hs-1",
+      "latest": 7,
+      "pending": 7
+    },
+    {
+      "seat_id": "oc-1",
+      "latest": 36,
+      "pending": 36
+    },
+    {
+      "seat_id": "oc-2",
+      "latest": 4,
+      "pending": 4
+    }
+  ],
+  "finished_at": "2026-09-25T00:37:18.019Z"
+}

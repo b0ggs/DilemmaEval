@@ -20,7 +20,10 @@ test("paired harnesses resolve to the same frozen Maritime proxy profile", () =>
   assert.deepEqual(openclaw.effective, hermes.effective);
   assert.equal(openclaw.effective.endpoint, "https://api.maritime.sh/api/llm/v1");
   assert.equal(openclaw.effective.primary_model, "gpt-5.4-mini");
-  assert.equal(openclaw.effective.fallback_model, "gpt-4o");
+  assert.equal(openclaw.effective.fallback_model, null);
+  assert.deepEqual(openclaw.effective.fallback_policy, {
+    order: ["gpt-5.4-mini"], fallback_only_on: []
+  });
 });
 
 test("a parity-sensitive mismatch is rejected", () => {

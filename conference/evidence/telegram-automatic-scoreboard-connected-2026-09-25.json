@@ -1,0 +1,61 @@
+{
+  "at": "2026-09-25T17:06:21.698Z",
+  "health": {
+    "ok": true,
+    "enabled": true,
+    "pending": 0,
+    "inflight": 0,
+    "sent": 0,
+    "uncertain": 0,
+    "rejected": 0,
+    "issues": [],
+    "retry_at": null,
+    "scoreboard": {
+      "ok": true,
+      "series_id": "five-v-five-mini-20260925",
+      "first_game_id": "17",
+      "wins": {
+        "openclaw": 0,
+        "hermes": 0
+      },
+      "ties": 0,
+      "awards_wei": {
+        "openclaw": "0",
+        "hermes": "0"
+      },
+      "completed": 0,
+      "cancelled": 0,
+      "defaulted_games": 0,
+      "rejected_results": [],
+      "pins": {
+        "openclaw": {
+          "chat_id": "-1004378812354",
+          "message_id": 3,
+          "status": "sent",
+          "updated_at": "2026-09-25T17:06:21.132Z"
+        },
+        "hermes": {
+          "chat_id": "-1004202252236",
+          "message_id": 3,
+          "status": "sent",
+          "updated_at": "2026-09-25T17:06:21.136Z"
+        }
+      },
+      "issues": []
+    }
+  },
+  "pins": [
+    {
+      "team": "hermes",
+      "message_id": 3,
+      "matches": true
+    },
+    {
+      "team": "openclaw",
+      "message_id": 3,
+      "matches": true
+    }
+  ],
+  "automatic_updates_connected": true,
+  "game_result_update_proven": false
+}

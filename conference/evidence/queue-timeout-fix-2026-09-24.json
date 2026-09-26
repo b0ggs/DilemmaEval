@@ -1,0 +1,25 @@
+{
+  "mode": "local-fixture-only-no-network",
+  "actual_runner_and_maritime_adapter": true,
+  "agent_timeout_ms": 50,
+  "wake_delay_ms": 60,
+  "calls": [],
+  "expired_dispatches_reached_chat": 0,
+  "health": [
+    {
+      "code": "AGENT_DISPATCH_EXPIRED",
+      "seat_id": "oc-1",
+      "game_id": "1"
+    },
+    {
+      "code": "AGENT_DISPATCH_EXPIRED",
+      "seat_id": "oc-2",
+      "game_id": "1"
+    },
+    {
+      "code": "AGENT_DISPATCH_EXPIRED",
+      "seat_id": "hs-1",
+      "game_id": "1"
+    }
+  ]
+}
