@@ -16,6 +16,8 @@ Read `AGENTS.md`, `CURRENT-STATUS.md`, and the **three remaining milestones** at
 2. **M2: reconcile operating state.** Reconcile one preserved operator broadcast record and establish the correct existing Telegram/outbox/scoreboard bindings. M1 investigation and M2 read-only reconciliation can proceed independently. Finish M2 before collecting the final short-lived readiness certificate.
 3. **M3: one audited 5v5 game and cleanup.** Only after M1/M2 and explicit bounded game authorization. Use the existing repository CLI and independent auditor. Stop after this proof; continuous operation, hosting, UI expansion and general refactoring are deferred.
 
+**M1 timing is also unresolved:** diagnostics start the existing 600-second evidence clock; all ten diagnostics, preparation, final all-ten continuity verification and creation must fit it. hs-1 alone took 68.934 seconds from activation to sleep/readback. The full sequence has not been measured. Do not claim the current serial flow fits, widen the limit, or turn this into another milestone; establish timing while resolving M1.
+
 The code and repeated fixtures are built. Default suites passed **520 runner + 199 site/shared = 719/719** at `2950f11`; zero failures/cancellations/skips. Independent review, Gitleaks and whitespace checks passed. Do not rerun unchanged full suites just to start a session. For a real code fix, use targeted regressions, then the documented defaults once before its checkpoint. This documentation-only handoff does not require another application test run.
 
 ## Proven live result and unresolved facts
@@ -32,6 +34,8 @@ Public observation: [live-diagnostic-preflight-2026-10-02.json](evidence/live-di
 ## Pending action and authorization
 
 The proposed next live action is a **10-minute hs-2-only public-runtime inspection**: one start, public artifact hash/model/route checks, one cleanup sleep and final inventory. It allows **zero chats/model calls, uploads, environment changes, gameplay, signing, transactions or Telegram messages**. The exact reviewed requests are in the external review below. It is a proposal, not an executed operation or a repository CLI subcommand; do not invent a command name or silently run the all-ten diagnostic instead.
+
+This start-only inspection checks present public state. Passing it would not reproduce or certify the failed post-`reload-env` boundary, clear the old unknown operation by itself, or complete M1. Keep that distinction when choosing the subsequent bounded diagnostic/reproduction scope.
 
 **This action has NOT been authorized.** The user's later requests were to explain the plan and prepare a new session. The previous window ended `2026-10-02T16:48:47.149Z` and stopped early on uncertainty. No time/budget rolls over. A session change does not authorize remote mutation. Request authorization for the concrete new scope only; do not ask again after the user grants it. Local work and safe read-only reconciliation can proceed without another planning cycle.
 

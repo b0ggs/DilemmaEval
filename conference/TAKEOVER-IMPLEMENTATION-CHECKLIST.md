@@ -20,6 +20,8 @@ The phases below retain detailed acceptance requirements. They are not nine new 
 
 M1 diagnosis and M2 reconciliation can progress independently. Finish M2 before the final M1 certification so the ten-minute evidence lifetime is useful for preparation and immediate precreation verification. Do not extend that lifetime to accommodate delays. Stop this tranche after M3; continuous games, hosting, UI changes, framework migrations and general cleanup are deferred.
 
+**M1 timing remains unproven.** The existing 600-second lifetime starts when diagnostics begin and must cover all ten diagnostics, preparation's all-ten continuity pass, the final all-ten continuity pass and creation. Only hs-1 was measured live: 68.934 seconds from activation through confirmed sleep/readback. Ten seats and both later passes have not been timed together. A straight extrapolation would exceed the limit, but is not an observed all-ten result. Resolve timing within M1; do not assume feasibility, widen the lifetime or add a separate milestone.
+
 Work one demonstrated failure at a time: identify the boundary, make the smallest necessary fix, run its targeted regression, then return to the authorized live check. A new failure may add a fix inside a milestone; it does not automatically add a new feature or acceptance gate. Retain the existing privacy, transaction, capacity, deadline and no-replay safeguards.
 
 Run the documented full suites once for a completed implementation tranche before checkpointing. Reuse verified results for unchanged source; documentation-only handoffs do not require another full run. Report progress as M1/M2/M3, live evidence gained, current blocker and next action—not as test volume. If a workstream has no new evidence or completed fix for 15 minutes, give a concise blocker/update and reconsider the current approach rather than opening more workstreams; this does not create a new approval requirement.
@@ -207,8 +209,8 @@ This phase is read-only except for waking/configuring agents as required by the 
 
 All of the following must be true at once:
 
-- [x] Conference source and existing evidence are recoverably committed and secret-scanned: implementation checkpoint `641f4ee`; all 32 staged files passed Gitleaks with zero findings and staged whitespace checks. No fresh live diagnostic evidence has been produced.
-- [x] Every affected local suite is green under the documented default command: October 2 final continuity tranche, **717/717 tests total**, zero failures, cancellations or skips.
+- [x] Conference source and existing evidence are recoverably committed and secret-scanned: implementation checkpoint `2950f11`; all seven staged files passed Gitleaks with zero findings and staged whitespace checks. The October 2 live run passed hs-1's two modes, then stopped on hs-2; no all-ten readiness certificate was produced.
+- [x] Every affected local suite is green under the documented default command: October 2 post-live-boundary correction, **719/719 tests total**, zero failures, cancellations or skips.
 - [x] The deterministic Hermes lifecycle ambiguity is resolved. This local regression fix does not establish remote lifecycle attestation.
 - [ ] All ten seats pass fresh exact-path, no-transaction diagnostics.
 - [ ] Readiness evidence matches the exact config, roster, artifacts, activation generations, transport, and current chain.
