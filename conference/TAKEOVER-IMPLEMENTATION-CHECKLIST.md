@@ -189,7 +189,7 @@ This phase is read-only except for waking/configuring agents as required by the 
 
 All of the following must be true at once:
 
-- [x] Conference source and existing evidence are recoverably committed and secret-scanned: implementation checkpoint `7d8e025`. No fresh live diagnostic evidence has been produced.
+- [x] Conference source and existing evidence are recoverably committed and secret-scanned: implementation checkpoint `641f4ee`; all 32 staged files passed Gitleaks with zero findings and staged whitespace checks. No fresh live diagnostic evidence has been produced.
 - [x] Every affected local suite is green under the documented default command: October 2 final continuity tranche, **717/717 tests total**, zero failures, cancellations or skips.
 - [x] The deterministic Hermes lifecycle ambiguity is resolved. This local regression fix does not establish remote lifecycle attestation.
 - [ ] All ten seats pass fresh exact-path, no-transaction diagnostics.

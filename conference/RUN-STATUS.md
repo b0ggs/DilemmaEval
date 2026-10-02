@@ -22,6 +22,8 @@ Independent review found and corrected verification-file replacement between ref
 
 A local read-only input review matched the committed 5v5 roster against all ten preserved canonical launch records and recovered their recorded installation roots. The historical temporary proof directory is absent; no deleted state was recreated. Public operations-manifest and operator/scoreboard/outbox bindings must be verified before any controlled game. A private external local review records these unresolved inputs and a proposed bounded runtime-inspection scope; it grants no live authorization.
 
+Recoverable implementation checkpoint: `641f4ee` (`Complete runtime continuity and guarded 5v5 proof execution`). All 32 staged files matched the scanned bytes; Gitleaks reported zero findings and staged `git diff --check` passed. The canonical launch-state file remained byte-identical to the local input-review snapshot.
+
 Remaining live work: review exact installed roots/artifacts/config and authorize any source refresh plus one bounded no-transaction diagnostic window. Fresh chain/account/operator/Telegram gate checks, an independent gate review, a separately authorized one-game window, independent proof audit, and cleanup remain outstanding. There is still no completed live 5v5 proof.
 
 ## Durable diagnostic and ten-seat implementation — October 2, 2026

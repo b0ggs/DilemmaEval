@@ -22,6 +22,7 @@ These attempts establish that agent inventory, model/tool probes, and isolated c
 
 ## Safe checkpoint
 
+- Current continuity/execution implementation checkpoint: `641f4ee` (`Complete runtime continuity and guarded 5v5 proof execution`). All **717** documented default tests passed; all **32** intended files passed Gitleaks with zero findings, and the staged whitespace check passed.
 - Previous diagnostic implementation checkpoint: `7d8e025` (`Implement durable ten-seat diagnostics and audited fixture coverage`), with all 577 documented default tests passing and all 36 intended files scanned before commit.
 - Recoverable source checkpoint: commit `688f3b9` (`Checkpoint conference implementation before takeover hardening`), created after the intended tree passed the takeover secret scan.
 - Takeover-hardening implementation: commit `8d0656f` (`Harden conference prelaunch diagnostics and proof evidence`), with the deterministic local baseline and no live mutations.
