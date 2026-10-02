@@ -166,6 +166,83 @@ test('cancelled game refunds all ten seats without presenting a successful indep
   assert.equal(report.dispatches.filter(row => row.operation === 'claim' && row.status === 'submitted').length, 10);
 });
 
+test('accepted creation waits through delayed confirmed visibility without retrying or guessing game identity', async t => {
+  const f = await fixture(t);
+  const idle = await f.adapters.chain.readSnapshot();
+  const readSnapshot = f.adapters.chain.readSnapshot, readEvents = f.adapters.chain.readEvents;
+  let visible = false, waitingPolls = 0;
+  f.adapters.chain.readSnapshot = args => visible ? readSnapshot(args) : structuredClone(idle);
+  f.adapters.chain.readEvents = args => visible ? readEvents(args) : [];
+  const pause = f.dependencies.pause;
+  f.dependencies.pause = async () => {
+    if (visible) return pause();
+    const pending = JSON.parse(await readFile(path.join(f.options.directory,'proof-run.json')));
+    assert.equal(pending.creation.status,'accepted');
+    assert.equal(pending.game_id,null);
+    assert.equal(pending.dispatches.length,0);
+    assert.equal(f.counts().creates,1);
+    if (++waitingPolls === 3) visible = true;
+  };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(waitingPolls,3);
+  assert.equal(report.status,'candidate-complete',JSON.stringify(report));
+  assert.equal(report.game_id,'1');
+  assert.equal(report.failure,null);
+  assert.equal(report.launch_attempts,1);
+  assert.equal(f.counts().creates,1);
+  assert.equal(report.dispatches.length,50);
+  assert.ok(report.dispatches.every(row=>row.game_id==='1'));
+  assert.equal(report.runner_stopped,true);
+  assert.equal(report.pending_dispatches,0);
+});
+
+test('unconfirmed accepted creation remains bounded by the original hard deadline', async t => {
+  const f = await fixture(t);
+  const idle = await f.adapters.chain.readSnapshot();
+  f.adapters.chain.readSnapshot = async () => structuredClone(idle);
+  f.adapters.chain.readEvents = async () => [];
+  f.dependencies.pause = async () => { f.advanceClock(60001); };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(report.failure.code,'PROOF_HARD_DEADLINE');
+  assert.equal(report.game_id,null);
+  assert.equal(report.creation.status,'accepted');
+  assert.equal(f.counts().creates,1);
+  assert.equal(f.counts().dispatches,0);
+  assert.equal(f.counts().advances,0);
+  assert.equal(report.runner_stopped,true);
+});
+
+test('accepted creation cannot dispatch against a different transaction, duplicate creation or mismatched snapshot', async t => {
+  for (const kind of ['transaction','duplicate','snapshot']) await t.test(kind, async t => {
+    const f = await fixture(t);
+    if (kind === 'transaction') {
+      const create = f.dependencies.launcher.create;
+      f.dependencies.launcher.create = async (...args) => ({...await create(...args),
+        reference:{kind:'transaction-hash',value:hash(999)}});
+    } else if (kind === 'duplicate') {
+      const readEvents = f.adapters.chain.readEvents;
+      f.adapters.chain.readEvents = async args => {
+        const events = await readEvents(args), created = events.find(event=>event.kind==='created');
+        return created ? [...events,{...created,id:`${hash(999)}:0`}] : events;
+      };
+    } else {
+      const readSnapshot = f.adapters.chain.readSnapshot;
+      f.adapters.chain.readSnapshot = async args => {
+        const snapshot = await readSnapshot(args);
+        return snapshot.game_id === '0' ? snapshot : {...snapshot,game_id:'2',active_game_id:'2'};
+      };
+    }
+    const report = await runControlledProof(f.dependencies);
+    assert.equal(report.failure.code,kind==='transaction'?'PROOF_GAME_IDENTITY_UNVERIFIED':
+      kind==='duplicate'?'PROOF_MULTIPLE_GAMES_OBSERVED':'PROOF_GAME_IDENTITY_CHANGED');
+    assert.equal(f.counts().creates,1);
+    assert.equal(f.counts().dispatches,0);
+    assert.equal(f.counts().advances,0);
+    assert.equal(report.runner_stopped,true);
+    assert.equal(report.candidate_proof_complete,false);
+  });
+});
+
 test('readiness refusal occurs before agent, spectator, phase or launch effect and before any execution state', async t => {
   const f = await fixture(t);
   f.options.validateReadinessCurrent = async () => { throw new Error('READINESS_REMOTE_GENERATION_UNATTESTED'); };

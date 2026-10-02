@@ -142,6 +142,20 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
     if (signal?.aborted || deadlineController.signal.aborted || stopController.signal.aborted) throw fixedError(report.failure?.code ?? 'PROOF_RUN_STOPPED');
   }
 
+  function observeConfirmedGame(state) {
+    const created = state.events.filter(event => event.kind === 'created' && UINT.test(event.game_id ?? ''));
+    const createdIds = [...new Set(created.map(event => event.game_id))];
+    if (created.length > 1 || report.game_id && createdIds.some(gameId => gameId !== report.game_id)) {
+      stop('PROOF_MULTIPLE_GAMES_OBSERVED');
+    } else if (!report.game_id && creationStarted && report.creation?.status === 'accepted' && createdIds.length === 1) {
+      const reference = report.creation.reference;
+      if (reference && created.some(event => event.transaction_hash?.toLowerCase() !== reference.value?.toLowerCase())) {
+        stop('PROOF_GAME_IDENTITY_UNVERIFIED');
+      } else report.game_id = createdIds[0];
+    }
+    if (report.game_id && state.snapshot.game_id !== report.game_id) stop('PROOF_GAME_IDENTITY_CHANGED');
+  }
+
   // In-flight operations may return after a sibling fails. Keep their actual
   // outcomes until the absolute deadline, when unresolved outcomes are ambiguous.
   async function boundedCall(callback, code, { mutation = false, allowStopped = false } = {}) {
@@ -162,6 +176,9 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
 
   const journal = createProofDispatchJournal({ report, persist, stopController, now: clock,
     adapter: { dispatch: async args => {
+      // Confirmation can first arrive inside tick's refresh, before play sends
+      // its first request and before the outer loop receives that tick's state.
+      observeConfirmedGame(runner.getState());
       assertOpen();
       if (!creationStarted || !report.game_id || args.request?.game_id !== report.game_id) throw fixedError('PROOF_GAME_IDENTITY_UNVERIFIED');
       const deadlineAt = Math.min(args.deadline_at_ms, options.hardStopAtMs);
@@ -180,6 +197,7 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
     .map(method => [method, (...args) => boundedCall(() => options.chain[method](...args), 'PROOF_CHAIN_READ_FAILED')]));
   const phaseRequests = new Set();
   const guardedPhase = { advance: intent => trackedEffect(async () => {
+    observeConfirmedGame(runner.getState());
     assertOpen();
     if (!report.game_id || intent?.game_id !== report.game_id || phaseRequests.has(intent.action_id)) throw fixedError('PROOF_PHASE_IDENTITY_UNVERIFIED');
     phaseRequests.add(intent.action_id);
@@ -243,14 +261,13 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
       const state = await boundedCall(() => runner.tick(), 'PROOF_RUNNER_TICK_FAILED');
       await journal.flush();
       report.final_chain = snapshotSummary(state.snapshot);
-      const created = state.events.filter(event => event.kind === 'created' && UINT.test(event.game_id ?? ''));
-      const createdIds = [...new Set(created.map(event => event.game_id))];
-      if (createdIds.length > 1 || report.game_id && createdIds.some(gameId => gameId !== report.game_id)) stop('PROOF_MULTIPLE_GAMES_OBSERVED');
-      else if (!report.game_id && creationStarted && createdIds.length === 1) report.game_id = createdIds[0];
-      if (report.game_id && state.snapshot.game_id !== report.game_id) stop('PROOF_GAME_IDENTITY_CHANGED');
+      observeConfirmedGame(state);
       if (journal.getFailure() || report.dispatches.some(row => BAD_DISPATCH.has(row.status))) stop('PROOF_AGENT_OPERATION_UNCERTAIN');
       const issues = (state.health ?? []).map(issue => issue?.code);
-      if (issues.some(code => !['LAUNCH_REJECTED'].includes(code))) stop('PROOF_RUNNER_HEALTH_BLOCKED');
+      if (issues.some(code => code !== 'LAUNCH_REJECTED' &&
+          !(code === 'LAUNCH_PENDING' && creationStarted && report.creation?.status === 'accepted' && !report.game_id))) {
+        stop('PROOF_RUNNER_HEALTH_BLOCKED');
+      }
       if (stopController.signal.aborted) break;
       if (report.game_id && state.snapshot.phase === 'terminal') {
         report.result = terminalResult(state, report.game_id, prepared.preparedConfig);
