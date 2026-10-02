@@ -168,9 +168,10 @@ function controlledEvidence(config, now=Date.parse('2026-09-25T18:00:00.000Z')) 
       persistent_bundles_verified:false,model_profile_verified:true,spectator_access_blocked:false}))};
 }
 
-test('controlled rehearsal accepts exact provision evidence while strict live readiness keeps later proof gates',async()=>{
+test('legacy controlled evidence is accepted only through explicit fixture compatibility',async()=>{
   const config=await fixtureConfig();const now=Date.parse('2026-09-25T18:00:00.000Z');const evidence=controlledEvidence(config,now);
-  assert.equal(validateControlledRuntimeEvidence(config,evidence,{now}),evidence);
+  assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now}),/PRODUCER_REQUIRED/);
+  assert.equal(validateControlledRuntimeEvidence(config,evidence,{now,allowLegacyFixtures:true}),evidence);
   assert.throws(()=>validateRuntimeEvidence(config,evidence),/IDENTITY_MISMATCH/);
 });
 
@@ -178,16 +179,16 @@ test('controlled evidence builder binds public diagnostics to the current config
   const config=await fixtureConfig();const now=Date.parse('2026-09-25T18:00:00.000Z');
   const seed=controlledEvidence(config,now);
   const evidence=buildControlledRuntimeEvidence(config,{confirmedBlockNumber:seed.confirmed_block_number,
-    confirmedBlockHash:seed.confirmed_block_hash,seats:seed.seats,now});
+    confirmedBlockHash:seed.confirmed_block_hash,seats:seed.seats,now,allowLegacyFixtures:true});
   assert.equal(evidence.verified_at,new Date(now).toISOString());
   assert.equal(evidence.expires_at,new Date(now+RUNTIME_EVIDENCE_MAX_AGE_MS).toISOString());
   assert.equal(evidence.config_fingerprint,configFingerprint(config));
   assert.equal(evidence.transport_fingerprint,TRANSPORT_FINGERPRINT);
-  assert.equal(validateControlledRuntimeEvidence(config,evidence,{now}),evidence);
+  assert.equal(validateControlledRuntimeEvidence(config,evidence,{now,allowLegacyFixtures:true}),evidence);
   const reordered=Object.fromEntries(Object.entries(evidence).reverse());
   assert.equal(runtimeEvidenceFingerprint(reordered),runtimeEvidenceFingerprint(evidence));
   assert.throws(()=>buildControlledRuntimeEvidence(config,{confirmedBlockNumber:seed.confirmed_block_number,
-    confirmedBlockHash:seed.confirmed_block_hash,seats:[...seed.seats,{...seed.seats[0]}],now}),/SEAT_IDENTITY/);
+    confirmedBlockHash:seed.confirmed_block_hash,seats:[...seed.seats,{...seed.seats[0]}],now,allowLegacyFixtures:true}),/SEAT_IDENTITY/);
 });
 
 test('controlled rehearsal rejects incomplete proof, unpinned SDK, unsafe commands and seat identity drift',async()=>{
@@ -200,7 +201,7 @@ test('controlled rehearsal rejects incomplete proof, unpinned SDK, unsafe comman
     evidence=>evidence.seats[0].gameplay_command=['node','/volume/private/player-cli.mjs','/volume/seat.json'],
     evidence=>evidence.seats[0].wallet_address=config.roster[1].wallet_address,
     evidence=>evidence.seats[0].agent_id=config.roster[1].agent_id
-  ]) {const evidence=controlledEvidence(config,now);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now}));}
+  ]) {const evidence=controlledEvidence(config,now);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now,allowLegacyFixtures:true}));}
 });
 
 test('controlled rehearsal requires fresh exact-path diagnostics from one safe lifecycle generation',async()=>{
@@ -217,7 +218,7 @@ test('controlled rehearsal requires fresh exact-path diagnostics from one safe l
     [e=>e.seats[0].diagnostics.commit_input.request_id=e.seats[0].diagnostics.gameplay_input.request_id,/IDENTITY_REUSED/],
     [e=>e.seats[0].sleep_confirmed=false,/LIFECYCLE/],
     [e=>e.seats[0].lifecycle_ambiguous=true,/LIFECYCLE/]
-  ]) {const evidence=controlledEvidence(config,now);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now}),code);}
+  ]) {const evidence=controlledEvidence(config,now);mutate(evidence);assert.throws(()=>validateControlledRuntimeEvidence(config,evidence,{now,allowLegacyFixtures:true}),code);}
 });
 
 test('controlled chain readiness permits only bounded longer rehearsal windows',async()=>{

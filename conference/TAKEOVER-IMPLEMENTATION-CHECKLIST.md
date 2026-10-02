@@ -47,8 +47,8 @@ This checklist replaces launch-first debugging. Do not create another game until
 - [x] Determine whether the third Hermes configuration write is required for a new activation generation or is an unintended replay. It is required after the confirmed sleep/reload generation boundary can rematerialize configuration.
 - [x] Correct the implementation or the invariant—not merely the assertion—and add a test proving ambiguous repair is inspected before any repeat mutation. The test also proves a stable rerun performs no fourth write.
 - [x] Make the conference-runner default test command deterministic. The package default now uses `--test-concurrency=1`.
-- [x] Run the conference-runner suite to zero failures and zero cancellations. Result: 255/255.
-- [x] Run the site suite and the changed shared package suites: game bridge, harness adapters, Maritime transport, orchestrator core, and team logs. Result: 199/199.
+- [x] Run the conference-runner suite to zero failures and zero cancellations. Inherited 255/255 reproduced; October 2 integrated default suite: **378/378**.
+- [x] Run the site suite and the changed shared package suites: game bridge, harness adapters, Maritime transport, orchestrator core, and team logs. October 2 default suites: **199/199**, zero failures or cancellations.
 - [x] Run `git diff --check`.
 
 **Exit condition:** all affected local suites pass using the documented default commands. A targeted pass cannot override a red full suite.
@@ -76,11 +76,13 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 ### 3.3 Fresh evidence
 
-- [ ] Produce one durable readiness record containing run ID, roster fingerprint, agent IDs, artifact hashes, transport/protocol version, activation generation, model profile, timestamps, and per-seat diagnostic results.
+- [x] Implement the durable all-ten readiness-v2 producer with run/config/roster/source/artifact/chain/model/lifecycle bindings, independent sanitized CLI receipts, exclusive external state, and atomic evidence publication. Repeated fixture runs pass; no live readiness record has been collected.
 - [x] Enforce a short maximum evidence age, initially ten minutes, at game preparation and again immediately before creation.
-- [ ] Invalidate evidence when roster identity, runtime artifact, transport code, player CLI, model configuration, activation generation, chain ID, game address, or relevant defaults change.
-- [ ] Require all ten seats to pass in the same bounded readiness run.
-- [ ] Require all agents to be confirmed sleeping at the end of readiness, with no poisoned awake lease or ambiguous lifecycle operation.
+- [x] Reject changed roster/config/artifacts/runtime/transport/model/chain/defaults and observed mixed generations in local tests. `activation_generation` now identifies a durable diagnostic-run activation intent. Unobservable remote generation remains fail-closed with `READINESS_REMOTE_GENERATION_UNATTESTED`; it is not inferred from provider timestamps.
+- [x] Require all ten seats and both diagnostic modes in one bounded run; missing seats, stale results, private fields, model-only replies, timeouts and incomplete publication fail local fixtures.
+- [x] Require final sleeping inventory plus per-seat sleep response/readback. Unresolved lifecycle operations or abort-ignoring late work prevent readiness; interrupted runs are inspectable without replay. These are local fixture results; fresh live sleep evidence remains required.
+
+**Live exit condition remains unmet:** no live diagnostic run has occurred. Produced fixture evidence is explicitly `diagnostics_complete:true`, `remote_generation_attested:false`, and `ready_for_controlled_gameplay:false`. Remote generation attestation must be resolved before any creation.
 
 **Exit condition:** all ten agents pass the exact chat-to-tool-to-stdin path without a transaction, and the creation path refuses missing, stale, mixed-generation, or mismatched evidence.
 
@@ -92,24 +94,24 @@ This checklist replaces launch-first debugging. Do not create another game until
 - [x] Reconcile every reported transaction against the expected wallet, contract, game, round, operation event, confirmed canonical receipt, and current chain snapshot through the independent proof auditor.
 - [x] Add a regression for the Game 17 shape: one transport failure, nine late successful outcomes, and complete evidence for all ten attempted seats.
 - [x] Bind the one-game creation fuse to the exact config digest and fresh readiness-evidence digest.
-- [ ] Refuse creation if the operator journal has an unresolved transaction, any owner or player nonce is pending, another runner/operator is active, or a game is already active.
-- [ ] Replace expired, workstation-specific proof preparation with a versioned repository command that accepts explicit paths and deadlines.
-- [ ] Make preparation safe to rerun into a new directory while refusing to overwrite an existing fuse, journal, evidence record, or runtime.
-- [ ] Add a read-only `plan`/`status` command that shows gates and fixed error codes without loading a signing key or printing secrets.
+- [x] Refuse preparation/creation for unresolved operator transactions, any pending owner/player nonce, an active game, or unrelated live locks. The creation guard accepts only exact in-memory ownership descriptors for the intended runner/operator and rechecks them before submission.
+- [x] Add versioned `conference-control.mjs` diagnostic/plan/status/proof-preparation commands with explicit paths and absolute deadlines. Historical launch entrypoints are disabled; no game-creation CLI is exposed while remote generation remains unverifiable.
+- [x] Require a fresh exclusive external directory and refuse to overwrite existing fuses, journals, evidence or runtime state; partial writes remain for inspection.
+- [x] Add local read-only `plan`/`status` with no credentials/network/writes, plus read-only proof checks. Only allowlisted error codes cross the CLI; signing keys are never loaded.
 - [x] Keep `candidate_proof_complete` non-authoritative. Only the independent chain/Telegram audit may mark a proof complete.
 
 **Exit condition:** a failed or interrupted proof leaves enough durable, sanitized evidence to reconcile every seat and transaction without guessing or blindly retrying.
 
 ## Phase 5 — local and fixture assembly gate
 
-- [ ] Run repeated ten-seat fixture games through discussion, commit, reveal, result, claims/refunds, scoreboards, and restart recovery.
-- [ ] Exercise five-awake scheduling with slow, rejected, timed-out, and abort-ignoring adapters.
+- [x] Run repeated ten-seat fixture games through all-ten joins/discussion/commits/reveals/results/claims, an all-ten cancellation/refund, scoreboards and restart recovery.
+- [x] Exercise five-awake scheduling with ten actual fixture seats, unrelated active/restoring consumers, slow chat, delayed sleep, rejection, timeout, abort-ignoring calls and poisoned permits. HTTP-success sleep responses must explicitly confirm sleeping.
 - [x] Verify a phase change aborts pending discussion and cannot dispatch stale commits.
 - [x] Verify an incomplete discussion blocks all commits.
 - [x] Verify a Telegram outage does not stop gameplay and that recovery does not duplicate uncertain sends.
 - [x] Verify scoreboards exclude funding, refunds, claims, cancellations, duplicate events, and historical unequal-roster games.
 - [x] Verify both team rooms receive only their own agent strategy while Dealer status/results reach both.
-- [ ] Exercise graceful restart after completed joins and a simulated crash around a pending non-signing adapter call.
+- [x] Exercise graceful restart after ten joins and actual fixture-subprocess termination during ten pending non-signing discussions; recovery cannot redispatch uncertain calls or commit before the discussion barrier.
 - [x] Run the independent proof auditor against valid and deliberately corrupted fixtures.
 
 **Exit condition:** the assembled local system passes all acceptance and failure-path tests without live agents or chain writes.
@@ -183,8 +185,8 @@ This phase is read-only except for waking/configuring agents as required by the 
 All of the following must be true at once:
 
 - [ ] Conference source and evidence are recoverably committed and secret-safe.
-- [ ] Every affected local suite is green under the documented default command.
-- [ ] The deterministic Hermes lifecycle ambiguity is resolved.
+- [x] Every affected local suite is green under the documented default command: October 2, 577/577 tests total.
+- [x] The deterministic Hermes lifecycle ambiguity is resolved. This local regression fix does not establish remote lifecycle attestation.
 - [ ] All ten seats pass fresh exact-path, no-transaction diagnostics.
 - [ ] Readiness evidence matches the exact config, roster, artifacts, activation generations, transport, and current chain.
 - [ ] Contract is idle, defaults are correct, balances are sufficient, and all relevant pending nonces equal latest nonces.

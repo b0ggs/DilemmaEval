@@ -4,7 +4,7 @@
 
 The accepted team log remains the source of agent text. Every outgoing message includes the seat, team, game, and round, followed by the exact accepted text. No Markdown/HTML parser is enabled. Oversize messages fail explicitly instead of being shortened; configure the agent and team-log message limit to 200 characters. This adapter has no chat updates/history reader and supplies no Telegram content to agents.
 
-Delivery state lives in `runtimeDir/telegram/outbox.json`, mode 0600, with atomic replacement and file/directory fsync. Each run is bound to its configured destinations. A repeated message sequence or event ID deduplicates durably; changed text under an existing ID is rejected. Do not copy an outbox into a different run or change its chat IDs. `health()` returns counts and fixed diagnostic codes without provider replies or token-bearing URLs.
+Delivery state lives in `runtimeDir/telegram/outbox.json`, mode 0600, with atomic replacement and file/directory fsync. Each run is bound to its configured destinations. A repeated message sequence or event ID deduplicates durably; changed text under an existing ID is rejected. Recovery rejects duplicate identities, changed text digests, and invalid successful-delivery metadata before sending. A successful acknowledgement must include a positive message ID and, when supplied, the expected chat ID. Do not copy an outbox into a different run or change its chat IDs. `health()` returns counts and fixed diagnostic codes without provider replies or token-bearing URLs.
 
 Each flush sends at most one message to each physical room, in parallel across distinct rooms, within a ten-second network budget including response-body reading. Calls from the same process are serialized. When both logical teams use one controlled proof room, their clearly labeled agent messages share that physical send queue and each Dealer event is queued only once. A 1.1-second room gap and persisted retry-after cooldown prevent immediate repeat sends. Completed/cancelled results precede round results, claim/refund notices, join notices and agent backlog. The coordinator should continue calling `publish()` or `flush()` during recovery; there is no background timer or blocking retry sleep.
 
@@ -24,6 +24,8 @@ Changed score or stage text is edited during `publish()`/`flush()` before queued
 
 When enabled, the existing outbox health fields retain their meaning, with a nested `scoreboard` field containing wins, ties, exact team `awards_wei`, completed/cancelled/defaulted game counts, rejected evidence diagnostics and each pin's status. Consumers should inspect `health.scoreboard.ok` separately from `health.ok`; a successful ordinary outbox does not prove scoreboard delivery or healthy gameplay. No scoreboard field is added when the option is absent.
 
+`proof-audit.mjs` exports `auditPinnedScoreboards({config,gameId,bindings,ledger,chainAudit,report,provider,token,fetchImpl?})`. This independent read-only audit requires the successful gameplay audit, verifies ledger identities and sums, and re-reads every counted game's canonical terminal receipt, exact roster, and per-wallet net awards at its result block. It then reads both existing pins with `getChat` and verifies their destinations, IDs, exact text, and digests. Earlier unequal-roster games or inconsistent historical awards cannot contribute to an accepted cumulative scoreboard. Output contains fixed error codes and public IDs/digests, with no message text, tokens, or provider errors.
+
 ## Setup and read-only verification
 
 The designated live operator performs service changes within the user's authorized scope:
@@ -39,6 +41,6 @@ API reference: [sendMessage](https://core.telegram.org/bots/api#sendmessage), [r
 
 ## Evidence boundary
 
-Local tests use injected fixture transports only. They cover durable deduplication/recovery, rate limits, explicit rejection, bounded timeouts, ambiguous delivery, team isolation, exact text, and Dealer formatting. No bot, groups, permissions, messages, or invite links have been provisioned or verified live by this implementation lane. The lead must record actual verification separately.
+Local tests use injected fixture transports only. They cover three ten-seat games with both rounds of team discussions, result priority in both rooms, durable deduplication/recovery, rate limits, explicit rejection, bounded timeouts, ambiguous delivery, exact text, and Dealer formatting. Independent audit fixtures corrupt current and historical canonical receipts, rosters, awards, totals, and pin readbacks. No bot, groups, permissions, messages, or invite links have been provisioned or verified live by this implementation lane. The lead must record actual verification separately.
 
-Run from `integration/conference-runner`: `node --test test/telegram/*.test.mjs`.
+Run from `integration/conference-runner`: `node --test --test-concurrency=1 test/telegram/*.test.mjs test/proof-audit.test.mjs`.

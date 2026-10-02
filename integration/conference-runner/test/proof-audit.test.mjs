@@ -12,9 +12,15 @@ const abi = new Interface([...GAME_ABI,
 const H = value => `0x${value.toString(16).padStart(64, '0')}`;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const PRIVATE_TEXT = 'fixture-only discussion text never included in audit output';
+const OWNER = `0x${'f'.repeat(40)}`;
+const tenSeatRoster = Array.from({ length: 10 }, (_, index) => ({
+  seat_id: `${index < 5 ? 'oc' : 'hs'}-${index % 5 + 1}`,
+  team: index < 5 ? 'openclaw' : 'hermes', harness: index < 5 ? 'openclaw' : 'hermes',
+  wallet_address: `0x${(index + 1).toString(16).padStart(40, '0')}`,
+}));
 const config = {
   chain_id: 84532, game_address: FROZEN_NETWORK.game, run_id: 'controlled-proof-fixture',
-  start_block: '100', confirmations: 2,
+  start_block: '100', confirmations: 2, expected_owner: OWNER,
   roster: [
     { seat_id: 'oc-1', team: 'openclaw', harness: 'openclaw', wallet_address: '0x1111111111111111111111111111111111111111' },
     { seat_id: 'oc-2', team: 'openclaw', harness: 'openclaw', wallet_address: '0x2222222222222222222222222222222222222222' },
@@ -32,21 +38,23 @@ function sent(key, team, text, message_id) {
     delivered_at: '2026-09-25T12:00:00.000Z' };
 }
 function fixture(roster = config.roster) {
-  const fixtureConfig = { ...config, roster: structuredClone(roster) };
+  const fixtureConfig = { ...structuredClone(config), roster: structuredClone(roster) };
   const logs = [log('GameCreated', [9, 1000, 100000000000000n, roster.length, roster.length, 2], 100)];
   for (const [i, seat] of roster.entries()) {
     const choice = i === roster.length - 1 ? 3 : 1;
-    logs.push(log('PlayerJoined', [9, seat.wallet_address, H(300 + i), 1, i + 1], 101, i));
-    logs.push(log('Committed', [9, 1, seat.wallet_address, H(9000 + i)], 104, i));
-    logs.push(log('Revealed', [9, 1, seat.wallet_address, choice], 107, i));
+    logs.push(log('PlayerJoined', [9, seat.wallet_address, H(300 + i), 1, i + 1], 101, i, H(10000 + i)));
+    logs.push(log('Committed', [9, 1, seat.wallet_address, H(9000 + i)], 104, i, H(20000 + i)));
+    logs.push(log('Revealed', [9, 1, seat.wallet_address, choice], 107, i, H(30000 + i)));
     logs.push(log('EffectiveChoiceMaterialized', [9, 1, seat.wallet_address, choice, false, false], 110, i));
   }
   logs.push(log('RoundResolved', [9, 1, roster.length - 1, 0, 1, roster.length - 1, 1, 0], 110, roster.length));
   logs.push(log('GameEnded', [9, 1, 1, 1, 0], 110, roster.length + 1));
-  const receipts = new Map([100, 110].map(number => [H(1000 + number), {
-    status: 1, hash: H(1000 + number), to: config.game_address, blockNumber: number,
-    blockHash: H(number), logs: logs.filter(item => item.blockNumber === number),
+  const receipts = new Map(logs.map(item => [item.transactionHash, {
+    status: 1, hash: item.transactionHash, from: abi.parseLog(item).args.wallet ?? OWNER,
+    to: config.game_address, blockNumber: item.blockNumber, blockHash: item.blockHash,
+    logs: logs.filter(log => log.transactionHash === item.transactionHash),
   }]));
+  receipts.get(H(1110)).from = OWNER;
   const calls = [];
   const provider = {
     async send(method, params) { assert.equal(method, 'eth_chainId'); assert.deepEqual(params, []); return '0x14a34'; },
@@ -63,9 +71,11 @@ function fixture(roster = config.roster) {
   };
   const report = { launch_attempts: 1, proof_complete: true, telegram: { ok: true },
     creation: { status: 'accepted', reference: { kind: 'transaction-hash', value: H(1100) } },
-    dispatches: roster.flatMap(seat => [
+    dispatches: roster.flatMap((seat, index) => [
       { game_id: '9', round: 1, seat_id: seat.seat_id, operation: 'discussion', status: 'observed', has_team_message: true },
-      ...['join', 'commit', 'reveal'].map(operation => ({ game_id: '9', round: 1, seat_id: seat.seat_id, operation, status: 'submitted' })),
+      ...['join', 'commit', 'reveal'].map((operation, opIndex) => ({ game_id: '9', round: operation === 'join' ? 0 : 1,
+        request_id: `conference:${hash(`${seat.seat_id}:${operation}`).slice(0, 32)}`,
+        seat_id: seat.seat_id, operation, status: 'submitted', transaction_hash: H(10000 * (opIndex + 1) + index) })),
     ]) };
   const outbox = { schema_version: 1, run_id: fixtureConfig.run_id,
     chats: { openclaw: '-100123', hermes: '-100123' }, entries: roster.map((seat, i) => sent(
@@ -131,7 +141,7 @@ test('audits a complete five-vs-five roster without weakening per-seat acceptanc
 test('old-game dispatches and outbox messages cannot satisfy current-game discussion', async () => {
   for (const kind of ['dispatch', 'outbox']) {
     const f = fixture();
-    if (kind === 'dispatch') f.report.dispatches.forEach(row => { row.game_id = '8'; });
+    if (kind === 'dispatch') f.report.dispatches.filter(row => row.operation === 'discussion').forEach(row => { row.game_id = '8'; });
     else f.outbox.entries.filter(row => row.key.startsWith('message:')).forEach(row => {
       row.key = row.key.replace(':9:', ':8:'); row.text = row.text.replace('Game 9', 'Game 8'); row.digest = hash(row.text);
     });
@@ -219,4 +229,93 @@ test('scope mismatch and provider failures fail closed without copying secrets',
   assert.equal(audit.proof_complete, false);
   assert.deepEqual(audit.issues, ['PROOF_AUDIT_UNAVAILABLE']);
   assert.equal(JSON.stringify(audit).includes('SECRET_RPC_KEY_PRIVATE'), false);
+});
+
+test('repeated ten-seat audits require every action receipt and both independent rooms', async () => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const f = fixture(tenSeatRoster);
+    f.config.run_id += `-${attempt}`; f.outbox.run_id = f.config.run_id;
+    f.config.telegram.hermes.chat_id = '-100456'; f.outbox.chats.hermes = '-100456';
+    const result = f.outbox.entries.at(-1);
+    f.outbox.entries.push(sent(result.key.replace('openclaw', 'hermes'), 'hermes', result.text, 99));
+    const read = f.provider.getTransactionReceipt;
+    const readHashes = new Set();
+    f.provider.getTransactionReceipt = async tx => { readHashes.add(tx); return read(tx); };
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, true, JSON.stringify(audit));
+    assert.equal(audit.discussion_message_count, 10);
+    assert.equal(audit.result_message_ids.length, 2);
+    assert.equal(readHashes.size, 32);
+    assert.ok(f.report.dispatches.filter(row => row.transaction_hash).every(row => readHashes.has(row.transaction_hash)));
+  }
+});
+
+test('ten-seat audit rejects corrupted player receipts and dispatch binding independently', async t => {
+  const cases = [
+    ['missing receipt', f => f.receipts.delete(H(10000)), 'PROOF_RECEIPT_UNVERIFIED'],
+    ['reverted receipt', f => { f.receipts.get(H(20000)).status = 0; }, 'PROOF_RECEIPT_UNVERIFIED'],
+    ['wrong transaction', f => { f.receipts.get(H(20000)).hash = H(999); }, 'PROOF_RECEIPT_UNVERIFIED'],
+    ['wrong contract', f => { f.receipts.get(H(20000)).to = OWNER; }, 'PROOF_RECEIPT_UNVERIFIED'],
+    ['wrong sender', f => { f.receipts.get(H(20000)).from = tenSeatRoster[1].wallet_address; }, 'PROOF_PLAYER_RECEIPT_UNVERIFIED'],
+    ['missing operation event', f => { f.receipts.get(H(30000)).logs = []; }, 'PROOF_PLAYER_RECEIPT_UNVERIFIED'],
+    ['receipt log from another transaction', f => { f.receipts.get(H(30000)).logs = f.receipts.get(H(30000)).logs.map(log => ({ ...log, transactionHash: H(999) })); }, 'PROOF_PLAYER_RECEIPT_UNVERIFIED'],
+    ['noncanonical player receipt', f => { f.receipts.get(H(30000)).blockHash = H(999); }, 'PROOF_CHAIN_REORG'],
+    ['wrong reported hash', f => { f.report.dispatches.find(row => row.operation === 'commit').transaction_hash = H(999); }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['wrong reported seat', f => { f.report.dispatches.find(row => row.operation === 'commit').seat_id = 'hs-5'; }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['wrong reported game', f => { f.report.dispatches.find(row => row.operation === 'commit').game_id = '8'; }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['wrong reported round', f => { f.report.dispatches.find(row => row.operation === 'commit').round = 2; }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['missing gameplay journal', f => { f.report.dispatches = f.report.dispatches.filter(row => row.operation === 'discussion'); }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['missing request identity', f => { delete f.report.dispatches.find(row => row.operation === 'reveal').request_id; }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['pre-submit rejection cannot prove operation attempt', f => { f.report.dispatches.find(row => row.operation === 'join').status = 'rejected-before-submit'; }, 'PROOF_DISPATCH_UNVERIFIED'],
+    ['wrong creation owner', f => { f.receipts.get(H(1100)).from = tenSeatRoster[0].wallet_address; }, 'PROOF_CREATION_UNVERIFIED'],
+    ['missing configured owner', f => { delete f.config.expected_owner; }, 'PROOF_AUDIT_INPUT_INVALID'],
+    ['wrong creation roster limits', f => replaceEvent(f, 'GameCreated', original => log('GameCreated', [9, 1000, 100000000000000n, 3, 3, 2], original.blockNumber)), 'PROOF_CREATION_UNVERIFIED'],
+    ['wrong choice tally', f => replaceEvent(f, 'RoundResolved', original => log('RoundResolved', [9, 1, 8, 1, 1, 9, 1, 0], original.blockNumber, original.index)), 'PROOF_ACTIONS_UNVERIFIED'],
+    ['wrong elimination tally', f => replaceEvent(f, 'RoundResolved', original => log('RoundResolved', [9, 1, 9, 0, 1, 8, 1, 0], original.blockNumber, original.index)), 'PROOF_ACTIONS_UNVERIFIED'],
+    ['wrong winner count', f => replaceEvent(f, 'GameEnded', original => log('GameEnded', [9, 1, 1, 2, 0], original.blockNumber, original.index)), 'PROOF_RESULT_UNVERIFIED'],
+    ['missing last seat reveal', f => { f.logs.splice(f.logs.findIndex(item => item.transactionHash === H(30009)), 1); }, 'PROOF_ACTIONS_UNVERIFIED'],
+    ['duplicate chain event', f => { f.logs.push(f.logs[1]); }, 'PROOF_CHAIN_LOG_INVALID'],
+    ['removed chain event', f => { f.logs[1].removed = true; }, 'PROOF_CHAIN_LOG_INVALID'],
+    ['defaulted last seat', f => replaceEvent(f, 'EffectiveChoiceMaterialized', original => log('EffectiveChoiceMaterialized', [9, 1, tenSeatRoster[0].wallet_address, 1, true, false], original.blockNumber, original.index)), 'PROOF_DEFAULTED_ACTIONS'],
+    ['missing last discussion', f => { f.outbox.entries = f.outbox.entries.filter(entry => !entry.text.startsWith('hs-5 ')); }, 'PROOF_DISCUSSION_UNVERIFIED'],
+    ['misrouted discussion', f => { f.outbox.entries[0].team = 'hermes'; }, 'PROOF_DISCUSSION_UNVERIFIED'],
+    ['duplicate Telegram message ID', f => { f.outbox.entries[1].message_id = f.outbox.entries[0].message_id; }, 'PROOF_TELEGRAM_UNDELIVERED'],
+    ['wrong result transaction link', f => { const entry = f.outbox.entries.at(-1); entry.text = entry.text.replace(H(1110), H(999)); entry.digest = hash(entry.text); }, 'PROOF_RESULT_DELIVERY_UNVERIFIED'],
+  ];
+  for (const [name, corrupt, issue] of cases) await t.test(name, async () => {
+    const f = fixture(tenSeatRoster); corrupt(f);
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, false);
+    assert.deepEqual(audit.issues, [issue]);
+    assert.ok(!JSON.stringify(audit).includes(PRIVATE_TEXT));
+  });
+});
+
+test('a durable ambiguous attempt without a returned hash is reconciled only by its canonical player event', async () => {
+  for (const status of ['ambiguous', 'cancelled-after-submit', 'observed']) {
+    const f = fixture(tenSeatRoster);
+    const dispatch = f.report.dispatches.find(row => row.operation === 'reveal');
+    dispatch.status = status; dispatch.transaction_hash = null;
+    assert.equal((await auditControlledProof(f)).proof_complete, true);
+    f.receipts.delete(H(30000));
+    assert.deepEqual((await auditControlledProof(f)).issues, ['PROOF_RECEIPT_UNVERIFIED']);
+  }
+});
+
+test('reported claims require a successful canonical receipt from the seat with its exact game/wallet event', async () => {
+  function withClaim() {
+    const f = fixture(tenSeatRoster), wallet = tenSeatRoster[0].wallet_address;
+    const claim = log('PrizeClaimed', [9, wallet, 1, 1, 0, 1, OWNER], 111, 0, H(40000));
+    f.receipts.set(H(40000), { status: 1, hash: H(40000), from: wallet, to: config.game_address,
+      blockNumber: 111, blockHash: H(111), logs: [claim] });
+    f.report.dispatches.push({ game_id: '9', round: 1, seat_id: 'oc-1', operation: 'claim', status: 'submitted', transaction_hash: H(40000) });
+    return f;
+  }
+  assert.equal((await auditControlledProof(withClaim())).proof_complete, true);
+  for (const corrupt of [f => { f.receipts.get(H(40000)).from = OWNER; },
+    f => { f.receipts.get(H(40000)).logs = []; },
+    f => { f.receipts.get(H(40000)).logs = [log('PrizeClaimed', [8, tenSeatRoster[0].wallet_address, 1, 1, 0, 1, OWNER], 111, 0, H(40000))]; }]) {
+    const f = withClaim(); corrupt(f);
+    assert.deepEqual((await auditControlledProof(f)).issues, ['PROOF_DISPATCH_UNVERIFIED']);
+  }
 });

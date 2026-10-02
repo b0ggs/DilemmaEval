@@ -4,11 +4,16 @@ import { playerFundingBudget } from './player-funding.mjs';
 
 export const RUNTIME_EVIDENCE_MAX_AGE_MS = 10 * 60 * 1000;
 const RUNTIME_FINGERPRINT_SOURCES = [
+  './readiness.mjs',
+  './maritime/readiness-run.mjs',
+  './maritime/install.mjs',
+  './maritime/recipes.mjs',
   './maritime/transport.mjs',
   './maritime/protocol.mjs',
   './maritime/player-cli.mjs',
   './maritime/player-runtime.mjs',
   './maritime/diagnostics.mjs',
+  './maritime/diagnostic-receipt.mjs',
   './maritime/roster.mjs',
   './maritime/runtime-identity.mjs',
   './maritime/install-runtime.mjs',
@@ -110,13 +115,15 @@ function rejectPrivateEvidence(value, key = '') {
 // exact non-signing chat -> tool -> stdin path for both input shapes.
 export function validateControlledRuntimeEvidence(config,evidence,{
   now = Date.now(), maxAgeMs = RUNTIME_EVIDENCE_MAX_AGE_MS,
-  transportFingerprint = TRANSPORT_FINGERPRINT
+  transportFingerprint = TRANSPORT_FINGERPRINT, allowLegacyFixtures = false, allowDiagnosticsOnly = false
 } = {}) {
   const nowMs = typeof now === 'function' ? now() : now;
   if (!Number.isSafeInteger(nowMs) || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 1 || maxAgeMs > RUNTIME_EVIDENCE_MAX_AGE_MS) {
     throw new Error('RUNTIME_EVIDENCE_CLOCK_INVALID');
   }
   rejectPrivateEvidence(evidence);
+  if (evidence?.producer_version !== undefined) validateProducerEvidence(config, evidence);
+  else if (!allowLegacyFixtures) throw new Error('RUNTIME_PRODUCER_REQUIRED');
   if(evidence?.schema_version!==2 || evidence.run_id!==config.run_id ||
       evidence.roster_fingerprint!==rosterFingerprint(config) || evidence.config_fingerprint!==configFingerprint(config) ||
       evidence.transport_fingerprint!==transportFingerprint)throw new Error('RUNTIME_EVIDENCE_IDENTITY_MISMATCH');
@@ -125,7 +132,7 @@ export function validateControlledRuntimeEvidence(config,evidence,{
       expiresAt-verifiedAt>maxAgeMs||nowMs>=expiresAt||nowMs-verifiedAt>maxAgeMs)throw new Error('RUNTIME_EVIDENCE_EXPIRED');
   if(!/^[1-9][0-9]*$/.test(evidence.confirmed_block_number??'')||
       !/^0x[0-9a-fA-F]{64}$/.test(evidence.confirmed_block_hash??''))throw new Error('RUNTIME_EVIDENCE_BLOCK_REQUIRED');
-  if(evidence.ready_for_controlled_gameplay!==true)throw new Error('CONTROLLED_RUNTIME_NOT_READY');
+  if(evidence.ready_for_controlled_gameplay!==true && !(allowDiagnosticsOnly && evidence.diagnostics_complete === true))throw new Error('CONTROLLED_RUNTIME_NOT_READY');
   if(evidence.sdk?.package!=='maritime-sdk'||evidence.sdk.version!=='0.6.0'||evidence.sdk.maxRetries!==0)throw new Error('RUNTIME_SDK_UNVERIFIED');
   if(!Array.isArray(evidence.seats)||evidence.seats.length!==config.roster.length)throw new Error('RUNTIME_SEAT_IDENTITY_MISMATCH');
   const requestIds = new Set();
@@ -158,7 +165,8 @@ export function validateControlledRuntimeEvidence(config,evidence,{
 // be serialized as a readiness permit.
 export function buildControlledRuntimeEvidence(config,{
   confirmedBlockNumber, confirmedBlockHash, seats, now = Date.now(),
-  maxAgeMs = RUNTIME_EVIDENCE_MAX_AGE_MS, transportFingerprint = TRANSPORT_FINGERPRINT
+  maxAgeMs = RUNTIME_EVIDENCE_MAX_AGE_MS, transportFingerprint = TRANSPORT_FINGERPRINT,
+  producer, allowLegacyFixtures = false
 } = {}) {
   const nowMs = typeof now === 'function' ? now() : now;
   if (!Number.isSafeInteger(nowMs) || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 1 ||
@@ -176,10 +184,54 @@ export function buildControlledRuntimeEvidence(config,{
     confirmed_block_number: String(confirmedBlockNumber ?? ''),
     confirmed_block_hash: confirmedBlockHash,
     sdk: { package: 'maritime-sdk', version: '0.6.0', maxRetries: 0 },
-    ready_for_controlled_gameplay: true,
-    seats: structuredClone(seats)
+    ready_for_controlled_gameplay: producer === undefined,
+    seats: structuredClone(seats),
+    ...(producer === undefined ? {} : structuredClone(producer))
   };
-  return validateControlledRuntimeEvidence(config,evidence,{now:nowMs,maxAgeMs,transportFingerprint});
+  return validateControlledRuntimeEvidence(config,evidence,{now:nowMs,maxAgeMs,transportFingerprint,
+    allowLegacyFixtures,allowDiagnosticsOnly:producer !== undefined});
+}
+
+function exactEvidenceKeys(value, keys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).sort().join('\0') !== [...keys].sort().join('\0')) {
+    throw new Error('RUNTIME_EVIDENCE_UNEXPECTED_FIELD');
+  }
+}
+
+function validateProducerEvidence(config, evidence) {
+  exactEvidenceKeys(evidence, ['schema_version','run_id','roster_fingerprint','config_fingerprint',
+    'transport_fingerprint','verified_at','expires_at','confirmed_block_number','confirmed_block_hash',
+    'sdk','ready_for_controlled_gameplay','seats','producer_version','diagnostic_run_id','chain_id',
+    'game_address','game_code_hash','chain_defaults_fingerprint','generation_scope','lifecycle_state_digest',
+    'remote_generation_attested','diagnostics_complete']);
+  if (evidence.producer_version !== 1 ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(evidence.diagnostic_run_id ?? '') ||
+      evidence.chain_id !== 84532 || evidence.game_address !== config.game_address.toLowerCase() ||
+      !/^0x[0-9a-f]{64}$/.test(evidence.game_code_hash ?? '') ||
+      !/^[0-9a-f]{64}$/.test(evidence.chain_defaults_fingerprint ?? '') ||
+      !/^[0-9a-f]{64}$/.test(evidence.lifecycle_state_digest ?? '') ||
+      evidence.generation_scope !== 'diagnostic-run-intent-v1' || evidence.remote_generation_attested !== false ||
+      evidence.diagnostics_complete !== true || evidence.ready_for_controlled_gameplay !== false) {
+    throw new Error('RUNTIME_PRODUCER_BINDING_INVALID');
+  }
+  exactEvidenceKeys(evidence.sdk, ['package','version','maxRetries']);
+  for (const row of evidence.seats ?? []) {
+    exactEvidenceKeys(row, ['seat_id','agent_id','harness','wallet_address','framework_status_verified',
+      'direct_runtime_inspection_verified','wallet_identity_verified','persistent_storage_verified',
+      'tool_execution_verified','gameplay_command','artifact_sha256','activation_generation',
+      'final_agent_status','sleep_confirmed','lifecycle_ambiguous','model_profile','diagnostics',
+      'runtime_instance_fingerprint','diagnostic_generations']);
+    exactEvidenceKeys(row.model_profile, ['model_endpoint','model','reasoning_effort','max_output_tokens','automatic_fallback']);
+    exactEvidenceKeys(row.diagnostics, ['gameplay_input','commit_input']);
+    exactEvidenceKeys(row.diagnostic_generations, ['gameplay_input','commit_input']);
+    if (!/^[0-9a-f]{64}$/.test(row.runtime_instance_fingerprint ?? '') || row.activation_generation < 1 ||
+        Object.values(row.diagnostic_generations).some(value => value !== row.activation_generation) ||
+        !['gameplay_input','commit_input'].every(mode => row.diagnostics[mode]?.request_id ===
+          `${evidence.diagnostic_run_id}:${row.seat_id}:${row.activation_generation}:${mode}`)) {
+      throw new Error('RUNTIME_PRODUCER_GENERATION_MISMATCH');
+    }
+  }
 }
 
 // Records actual harness checks that cannot be inferred from an HTTP 200 or a prompt.

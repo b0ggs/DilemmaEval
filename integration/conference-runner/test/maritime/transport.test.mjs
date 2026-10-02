@@ -378,9 +378,21 @@ test('maxAwake bounds a synchronous burst and queues the sixth lease', async () 
 test('maxAwake parks on unrelated capacity and expires without POST spin', async () => {
   let gets = 0; let posts = 0;
   const adapter = createMaritimeAdapter({ config, apiKey: 'test-credential', runtimeEvidence: runtimeEvidence(), maxAwake: 1, wakeDelayMs: 0,
-    fetchImpl: async (url, options) => { if (options.method === 'GET') { gets++; return jsonResponse([{ id: 'other', status: 'active' }]); } posts++; return jsonResponse({}); } });
+    fetchImpl: async (url, options) => { if (options.method === 'GET') { gets++; return jsonResponse([
+      ...roster.map(seat => ({id:seat.agent_id,status:'sleeping'})),{ id: 'other', status: 'active' }]); } posts++; return jsonResponse({}); } });
   await assert.rejects(adapter.dispatch({ seat: roster[0], request: poke('join', roster[0]), deadline_at_ms: Date.now() + 15 }), /MARITIME_DISPATCH_EXPIRED/);
   assert.equal(posts, 0); assert.ok(gets <= 2);
+});
+
+test('account-wide pool rejects malformed, incomplete, paginated and duplicate inventory before wake',async()=>{
+  const agents=roster.map(seat=>({id:seat.agent_id,status:'sleeping'}));
+  for(const value of [null,{},agents.slice(1),[...agents,agents[0]],{agents,next_cursor:'more'}]) {
+    let posts=0;
+    const adapter=createMaritimeAdapter({config,apiKey:'fixture-key',runtimeEvidence:runtimeEvidence(),maxAwake:5,
+      fetchImpl:async(_url,options)=>{if(options.method==='GET')return jsonResponse(value);posts++;return jsonResponse({});}});
+    await assert.rejects(adapter.dispatch({seat:roster[0],request:poke('join'),deadline_at_ms:Date.now()+1000}),/INVENTORY_INVALID/);
+    assert.equal(posts,0);
+  }
 });
 
 test('maxAwake retains a poisoned permit after ambiguous chat or rejected sleep', async () => {
@@ -444,7 +456,7 @@ test('malformed successful gameplay chat recovers once from a verified completed
     verifyRecoveredResponse: async input => { verified++; assert.deepEqual(input.response, recovered); return true; },
     fetchImpl: async (url, options) => {
       const path = new URL(url).pathname; calls.push(path);
-      if (path.endsWith('/reload-env') || path.endsWith('/sleep')) return jsonResponse({ status: 'ok' });
+      if (path.endsWith('/reload-env') || path.endsWith('/sleep')) return jsonResponse({ status: path.endsWith('/sleep')?'sleeping':'active' });
       if (path.endsWith('/chat')) return jsonResponse({ response: 'not JSON' });
       const body = JSON.parse(options.body);
       assert.equal(path.endsWith('/exec'), true);
@@ -728,7 +740,7 @@ test('oneAwake expires queued work before every remote mutation and permits a st
     oneAwake: true, wakeDelayMs: 0, timeoutMs: 500, fetchImpl: async (url, options) => {
       const path = new URL(url).pathname;
       calls.push(path);
-      if (path.endsWith('/reload-env') || path.endsWith('/sleep')) return jsonResponse({ status: 'active' });
+      if (path.endsWith('/reload-env') || path.endsWith('/sleep')) return jsonResponse({ status: path.endsWith('/sleep')?'sleeping':'active' });
       if (path.endsWith('/exec')) return jsonResponse({ exitCode: 0,
         stdout: JSON.stringify(modelConfigurationEvidence(seatFromUrl(config, url))), stderr: '' });
       const request = JSON.parse(JSON.parse(options.body).message.split('REQUEST_JSON\n')[1]);

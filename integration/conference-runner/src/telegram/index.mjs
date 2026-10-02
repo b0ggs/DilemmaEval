@@ -189,6 +189,10 @@ export function createTelegramMirror({ config, runtimeDir, token, fetchImpl = gl
       ensure(parsed.schema_version === 1 && parsed.run_id === config.run_id && JSON.stringify(parsed.chats) === JSON.stringify(chats), 'TELEGRAM_OUTBOX_SCOPE_MISMATCH');
       ensure(Array.isArray(parsed.entries) && Number.isFinite(parsed.retry_at) && parsed.chat_ready_at && TEAMS.every((team) => Number.isFinite(parsed.chat_ready_at[team])), 'TELEGRAM_OUTBOX_INVALID');
       ensure(parsed.entries.every((entry) => entry && typeof entry.key === 'string' && typeof entry.text === 'string' && TEAMS.includes(entry.team) && ['pending', 'inflight', 'sent', 'uncertain', 'rejected'].includes(entry.status) && Number.isFinite(entry.retry_at)), 'TELEGRAM_OUTBOX_INVALID');
+      ensure(new Set(parsed.entries.map(entry => entry.key)).size === parsed.entries.length && parsed.entries.every(entry =>
+        entry.digest === hash(entry.text) && entry.text.length > 0 && entry.text.length <= MAX_TEXT_LENGTH &&
+        (entry.status !== 'sent' || Number.isSafeInteger(entry.message_id) && entry.message_id > 0 && Number.isFinite(Date.parse(entry.delivered_at)))),
+      'TELEGRAM_OUTBOX_INVALID');
       state = parsed;
       for (const entry of state.entries) {
         if (entry.status === 'inflight') { entry.status = 'uncertain'; entry.reason = 'PROCESS_EXIT_DURING_SEND'; }
@@ -265,7 +269,8 @@ export function createTelegramMirror({ config, runtimeDir, token, fetchImpl = gl
     for (let index = 0; index < selected.length; index += 1) {
       const { entry } = selected[index];
       const { status, payload } = replies[index];
-      if (status >= 200 && status < 300 && payload?.ok === true && Number.isSafeInteger(payload.result?.message_id)) {
+      if (status >= 200 && status < 300 && payload?.ok === true && Number.isSafeInteger(payload.result?.message_id) && payload.result.message_id > 0 &&
+          (payload.result.chat?.id === undefined || String(payload.result.chat.id) === selected[index].chatId)) {
         entry.status = 'sent'; entry.message_id = payload.result.message_id;
         entry.delivered_at = new Date(now()).toISOString(); entry.reason = null;
       } else if (payload?.ok === false && (status === 429 || payload.error_code === 429)) {

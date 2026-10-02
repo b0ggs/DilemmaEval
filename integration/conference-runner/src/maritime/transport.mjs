@@ -195,6 +195,16 @@ export async function stagePublicRequest(spec, { fsImpl } = {}) {
   if (!dirMeta.isDirectory() || dirMeta.isSymbolicLink() || await fs.realpath(directory) !== directory) fail();
   if (dirMeta.uid !== identity.uid || dirMeta.gid !== identity.gid) await fs.chown(directory, identity.uid, identity.gid);
   await fs.chmod(directory, 0o700);
+  if (envelope.request.type === 'runtime-diagnostic') {
+    const receipts = path.join(spec.base, 'diagnostic-receipts');
+    try { await fs.mkdir(receipts, { mode: 0o700 }); } catch (error) { if (error.code !== 'EEXIST') throw error; }
+    const receiptMeta = await fs.lstat(receipts);
+    if (!receiptMeta.isDirectory() || receiptMeta.isSymbolicLink() || await fs.realpath(receipts) !== receipts) fail();
+    if (receiptMeta.uid !== identity.uid || receiptMeta.gid !== identity.gid) await fs.chown(receipts, identity.uid, identity.gid);
+    await fs.chmod(receipts, 0o700);
+    const receiptDirectory = await fs.open(receipts, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try { await receiptDirectory.sync(); } finally { await receiptDirectory.close(); }
+  }
   let handle;
   try {
     try {
@@ -332,7 +342,7 @@ function validateModelConfigurationResult(result, seat, apiKey) {
 
 export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchImpl = globalThis.fetch,
   timeoutMs = 120_000, oneAwake = false, maxAwake, maxAgents = 3, wakeDelayMs = 10_000,
-  verifyRecoveredResponse = verifyCompletedReceipt } = {}) {
+  verifyRecoveredResponse = verifyCompletedReceipt, diagnosticStageRetries = 1 } = {}) {
   if (config?.chain_id !== 84532) throw new TypeError('BASE_SEPOLIA_REQUIRED');
   if (typeof apiKey !== 'string' || !apiKey || /[\r\n]/.test(apiKey)) throw new TypeError('MARITIME_CREDENTIAL_MISSING');
   validateMaritimeRoster(config.roster);
@@ -346,6 +356,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
   const awakeLimit = maxAwake ?? (oneAwake ? 1 : undefined);
   if (!Number.isInteger(wakeDelayMs) || wakeDelayMs < 0 || wakeDelayMs > 60_000) throw new TypeError('MARITIME_WAKE_DELAY_INVALID');
   if (typeof verifyRecoveredResponse !== 'function') throw new TypeError('MARITIME_RECOVERY_VERIFIER_INVALID');
+  if (![0,1].includes(diagnosticStageRetries)) throw new TypeError('MARITIME_DIAGNOSTIC_RETRIES_INVALID');
   const roster = structuredClone(config.roster);
   const bindings = runtimeBindings(runtimeEvidence, roster, config.run_id);
   const attempts = new Map(), busy = new Set();
@@ -391,8 +402,13 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             // Inventory is read-only and deliberately conservative: every
             // non-sleeping unrelated agent consumes a slot.
             const agents = await maritimeRequest({ apiKey, fetchImpl, timeoutMs, path: '/api/agents', signal: item.boundary.signal });
-            const unrelatedAwake = Array.isArray(agents) ? agents.filter(agent => !leasedAgentIds.has(agent?.id) &&
-              !['sleeping', 'stopped', 'offline', 'inactive'].includes(String(agent?.status ?? '').toLowerCase())).length : 0;
+            if (!Array.isArray(agents) || agents.some(agent => !agent || typeof agent.id !== 'string' || !agent.id ||
+                typeof agent.status !== 'string') || new Set(agents.map(agent => agent.id)).size !== agents.length ||
+                roster.some(seat => !agents.some(agent => agent.id === seat.agent_id))) {
+              throw new MaritimeAdapterError('MARITIME_INVENTORY_INVALID');
+            }
+            const unrelatedAwake = agents.filter(agent => !leasedAgentIds.has(agent.id) &&
+              !['sleeping', 'stopped'].includes(String(agent.status).toLowerCase())).length;
             if (unrelatedAwake + awakeLeases >= awakeLimit) {
               leaseQueue.unshift(item);
               scheduleLeaseDeadline();
@@ -554,7 +570,12 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             }
           }
           if (awakeLimit !== undefined) {
-            try { await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` }); }
+            try {
+              const sleeping = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` });
+              if (String(sleeping?.status ?? '').toLowerCase() !== 'sleeping') {
+                throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
+              }
+            }
             catch (error) {
               // A definite sleep rejection retains the validated action result,
               // but the awake slot still cannot be rotated. Unknown sleep
@@ -652,7 +673,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             validateModelConfigurationResult(modelConfigured, assigned, apiKey);
           }
           const staged = buildRuntimeDiagnosticArtifact(snapshot, binding, assigned.harness);
-          for (let attempt = 0; attempt < 2; attempt++) {
+          for (let attempt = 0; attempt <= diagnosticStageRetries; attempt++) {
             try {
               const stage = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
                 body: { command: staged.command, timeout: 30 } });
@@ -662,7 +683,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               }
               break;
             } catch (error) {
-              if (attempt === 0 && error?.ambiguous && !signal?.aborted &&
+              if (attempt < diagnosticStageRetries && error?.ambiguous && !signal?.aborted &&
                   (deadlineAtMs === undefined || Date.now() < deadlineAtMs)) continue;
               throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
             }
@@ -671,7 +692,9 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             body: { message: buildRuntimeDiagnosticPrompt(snapshot, binding, staged.path),
               conversation_id: `${config.run_id}:${assigned.seat_id}:runtime-diagnostic` } });
           const responseText = payload?.response;
-          if (typeof responseText !== 'string' || !responseText.length || responseText.length > 16_384 ||
+          if (!payload || payload.error != null ||
+              Object.keys(payload).some(key => !['response','error'].includes(key)) ||
+              typeof responseText !== 'string' || !responseText.length || responseText.length > 16_384 ||
               responseText.includes(apiKey) || PRIVATE_REPLY_LOOKING.test(responseText)) {
             const invalid = new MaritimeAdapterError('MARITIME_DIAGNOSTIC_RESPONSE_INVALID', { ambiguous: true });
             invalid.diagnostic_code = typeof responseText === 'string' && responseText.length > 16_384 ?

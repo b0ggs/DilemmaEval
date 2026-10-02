@@ -7,6 +7,8 @@ import { assertPublicGameplayRequest, validateRuntimeDiagnosticInput } from './p
 import { validateMaritimeRoster } from './roster.mjs';
 import { runtimeIdentityForSettings } from './runtime-identity.mjs';
 import { safePlayerErrorCode, classifyPlayerBridgeError } from './diagnostics.mjs';
+import { writeDiagnosticReceipt } from './diagnostic-receipt.mjs';
+import { inspectModelRoute } from './install-runtime.mjs';
 
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 
@@ -283,9 +285,10 @@ function defaultDiagnosticReaderFactory({ settings, env }) {
 /** Runs inside ONE assigned agent VM. No coordinator key or strategy implementation. */
 export function createPlayerRuntime({ settings, env = process.env, bridgeFactory = defaultBridgeFactory,
   checkoutVerifier = verifyCheckout, accessImpl = access, privateDirectoryImpl = privateDirectory,
-  lockSeatImpl = lockSeat, diagnosticChainVerifier = createPlayerChainVerifier(),
+  lockSeatImpl = lockSeat, diagnosticChainVerifier = createJsonRpcChainVerifier({ timeoutMs: 5_000 }),
   diagnosticContractVerifier = createPlayerContractVerifier(),
-  diagnosticReaderFactory = defaultDiagnosticReaderFactory } = {}) {
+  diagnosticReaderFactory = defaultDiagnosticReaderFactory,
+  diagnosticReceiptWriter = writeDiagnosticReceipt, diagnosticModelRouteVerifier = inspectModelRoute } = {}) {
   validatePlayerSettings(settings);
   if (typeof checkoutVerifier !== 'function' || typeof accessImpl !== 'function' ||
       typeof privateDirectoryImpl !== 'function' || typeof lockSeatImpl !== 'function' ||
@@ -432,11 +435,16 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
         if (contract?.contract_read !== true || Object.keys(contract).length !== 1) {
           throw new Error('PLAYER_DIAGNOSTIC_CONTRACT_CHECK_FAILED');
         }
+        const route = await diagnosticModelRouteVerifier(settings,{env});
+        if (route?.schema_version !== 1 || route.seat_id !== seat.seat_id || route.model_route_verified !== true ||
+            Object.keys(route).length !== 3) throw new Error('READINESS_MODEL_ROUTE_UNVERIFIED');
       } finally { await release(); }
-      return { schema_version: 1, type: 'runtime-diagnostic-response', request_id: request.request_id,
+      const response = { schema_version: 1, type: 'runtime-diagnostic-response', request_id: request.request_id,
         seat_id: request.seat_id, team: request.team, mode: request.mode, status: 'ready',
         checks: { stdin: true, wallet_identity: true, checkout: true, dependencies: true, wrapper: true,
           private_state: true, seat_lock: true, chain_id: true, contract_read: true } };
+      await diagnosticReceiptWriter(settings, request, response);
+      return response;
     },
     async inspect() {
       const wallet = assertWallet();

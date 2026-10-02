@@ -1,6 +1,6 @@
 # Canonical conference status
 
-**As of:** September 25, 2026 takeover hardening implementation checkpoint
+**As of:** October 2, 2026 local takeover implementation
 
 **Active target:** one independently audited 5v5 game using the five existing OpenClaw agents and five existing Hermes agents on Base Sepolia.
 
@@ -24,12 +24,21 @@ These attempts establish that agent inventory, model/tool probes, and isolated c
 
 - Recoverable source checkpoint: commit `688f3b9` (`Checkpoint conference implementation before takeover hardening`), created after the intended tree passed the takeover secret scan.
 - Takeover-hardening implementation: commit `8d0656f` (`Harden conference prelaunch diagnostics and proof evidence`), with the deterministic local baseline and no live mutations.
-- Latest read-only Base Sepolia observation from this takeover: Game 17 is terminal and `active_game_id` is `0`.
-- All ten existing Maritime agents were observed sleeping. Do not replace or reprovision them.
+- Canonical status checkpoint `c54b8b0` was verified before this tranche; the branch and starting working tree matched the handoff.
+- Latest historical read-only Base Sepolia observation (September 25): Game 17 is terminal and `active_game_id` is `0`.
+- All ten existing Maritime agents were observed sleeping at that historical checkpoint. Do not replace or reprovision them.
 - A completed 5v5 game remains unproven. No further game should be created from the historical launch instructions or expired execution windows.
+
+## October 2 local verification
+
+The inherited 255 runner tests and 199 site/shared-package tests were reproduced before implementation. After integration, the documented default suites passed **378/378 conference-runner tests** and **199/199 site/shared-package tests** (site 9, game bridge 68, harness adapters 19, Maritime transport 40, orchestrator core 41, team logs 22), with zero failures or cancellations. Targeted development tests and independent source review also completed. The intended-change credential-pattern scan and `git diff --check` passed. These are local fixture results, not live 5v5 or all-ten diagnostic evidence.
 
 ## Next gate
 
-The deterministic local baseline is restored: the conference runner passes 255/255 under its default sequential command, and the site plus changed shared packages pass 199/199. A separate non-signing diagnostic now exercises the Maritime chat → native tool → staged request → CLI stdin path for gameplay-shaped and commit-shaped input, while the player runtime checks wallet authorization, checkout/dependencies, lock/private state, chain, idle game, and cause eligibility without constructing a signer operation.
+The durable all-ten diagnostic producer is implemented. It runs both input modes through Maritime chat → native tool → staged JSON → player CLI stdin, checks independent sanitized CLI receipts, and atomically publishes diagnostics-only readiness-v2 evidence outside the repository. It serializes seats while respecting the account-wide five-awake limit, journals intents, verifies deployed source/model-route/runtime identity, and requires confirmed sleep. Failed or interrupted runs cannot be replayed or overwritten. No gameplay journal, bundle, signing operation, or transaction is part of this path.
 
-The remaining pre-live implementation gap is the durable all-ten diagnostic operator: it must collect both modes for every seat in one bounded run, bind them to the deployed artifact and activation generation, verify all ten agents finish sleeping, and atomically write readiness-v2 evidence. No live diagnostic run has occurred, and no live game is authorized by this checkpoint. After that producer and the remaining fixture/proof-control gates pass, refresh chain/nonces and seek a new explicit execution window before any creation.
+The versioned entrypoint is [conference-control.mjs](../integration/conference-runner/src/conference-control.mjs); [operator instructions](../integration/conference-runner/README.md#current-controlled-operator-version-1) describe explicit paths and deadlines. Local `plan`/`status` do not load credentials or contact services. Proof preparation and the creation-guard library bind the same evidence digest, recheck chain/nonces/journals/process ownership, and preserve the one-game fuse after uncertainty. Historical unfused launch entrypoints are disabled. Repeated ten-seat fixtures now cover full games, cancellation/refunds, restart/crash recovery, account capacity, Telegram isolation/recovery, scoreboards, and independent canonical audits.
+
+**Creation remains blocked.** The historical `activation_generation` is a local journal counter. The pinned Maritime SDK's [Agent contract](https://github.com/maritime-sh/maritime-sdk/blob/main/typescript/src/types.ts) does not document a remote generation token. New evidence records the durable diagnostic activation intent and observed runtime identity, but explicitly sets `remote_generation_attested:false` and `ready_for_controlled_gameplay:false`. An unseen restore after final sleep cannot be ruled out; current-generation verification returns `READINESS_REMOTE_GENERATION_UNATTESTED`. Do not invent a generation from `updatedAt`, copy historical counters, or set readiness booleans manually.
+
+Remaining live preflight: establish a trustworthy remote lifecycle revalidation mechanism; review exact config, artifacts and existing installed paths; authorize any required source refresh and one bounded all-ten diagnostic window; then refresh chain/code/defaults/admissions/causes/balances/nonces, process and journal state, Telegram destinations/pins/permissions/outbox and scoreboard identity. A separate reviewed game window and independent gate audit remain required. This tranche made no agent wake, model call, chain transaction, game, or Telegram message and made no fresh live-state observation. Historical stopped/sleeping observations above are unchanged evidence, not a new live readback.

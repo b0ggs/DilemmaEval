@@ -148,6 +148,7 @@ test('diagnostic runtime verifies both stdin shapes without signer, journal, or 
     checkoutVerifier: async (...args) => { calls.push(['checkout', ...args.slice(0, 1)]); return { ok: true }; },
     accessImpl: async (path, mode) => { calls.push(['access', path, mode]); },
     diagnosticChainVerifier: async request => { calls.push(['chain', request]); return { chainId: 84532 }; },
+    diagnosticModelRouteVerifier: async () => ({schema_version:1,seat_id:'oc-1',model_route_verified:true}),
     diagnosticContractVerifier: async request => { calls.push(['contract', request]); return { contract_read: true }; }
   });
   for (const mode of ['gameplay-input', 'commit-input']) {
@@ -190,6 +191,25 @@ test('diagnostic runtime rejects malformed commit input before filesystem, chain
   await assert.rejects(runtime.diagnose({ request }), /RUNTIME_DIAGNOSTIC_CHOICE_INVALID/);
   await assert.rejects(runtime.execute({ request, choice: 'share' }));
   assert.equal(work, 0);
+});
+
+test('diagnostic default chain verifier never retries a failed RPC or writes a success receipt',async t=>{
+  const f=await fixture(t),privateKey=`0x${'1'.repeat(64)}`,wallet=deriveEthereumAddress(privateKey);
+  const settings={...f.settings,bin_directory:join(f.directory,'bin'),
+    roster:f.settings.roster.map((row,index)=>index===0?{...row,wallet_address:wallet}:row)};
+  const originalFetch=globalThis.fetch;let reads=0;
+  globalThis.fetch=async()=>{reads++;throw new Error('fixture RPC timeout');};
+  t.after(()=>{globalThis.fetch=originalFetch;});
+  const runtime=createPlayerRuntime({settings,env:{GAMEPLAY_WALLET_PRIVATE_KEY:privateKey},
+    bridgeFactory:()=>assert.fail('diagnostics cannot sign'),checkoutVerifier:async()=>({ok:true}),accessImpl:async()=>{},
+    diagnosticReaderFactory:()=>({run:async()=>({exit_code:0,error:null,parsed:{wallet,isAuthorized:true}})}),
+    diagnosticContractVerifier:async()=>assert.fail('failed chain query stops before contract reads'),
+    diagnosticModelRouteVerifier:async()=>assert.fail('failed chain query cannot create receipt')});
+  await assert.rejects(runtime.diagnose({request:{schema_version:1,type:'runtime-diagnostic',request_id:'no-retry:fixture',
+    seat_id:'oc-1',team:'openclaw',mode:'gameplay-input',chain_state:{chain_id:84532,game_address:config.game_address,
+      confirmed_block_number:'123',confirmed_block_hash:`0x${'a'.repeat(64)}`}}}));
+  assert.equal(reads,1);
+  assert.equal((await readdir(f.directory)).includes('diagnostic-receipts'),false);
 });
 
 test('diagnostic runtime requires assigned wallet authorization before its direct chain checks', async t => {

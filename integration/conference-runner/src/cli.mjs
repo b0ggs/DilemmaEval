@@ -20,6 +20,9 @@ async function main(){
   const [command,...rest]=process.argv.slice(2);
   if(!['run','rehearse','fixture','preflight'].includes(command)){console.log('Usage: node src/cli.mjs preflight|run --config CONFIG [--secrets-env PRIVATE_ENV] [--output PUBLIC_JSON]\n       node src/cli.mjs run --config CONFIG --runtime-dir PRIVATE_DIR --readiness VERIFIED_JSON\n       node src/cli.mjs rehearse --config CONFIG --runtime-dir PRIVATE_DIR --readiness VERIFIED_JSON --accept-initial-readiness-gaps true\n       node src/cli.mjs fixture --runtime-dir TEMP_DIR [--port 8787]');return;}
   const args=options(rest);assertCoordinatorEnvironment();
+  // Historical launch routes lack the current durable readiness/fuse contract.
+  // Refuse before credentials, RPC, runtime creation, or any external work.
+  if(['run','rehearse'].includes(command))throw new Error('PROOF_VERSIONED_CLI_REQUIRED');
   if(command==='rehearse'&&args['accept-initial-readiness-gaps']!=='true')throw new Error('CONTROLLED_REHEARSAL_ACCEPTANCE_REQUIRED');
   const config=command==='fixture'?validateConfig(await fixtureConfig({runId:args['run-id']??'local-fixture'})):await loadConfig(args.config,{allowIncomplete:command==='preflight'});
   const secrets=command==='fixture'?{}:await secretEnvironment(args['secrets-env']);

@@ -4,6 +4,27 @@ The September 25 demo combines the existing game bridge, team logs, and orchestr
 
 Requires Node 22+, `npm ci`, and the pinned runtime described in [Maritime installation](src/maritime/README.md). All chain writes use Base Sepolia. The coordinator holds API credentials but no player or owner signing keys. Each player executes its own tool in its own Maritime runtime and keeps its private reveal bundles on persistent storage.
 
+## Current controlled operator (version 1)
+
+The active target is the existing five OpenClaw and five Hermes agents. Use [the canonical checklist](../../conference/TAKEOVER-IMPLEMENTATION-CHECKLIST.md). `src/conference-control.mjs` replaces workstation-specific preparation. The historical `run`, `rehearse`, and saved controlled-proof launch entrypoints now refuse execution with `PROOF_VERSIONED_CLI_REQUIRED`; their older instructions below are historical. The new CLI has no game-creation command.
+
+`plan` and `status` are local, read-only commands: they do not load credentials, contact providers, or create directories. Supply the exact public config, operations manifest, and an artifact plan containing `{ "schema_version": 1, "seats": [{ "seat_id": "oc-1", "persistent_root": "/actual/installed/volume" }] }` with one row for each of the ten seats. Use the installed roots; do not guess them or replace agents. Artifact reconstruction uses the current repository sources, so any deployed mismatch blocks diagnostics and requires a separately reviewed installation update.
+
+```sh
+node integration/conference-runner/src/conference-control.mjs --version
+node integration/conference-runner/src/conference-control.mjs plan \
+  --config /absolute/public/conference.json \
+  --runtime-dir /absolute/outside-repository/new-readiness-run \
+  --artifact-plan /absolute/public/artifact-plan.json \
+  --operations-manifest /absolute/public/operations-manifest.json
+```
+
+After explicit authorization, `diagnose` accepts those four paths plus `--deadline UTC_ISO`, `--cleanup-deadline UTC_ISO`, and `--secrets-env /absolute/private/coordinator.env`. Both deadlines are absolute UTC timestamps. It wakes/reloads/configures existing agents, runs both native diagnostic inputs within one activation per seat, and confirms sleep. These operations consume model/service usage even though they never create a game or sign a transaction. This implementation tranche does not authorize running that command. Never supply an owner or player signing key to it.
+
+Use a canonical external directory path (for example `/private/tmp`, rather than its `/tmp` alias). The fresh directory contains the sanitized diagnostic journal, lifecycle state, and atomically published `readiness-v2.json`. Each successful native player CLI diagnostic also writes a separate sanitized receipt, checked independently after chat; it never hashes or records the choice-bearing stdin envelope. Hermes receipt-directory ownership is prepared explicitly. A failed/interrupted run is preserved for inspection and cannot be replayed or overwritten. The producer records diagnostic completion separately from permission to create: Maritime SDK 0.6.0 does not document a remote lifecycle generation token. Its historical `activation_generation` is a local journal counter. Runtime identity checks establish stability during diagnostics, but cannot prove that an unseen restore did not happen after final sleep. Evidence therefore records `remote_generation_attested:false` and `ready_for_controlled_gameplay:false`; creation remains blocked until that external-generation boundary is verifiable.
+
+`proof-plan`, `proof-status`, and `proof-prepare` require `--config`, `--evidence`, `--readiness-dir`, `--proof-dir`, `--operator-dir`, `--runner-dirs` (a JSON array of absolute runtime directory paths), `--stop-new-games-at`, `--hard-stop-at`, and `--secrets-env`. Plan/status perform read-only checks; prepare can only write a fresh local directory after those checks pass. They validate the same evidence digest, source/prepared config, lifecycle state, confirmed chain/defaults, owner/player nonces, operator journal and process locks. Missing verification fails closed. Preparation requires stopped processes; the creation-guard API accepts exact in-memory ownership descriptors for the intended initialized runner/operator and rejects changed or unrelated locks. Ownership tokens never enter serialized evidence. Existing journals, fuses, evidence and runtime state are never overwritten. The creation-guard library revalidates those inputs immediately before its single fsynced creation fuse; a remote uncertainty leaves that fuse consumed.
+
 ## Local preview and tests
 
 ```sh
@@ -29,7 +50,7 @@ The example's third agent ID and Telegram settings intentionally remain unset; s
 
 Preflight verifies the expected network, code presence/hash, owner/auth/identity wiring, seat admission, distinct identities, causes and balances. A wallet balance above entry fee is only an immediate sanity check; measure gas and payouts to establish operating runway. A code hash alone is not proof of source equivalence.
 
-## Live operation
+## Historical live operation (disabled entrypoints)
 
 1. Reconcile account agents within the three-slot budget, complete the public config, install the same tools/model profile in each real harness, verify wallet identity and persistent bundles, and restrict spectator/opponent feed access in actual tool/network policy. [Installation tools](src/maritime/README.md) produce artifacts but never label them live-proven automatically.
 2. Use the [isolated signer CLI](src/chain/README.md) to configure all nine defaults while idle and read back the receipt. One owner/operator process handles both creation and phase advancement with one key, queue and journal. Put `DILEMMA_LAUNCHER_PRIVATE_KEY` only in `launcher.env`; `phase.env` is unused. The coordinator uses the matching service token and receives no signing key.
@@ -85,3 +106,5 @@ Telegram outages do not stop chain scheduling. Its outbox persists delivery stat
 Missing Telegram credentials/groups also leave the mirror disconnected without preventing a real-game rehearsal. Both live groups and verified read-only invitations remain required for the complete conference deliverable.
 
 `SIGTERM` waits for the current tick, closes the public server and releases the lock. A supervisor restart resumes from the same private directory. Run stop time is independent of process shutdown; inspect outstanding settlement before taking the host offline. Save an explicitly labeled backup recording after the real rehearsal; never mix replay counts with live state.
+
+The default regression commands for this tranche are `npm test --prefix integration/conference-runner`, `npm test --prefix conference/site`, and `npm test --prefix integration/PACKAGE` for `game-bridge`, `harness-adapters`, `maritime-transport`, `orchestrator-core`, and `team-logs`. The runner default executes tests sequentially. No live diagnostic or game is part of these suites.

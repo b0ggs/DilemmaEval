@@ -536,6 +536,38 @@ export async function inspectModel(settings) {
     configured: true, ...profile };
 }
 
+/** Inspect only the selected route. Never return configuration or env values. */
+export async function inspectModelRoute(settings, { env = process.env, readFileImpl = readFile } = {}) {
+  const endpoint = 'https://api.maritime.sh/api/llm/v1';
+  const reject = () => { throw new Error('READINESS_MODEL_ROUTE_UNVERIFIED'); };
+  try {
+    for (const key of ['OPENAI_BASE_URL','OPENAI_API_BASE']) if (env[key] !== undefined && env[key] !== endpoint) reject();
+    if (settings.harness === 'openclaw') {
+      const config = JSON.parse(await readFileImpl(openClawConfigPath(settings),'utf8'));
+      if (config.agents?.defaults?.model?.primary !== 'openai/gpt-5.4-mini' ||
+          config.models?.providers?.openai?.baseUrl !== endpoint) reject();
+    } else if (settings.harness === 'hermes') {
+      const lines = (await readFileImpl(hermesConfigPath(settings),'utf8')).split(/\r?\n/);
+      const indices = lines.map((line,index) => /^model\s*:/.test(line) ? index : -1).filter(index => index >= 0);
+      if (indices.length !== 1 || !/^model:\s*(?:#.*)?$/.test(lines[indices[0]])) reject();
+      let end = indices[0]+1;
+      while (end < lines.length && (!lines[end].trim() || /^\s|^#/.test(lines[end]))) end++;
+      const block = lines.slice(indices[0]+1,end);
+      const scalar = key => {
+        const matches = block.filter(line => new RegExp(`^\\s+${key}\\s*:`).test(line));
+        if (matches.length !== 1 || !new RegExp(`^  ${key}:`).test(matches[0])) reject();
+        const raw = matches[0].replace(new RegExp(`^  ${key}:\\s*`),'').trim();
+        if (raw.startsWith('"')) return JSON.parse(raw);
+        if (raw.startsWith("'")) { if (!/^'[^']*'$/.test(raw)) reject(); return raw.slice(1,-1); }
+        if (/[\s#&*!{}[\]]/.test(raw)) reject();
+        return raw;
+      };
+      if (scalar('provider') !== 'openai' || scalar('base_url') !== endpoint) reject();
+    } else reject();
+  } catch { reject(); }
+  return { schema_version:1,seat_id:settings.seat_id,model_route_verified:true };
+}
+
 export async function installRuntime(settingsPath) {
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('NODE_22_REQUIRED');
   const settings = JSON.parse(await readFile(settingsPath, 'utf8'));
@@ -584,7 +616,7 @@ export async function installRuntime(settingsPath) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const action = process.argv[2] === '--check-model' ? readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(inspectModel) : process.argv[2] === '--configure-model' ? readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(configureModel) : process.argv[2] === '--check-hermes-config' ?
+  const action = process.argv[2] === '--check-model-route' ? readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(inspectModelRoute) : process.argv[2] === '--check-model' ? readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(inspectModel) : process.argv[2] === '--configure-model' ? readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(configureModel) : process.argv[2] === '--check-hermes-config' ?
     readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(async settings => ({
       schema_version: 1, seat_id: settings.seat_id,
       ...await inspectHermesTerminalEnvPassthrough(hermesConfigPath(settings)),

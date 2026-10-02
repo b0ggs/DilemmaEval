@@ -29,6 +29,7 @@ export async function auditControlledProof({ config, gameId, provider, report, o
     const confirmations = config?.confirmations ?? 2;
     requireProof(audit.game_id && config?.chain_id === 84532 &&
       config.game_address?.toLowerCase() === FROZEN_NETWORK.game.toLowerCase() &&
+      ADDRESS.test(config.expected_owner ?? '') &&
       typeof config.run_id === 'string' && config.run_id.length > 0 &&
       uint.test(config.start_block ?? '') && Number.isSafeInteger(Number(config.start_block)) &&
       Number.isSafeInteger(confirmations) && confirmations >= 1 && confirmations <= 100 &&
@@ -67,12 +68,15 @@ export async function auditControlledProof({ config, gameId, provider, report, o
       }
       requireProof(blocks.get(blockNumber) === blockHash.toLowerCase(), 'PROOF_CHAIN_REORG');
     }
+    const receipts = new Map();
     async function receiptFor(hash) {
+      if (receipts.has(hash)) return receipts.get(hash);
       const receipt = await provider.getTransactionReceipt(hash);
       requireProof(receipt?.status === 1 && receipt.hash?.toLowerCase() === hash &&
         receipt.to?.toLowerCase() === config.game_address.toLowerCase() && Array.isArray(receipt.logs),
       'PROOF_RECEIPT_UNVERIFIED');
       await canonical(receipt.blockNumber, receipt.blockHash);
+      receipts.set(hash, receipt);
       return receipt;
     }
     const creationReceipt = await receiptFor(creationHash);
@@ -99,11 +103,19 @@ export async function auditControlledProof({ config, gameId, provider, report, o
     }
     events.sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
     const named = name => events.filter(log => log.event.name === name);
-    const receiptContains = (receipt, log) => receipt.logs.some(item => item.address?.toLowerCase() === config.game_address.toLowerCase() &&
+    const receiptContains = (receipt, log) => receipt.blockNumber === log.blockNumber &&
+      receipt.blockHash?.toLowerCase() === log.blockHash.toLowerCase() && receipt.hash?.toLowerCase() === log.transactionHash.toLowerCase() &&
+      receipt.logs.some(item => item.address?.toLowerCase() === config.game_address.toLowerCase() && !item.removed &&
+      item.transactionHash?.toLowerCase() === receipt.hash.toLowerCase() && item.blockNumber === receipt.blockNumber &&
+      item.blockHash?.toLowerCase() === receipt.blockHash.toLowerCase() &&
       item.index === log.index && item.data === log.data && JSON.stringify(item.topics) === JSON.stringify(log.topics));
     const created = named('GameCreated');
     requireProof(created.length === 1 && created[0].transactionHash.toLowerCase() === creationHash &&
       receiptContains(creationReceipt, created[0]), 'PROOF_CREATION_UNVERIFIED');
+    requireProof(Number(created[0].event.args.minPlayers) === rosterSize &&
+      Number(created[0].event.args.maxPlayers) === rosterSize &&
+      creationReceipt.from?.toLowerCase() === config.expected_owner.toLowerCase(),
+    'PROOF_CREATION_UNVERIFIED');
     audit.creation_transaction_hash = creationHash;
     const ended = named('GameEnded');
     requireProof(ended.length === 1 && [1, 2].includes(Number(ended[0].event.args.outcome)) &&
@@ -132,7 +144,11 @@ export async function auditControlledProof({ config, gameId, provider, report, o
       const materialized = effective.filter(log => log.event.args.round === args.round);
       const expected = Number(args.sharers) + Number(args.catchers) + Number(args.stealers);
       requireProof(expected === living && materialized.length === expected &&
-        new Set(materialized.map(log => log.event.args.wallet.toLowerCase())).size === expected,
+        new Set(materialized.map(log => log.event.args.wallet.toLowerCase())).size === expected &&
+        [[1, args.sharers], [2, args.catchers], [3, args.stealers]].every(([choice, count]) =>
+          materialized.filter(log => Number(log.event.args.choice) === choice).length === Number(count)) &&
+        Number(args.aliveCount) >= 0 && Number(args.aliveCount) <= living &&
+        Number(args.eliminatedCount) === living - Number(args.aliveCount),
       'PROOF_ACTIONS_UNVERIFIED');
       for (const choice of materialized) {
         const wallet = choice.event.args.wallet.toLowerCase();
@@ -144,7 +160,49 @@ export async function auditControlledProof({ config, gameId, provider, report, o
       }
       living = Number(args.aliveCount);
     }
+    requireProof(Number(ended[0].event.args.winnerCount) === living, 'PROOF_RESULT_UNVERIFIED');
     requireProof(commits.length === effective.length && reveals.length === effective.length, 'PROOF_ACTIONS_UNVERIFIED');
+    requireProof(Array.isArray(report.dispatches), 'PROOF_DISPATCH_UNVERIFIED');
+    // Logs alone do not establish that the expected player signed the operation. Bind every
+    // player event to its canonical successful receipt and every reported hash to that event.
+    for (const [operation, operationLogs] of [['join', joined], ['commit', commits], ['reveal', reveals]]) {
+      for (const log of operationLogs) {
+        const wallet = log.event.args.wallet.toLowerCase();
+        const receipt = await receiptFor(log.transactionHash.toLowerCase());
+        requireProof(receipt.from?.toLowerCase() === wallet && receiptContains(receipt, log), 'PROOF_PLAYER_RECEIPT_UNVERIFIED');
+        const seat = roster.find(item => item.wallet_address.toLowerCase() === wallet);
+        requireProof(report.dispatches.some(dispatch => dispatch.game_id === gameId && dispatch.seat_id === seat.seat_id &&
+          dispatch.operation === operation && /^conference:[0-9a-f]{32}$/.test(dispatch.request_id ?? '') &&
+          ['submitted', 'observed', 'ambiguous', 'cancelled-after-submit'].includes(dispatch.status) &&
+          (operation === 'join' ? dispatch.round === 0 : dispatch.round === Number(log.event.args.round)) &&
+          (dispatch.transaction_hash == null ? dispatch.status !== 'submitted' : dispatch.transaction_hash.toLowerCase() === log.transactionHash.toLowerCase())),
+        'PROOF_DISPATCH_UNVERIFIED');
+        if (operation !== 'join') {
+          const join = joined.find(item => item.event.args.wallet.toLowerCase() === wallet);
+          requireProof(join && before(join, log), 'PROOF_ACTIONS_UNVERIFIED');
+        }
+      }
+    }
+    for (const dispatch of report.dispatches) {
+      if (dispatch.transaction_hash == null) continue;
+      requireProof(TX.test(dispatch.transaction_hash) && dispatch.game_id === gameId,
+        'PROOF_DISPATCH_UNVERIFIED');
+      const seat = roster.find(item => item.seat_id === dispatch.seat_id);
+      const operationLogs = { join: joined, commit: commits, reveal: reveals }[dispatch.operation];
+      if (['claim', 'refund'].includes(dispatch.operation)) {
+        const receipt = await receiptFor(dispatch.transaction_hash.toLowerCase());
+        const name = dispatch.operation === 'claim' ? 'PrizeClaimed' : 'RefundClaimed';
+        requireProof(seat && receipt.from?.toLowerCase() === seat.wallet_address.toLowerCase() && receipt.logs.some(log => {
+          if (log.address?.toLowerCase() !== config.game_address.toLowerCase() || !receiptContains(receipt, log)) return false;
+          const event = ABI.parseLog(log);
+          return event?.name === name && String(event.args.gameId) === gameId && event.args.wallet.toLowerCase() === seat.wallet_address.toLowerCase();
+        }), 'PROOF_DISPATCH_UNVERIFIED');
+        continue;
+      }
+      requireProof(seat && operationLogs?.some(log => log.transactionHash.toLowerCase() === dispatch.transaction_hash.toLowerCase() &&
+        log.event.args.wallet.toLowerCase() === seat.wallet_address.toLowerCase() &&
+        (dispatch.operation === 'join' || Number(log.event.args.round) === dispatch.round)), 'PROOF_DISPATCH_UNVERIFIED');
+    }
     for (let index = 0; index < roster.length; index++) {
       const wallet = roster[index].wallet_address.toLowerCase(), seat = audit.seats[index];
       const seatCommits = commits.filter(log => log.event.args.wallet.toLowerCase() === wallet);

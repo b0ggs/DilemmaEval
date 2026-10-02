@@ -11,6 +11,7 @@
     "start": "node src/cli.mjs run",
     "preflight": "node src/cli.mjs preflight",
     "fixture": "node src/cli.mjs fixture",
+    "control": "node src/conference-control.mjs",
     "maritime:plan": "node src/provision-cli.mjs plan",
     "maritime:launch": "node src/provision-cli.mjs launch"
   },

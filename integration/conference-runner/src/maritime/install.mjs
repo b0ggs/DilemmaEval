@@ -10,7 +10,7 @@ import { HERMES_RUNTIME_IDENTITY } from './runtime-identity.mjs';
 
 const SOURCE_FILES = [
   'game-bridge/src/index.js', 'shared/runtime-source.json', 'maritime-transport/src/validation.mjs',
-  ...['protocol.mjs', 'roster.mjs', 'runtime-identity.mjs', 'diagnostics.mjs', 'player-runtime.mjs', 'player-cli.mjs', 'install-runtime.mjs']
+  ...['protocol.mjs', 'roster.mjs', 'runtime-identity.mjs', 'diagnostics.mjs', 'diagnostic-receipt.mjs', 'player-runtime.mjs', 'player-cli.mjs', 'install-runtime.mjs']
     .map(file => `conference-runner/src/maritime/${file}`)
 ];
 const MAX_ARTIFACT_HASH_OUTPUT_BYTES = 131_072;
@@ -182,6 +182,7 @@ export async function buildInstallArtifact({ config, seatId, persistentRoot, ope
     } : {}),
     model_configure_command: ['node', installer, '--configure-model', settingsPath],
     model_config_check_command: ['node', installer, '--check-model', settingsPath],
+    model_route_check_command: ['node', installer, '--check-model-route', settingsPath],
     gameplay_command: ['node', cli, settingsPath],
     live_evidence: { installed: false, wallet_verified: false, gameplay_execution_proven: false,
       model_route_verified: false, spectator_access_blocked: false, restart_bundle_recovery_proven: false }
