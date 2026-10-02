@@ -19,6 +19,8 @@ Implemented and verified locally:
 
 Final documented default suites: **conference runner 378/378**, **site 9/9**, **game bridge 68/68**, **harness adapters 19/19**, **Maritime transport 40/40**, **orchestrator core 41/41**, **team logs 22/22**: **577 tests**, zero failures or cancellations. Targeted worker/lead tests and an independent source review preceded the final full run. Intended-change credential-pattern scanning and `git diff --check` passed before checkpointing.
 
+Recoverable implementation checkpoint: `7d8e025` (`Implement durable ten-seat diagnostics and audited fixture coverage`). All 36 staged files passed the credential-pattern scan and staged whitespace check; the working tree was clean immediately after the commit.
+
 Remaining gate: establish a trustworthy remote lifecycle revalidation mechanism, review the exact config and new deployed artifact hashes, then obtain explicit authorization for any installation refresh and bounded all-ten diagnostic window. No deployed artifact was refreshed and no live readiness evidence was produced here. Fresh chain/code/defaults/admissions/causes/balances/nonces, processes/journals, Telegram destinations/pins/permissions/outbox and series identity still require review. A separate controlled-game window and independent prelaunch audit remain outstanding. Historical idle/sleeping observations are not new readbacks. Do not create a game to discover another defect.
 
 ## Takeover hardening implementation — September 25, 2026

@@ -184,7 +184,7 @@ This phase is read-only except for waking/configuring agents as required by the 
 
 All of the following must be true at once:
 
-- [ ] Conference source and evidence are recoverably committed and secret-safe.
+- [x] Conference source and existing evidence are recoverably committed and secret-scanned: implementation checkpoint `7d8e025`. No fresh live diagnostic evidence has been produced.
 - [x] Every affected local suite is green under the documented default command: October 2, 577/577 tests total.
 - [x] The deterministic Hermes lifecycle ambiguity is resolved. This local regression fix does not establish remote lifecycle attestation.
 - [ ] All ten seats pass fresh exact-path, no-transaction diagnostics.
