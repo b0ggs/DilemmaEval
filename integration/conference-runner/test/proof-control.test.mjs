@@ -95,7 +95,7 @@ async function setupContinuity(t) {
       status: 'complete', started_at_ms: at, completed_at_ms: at });
     for (const seat of f.config.roster) {
       record('inventory');
-      for (const kind of ['activation', 'lifecycle-read', 'continuity-check', 'lifecycle-read',
+      for (const kind of ['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
         ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read']) {
         record(kind); operations.at(-1).seat_id = seat.seat_id;
       }
@@ -128,7 +128,10 @@ test('v2 creation rereads complete ten-seat verification and forwards the cancel
       assert.equal(request.not_after_ms, f.options.now() + 20000);
       const fuse = JSON.parse(await readFile(path.join(f.options.directory, 'launch-once.json')));
       assert.notEqual(fuse.verification_path, preparationPath);
-      assert.equal(fuse.verification_sha256, configFingerprint(JSON.parse(await readFile(f.verificationPath))));
+      const verification = JSON.parse(await readFile(f.verificationPath));
+      assert.equal(verification.operations.length, 182);
+      assert.equal(verification.operations.filter(row => row.kind === 'activation-settle').length, 10);
+      assert.equal(fuse.verification_sha256, configFingerprint(verification));
       assert.equal(fuse.runtime_evidence_sha256, prepared.bindings.runtime_evidence_sha256);
       return { status: 'accepted' };
     } } });
@@ -141,8 +144,18 @@ test('v2 verification rejects incomplete seats, ambiguous operations and invalid
     ['empty operations', value => { value.operations = []; }],
     ['missing seat', value => { value.operations = value.operations.filter(row => row.seat_id !== 'hs-5'); }],
     ['mixed seat', value => { value.operations.find(row => row.seat_id === 'hs-5').seat_id = 'oc-1'; }],
+    ['absent activation settles', value => {
+      value.operations = value.operations.filter(row => row.kind !== 'activation-settle');
+      value.operations.forEach((row, index) => { row.sequence = index + 1; });
+    }],
+    ['activation settle after guest access', value => {
+      const settle = value.operations.find(row => row.kind === 'activation-settle');
+      const guest = value.operations.find(row => row.kind === 'runtime-read');
+      [settle.kind, guest.kind] = [guest.kind, settle.kind];
+    }],
+    ['unknown activation settle', value => { value.operations.find(row => row.kind === 'activation-settle').status = 'unknown'; }],
     ['missing receipt read', value => { value.operations.find(row => row.kind === 'runtime-read').kind = 'lifecycle-read'; }],
-    ['unknown operation', value => { value.operations[4].status = 'unknown'; }],
+    ['unknown operation', value => { value.operations[5].status = 'unknown'; }],
     ['missing completion', value => { delete value.completed_at_ms; }],
     ['future completion', value => { value.completed_at_ms += 1; }],
     ['future start', value => { value.started_at_ms += 1; }],

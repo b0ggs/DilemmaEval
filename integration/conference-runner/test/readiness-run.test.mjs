@@ -38,7 +38,7 @@ async function fixture(t, options = {}) {
   const agents = roster.map(seat => ({ id:seat.agent_id, name:seat.maritime_agent, externalId:seat.maritime_agent,
     framework:seat.harness, status:'sleeping' }));
   agents.push(...Array.from({ length: options.unrelated ?? 0 }, (_, i) => ({ id:`unrelated-${i}`, name:`unrelated-${i}`, framework:'openclaw', status:'active' })));
-  const calls = [], cliInputs = [], stages = new Map(), generationChecks = new Map(), receipts = new Map();
+  const calls = [], waits = [], cliInputs = [], stages = new Map(), generationChecks = new Map(), receipts = new Map();
   let maxAwake = agents.filter(agent => agent.status === 'active').length;
   const fetchImpl = async (url, request) => {
     const path = new URL(url).pathname;
@@ -142,8 +142,13 @@ async function fixture(t, options = {}) {
   // expire because another local suite stalls disk I/O; deadline tests advance
   // their injected clock only after the specific operation under test starts.
   const fixtureAtMs = Date.now(), now = options.now ?? (() => fixtureAtMs), startedAtMs = now();
+  const waitImpl = async (milliseconds, context) => {
+    waits.push({ milliseconds, callCount:calls.length });
+    await options.waitImpl?.(milliseconds, context);
+  };
   const runOptions = { config,runtimeDir,artifacts,apiKey:'fixture-credential',fetchImpl,chain,
-    deadlineAtMs:startedAtMs+duration,cleanupDeadlineAtMs:startedAtMs+duration+10_000,now };
+    deadlineAtMs:startedAtMs+duration,cleanupDeadlineAtMs:startedAtMs+duration+10_000,now,waitImpl,
+    ...(options.wakeDelayMs === undefined ? {} : {wakeDelayMs:options.wakeDelayMs}) };
   const runner=createReadinessRun(runOptions);
   const controlledRunner={...runner,async run(){
     // The real adapter has a native Date.now deadline boundary as well as the
@@ -153,7 +158,7 @@ async function fixture(t, options = {}) {
     try { return await runner.run(); }
     finally { clock.mock.restore();assert.equal(Date.now,nativeClock,'fixture clock is restored after success or failure'); }
   }};
-  return { runner:controlledRunner,runOptions,runtimeDir,parent,calls,cliInputs,agents,generationChecks,receipts,options,
+  return { runner:controlledRunner,runOptions,runtimeDir,parent,calls,waits,cliInputs,agents,generationChecks,receipts,options,
     maxAwake:() => maxAwake, chain };
 }
 
@@ -176,6 +181,106 @@ test('readiness plan and absent status use no credentials, network, or filesyste
   assert.equal((await runner.status()).status, 'absent');
   assert.equal(f.calls.length, 0);
   await assert.rejects(readFile(join(f.runtimeDir, READINESS_FILES.journal)), /ENOENT/);
+});
+
+test('activation settle options reject invalid inputs before any remote operation', async t => {
+  const f = await fixture(t);
+  for (const wakeDelayMs of [-1, 60_001, 0.5, NaN, '10000']) {
+    assert.throws(() => createReadinessRun({...f.runOptions,wakeDelayMs}), /READINESS_WAKE_DELAY_INVALID/);
+    await assert.rejects(verifyReadinessCurrent({...f.runOptions,wakeDelayMs}), /READINESS_WAKE_DELAY_INVALID/);
+  }
+  for (const wakeDelayMs of [0, 60_000]) {
+    assert.doesNotThrow(() => createReadinessRun({...f.runOptions,wakeDelayMs}));
+  }
+  assert.throws(() => createReadinessRun({...f.runOptions,waitImpl:null}), /READINESS_WAIT_INVALID/);
+  await assert.rejects(verifyReadinessCurrent({...f.runOptions,waitImpl:null}), /READINESS_WAIT_INVALID/);
+  assert.equal(f.calls.length, 0);
+});
+
+test('producer and current verification journal the default settle before guest file or exec access', async t => {
+  let clock = Date.now(), journalPath;
+  const f = await fixture(t, {duration:600_000, now:() => clock,
+    waitImpl:async milliseconds => {
+      assert.equal(milliseconds, 10_000, 'production default remains ten seconds');
+      const journal = JSON.parse(await readFile(journalPath, 'utf8'));
+      assert.equal(journal.operations.at(-1).kind, 'activation-settle');
+      assert.equal(journal.operations.at(-1).status, 'intent');
+      assert.equal(journal.operations.at(-2).kind, 'lifecycle-read');
+      assert.equal(journal.operations.at(-2).status, 'complete');
+      clock += milliseconds;
+    },
+    onCall:async ({path,seat}) => {
+      if (!/\/(exec|files\/list)$/.test(path)) return;
+      const journal = JSON.parse(await readFile(journalPath, 'utf8'));
+      const settles = journal.operations.filter(row => row.kind === 'activation-settle' && row.seat_id === seat.seat_id);
+      assert.equal(settles.length, 1);
+      assert.equal(settles[0].status, 'complete');
+      assert.equal(settles[0].completed_at_ms - settles[0].started_at_ms, 10_000);
+    }
+  });
+  journalPath = join(f.runtimeDir, READINESS_FILES.journal);
+  const result = await f.runner.run();
+  assert.equal(f.waits.length, 10);
+  const args = verificationOptions(f,result.evidence,'settled-verification');
+  journalPath = join(args.verificationDir,'continuity-verification.json');
+  assert.equal((await verifyReadinessCurrent(args)).ready, true);
+  assert.equal(f.waits.length, 20);
+  assert.equal(f.calls.filter(row => row.path.endsWith('/reload-env')).length, 10);
+  assert.equal(f.calls.filter(row => row.path.endsWith('/start')).length, 10);
+  assert.equal(f.calls.filter(row => row.path.endsWith('/sleep')).length, 20);
+});
+
+test('producer deadline during activation settle prevents guest access and cleans up without replay', async t => {
+  let clock = Date.now();
+  const f = await fixture(t, {duration:5_000, now:() => clock,
+    waitImpl:async milliseconds => { assert.equal(milliseconds, 5_000); clock += milliseconds; }});
+  await assert.rejects(f.runner.run(), error => error.message === 'READINESS_RUN_FAILED');
+  assert.equal(f.calls.filter(row => row.path.endsWith('/reload-env')).length, 1);
+  assert.equal(f.calls.filter(row => row.path.endsWith('/sleep')).length, 1);
+  assert.equal(f.calls.some(row => /\/(exec|files\/list|chat)$/.test(row.path)), false);
+  const journal = JSON.parse(await readFile(join(f.runtimeDir,READINESS_FILES.journal),'utf8'));
+  assert.equal(journal.operations.find(row => row.kind === 'activation-settle').status, 'unknown');
+  assert.equal(journal.all_seats_sleeping, true, 'an interrupted local wait creates no remote execution uncertainty');
+  assert.ok(f.agents.every(row => row.status === 'sleeping'));
+  await assert.rejects(readFile(join(f.runtimeDir,READINESS_FILES.evidence)), /ENOENT/);
+  await assert.rejects(f.runner.run(), /READINESS_RUN_ALREADY_STARTED/);
+  await assert.rejects(createReadinessRun({...f.runOptions,deadlineAtMs:clock+5_000,cleanupDeadlineAtMs:clock+10_000}).run(),
+    /DIRECTORY_ALREADY_EXISTS/);
+  assert.equal(f.calls.filter(row => row.path.endsWith('/reload-env')).length, 1);
+});
+
+test('verification cutoff or abort during activation settle prevents exec and preserves cleanup and no-replay', async t => {
+  const f = await fixture(t), result = await f.runner.run(), original = await originalPublication(f);
+  for (const kind of ['deadline','abort']) {
+    let clock = f.runOptions.now(), waited = false;
+    const controller = new AbortController(), begin = f.calls.length;
+    const args = verificationOptions(f,result.evidence,`settle-${kind}`,{
+      now:() => clock, signal:controller.signal, deadlineAtMs:clock+5_000, cleanupDeadlineAtMs:clock+15_000,
+      waitImpl:async (milliseconds,{signal}) => {
+        waited = true;
+        assert.equal(milliseconds, 5_000);
+        assert.equal(signal, controller.signal);
+        const journal = JSON.parse(await readFile(join(args.verificationDir,'continuity-verification.json'),'utf8'));
+        assert.equal(journal.operations.at(-1).kind, 'activation-settle');
+        if (kind === 'deadline') clock += milliseconds;
+        else controller.abort();
+      }
+    });
+    await assert.rejects(verifyReadinessCurrent(args), error => error.message === 'READINESS_VERIFICATION_FAILED');
+    assert.equal(waited, true);
+    const calls = f.calls.slice(begin);
+    assert.equal(calls.filter(row => row.path.endsWith('/start')).length, 1);
+    assert.equal(calls.filter(row => row.path.endsWith('/sleep')).length, 1);
+    assert.equal(calls.some(row => /\/(exec|files\/list|chat)$/.test(row.path)), false);
+    assert.ok(f.agents.every(row => row.status === 'sleeping'));
+    const journal = JSON.parse(await readFile(join(args.verificationDir,'continuity-verification.json'),'utf8'));
+    assert.equal(journal.status, 'failed');
+    assert.equal(journal.operations.find(row => row.kind === 'activation-settle').status, 'unknown');
+    assert.equal(journal.all_seats_sleeping, true);
+    await assert.rejects(verifyReadinessCurrent(verificationOptions(f,result.evidence,`settle-${kind}`)), /DIRECTORY_ALREADY_EXISTS/);
+    assert.equal(f.calls.slice(begin).filter(row => row.path.endsWith('/start')).length, 1);
+    assert.deepEqual(await originalPublication(f), original);
+  }
 });
 
 test('all ten exact CLI paths run both diagnostics in one persisted activation with four unrelated awake agents', async t => {

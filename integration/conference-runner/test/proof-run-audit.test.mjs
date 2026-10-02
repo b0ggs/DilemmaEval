@@ -69,6 +69,7 @@ async function fixture(t) {
   };
   for (const seat of source.roster) {
     record('inventory'); record('activation', seat.seat_id); record('lifecycle-read', seat.seat_id);
+    record('activation-settle', seat.seat_id);
     const continuity = record('continuity-check', seat.seat_id);
     record('lifecycle-read', seat.seat_id);
     for (let read = 0; read < 9; read++) record('runtime-read', seat.seat_id);
@@ -119,7 +120,8 @@ async function fixture(t) {
 
 test('expired original readiness can be audited after completion with both independent auditors and immutable inputs', async t => {
   const f = await fixture(t);
-  assert.equal(f.verification.operations.length, 172);
+  assert.equal(f.verification.operations.length, 182);
+  assert.equal(f.verification.operations.filter(operation => operation.kind === 'activation-settle').length, 10);
   for (const seat of f.source.roster) assert.equal(f.verification.operations.filter(operation => operation.seat_id === seat.seat_id && operation.kind === 'runtime-read').length, 9);
   assert.ok(Date.parse(f.evidence.expires_at) < Date.now());
   const before = new Map(await Promise.all([...f.documents.keys()].map(async file => [file, await readFile(file, 'utf8')])));
@@ -185,22 +187,32 @@ test('consumed fuse must bind a completed original continuity verification befor
 test('recomputed verification digests cannot conceal incomplete, reordered or private lifecycle histories', async t => {
   const cases = [
     ['empty history', record => { record.operations = []; }],
-    ['missing seat history', record => { record.operations.splice(153, 17); }],
+    ['missing seat history', record => { record.operations.splice(162, 18); }],
     ['same-length substituted seat', record => { for (const operation of record.operations) if (operation.seat_id === 'hs-5') operation.seat_id = 'hs-4'; }],
-    ['unknown operation', record => { record.operations[5].kind = 'configure-model'; }],
-    ['missing original receipt read', record => { record.operations[13].kind = 'lifecycle-read'; }],
-    ['missing nested lifecycle object', record => { record.operations[14] = null; }],
-    ['unknown operation outcome', record => { record.operations[16].status = 'unknown'; }],
-    ['duplicate sequence', record => { record.operations[4].sequence = 4; }],
+    ['absent activation settles', record => {
+      record.operations = record.operations.filter(operation => operation.kind !== 'activation-settle');
+      record.operations.forEach((operation, index) => { operation.sequence = index + 1; });
+    }],
+    ['activation settle after guest access', record => {
+      const settle = record.operations.find(operation => operation.kind === 'activation-settle');
+      const guest = record.operations.find(operation => operation.kind === 'runtime-read');
+      [settle.kind, guest.kind] = [guest.kind, settle.kind];
+    }],
+    ['unknown activation settle', record => { record.operations.find(operation => operation.kind === 'activation-settle').status = 'unknown'; }],
+    ['unknown operation', record => { record.operations[6].kind = 'configure-model'; }],
+    ['missing original receipt read', record => { record.operations[14].kind = 'lifecycle-read'; }],
+    ['missing nested lifecycle object', record => { record.operations[15] = null; }],
+    ['unknown operation outcome', record => { record.operations[17].status = 'unknown'; }],
+    ['duplicate sequence', record => { record.operations[5].sequence = 5; }],
     ['extra operation', record => { record.operations.push(structuredClone(record.operations.at(-1))); }],
     ['private top-level structure', record => { record.session = { raw_reply: PRIVATE_TEXT }; }],
-    ['private nested structure', record => { record.operations[5].provider_response = { private_key: PRIVATE_TEXT }; }],
+    ['private nested structure', record => { record.operations[6].provider_response = { private_key: PRIVATE_TEXT }; }],
     ['invalid verification ID', record => { record.verification_id = PRIVATE_TEXT; }],
     ['cleanup deadline drift', record => { record.cleanup_deadline_at_ms++; }],
     ['regressed operation start', record => { record.operations[2].started_at_ms = record.operations[1].started_at_ms - 1; }],
     ['overlapping serialized operation', record => { record.operations[1].completed_at_ms = record.operations[2].started_at_ms + 1; }],
-    ['continuity finished before nested reads', record => { record.operations[3].completed_at_ms = record.operations[3].started_at_ms; }],
-    ['continuity completed after sleep began', record => { record.operations[3].completed_at_ms = record.operations[15].started_at_ms + 1; }],
+    ['continuity finished before nested reads', record => { record.operations[4].completed_at_ms = record.operations[4].started_at_ms; }],
+    ['continuity completed after sleep began', record => { record.operations[4].completed_at_ms = record.operations[16].started_at_ms + 1; }],
     ['operation exceeds completed record', record => { record.operations.at(-1).completed_at_ms = record.completed_at_ms + 1; }],
     ['verification predates prepared run', record => { record.started_at_ms = start - 1; }],
   ];

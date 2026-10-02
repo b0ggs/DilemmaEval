@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { REPOSITORY_ROOT } from '../config.mjs';
 import { atomicWrite } from '../runner/store.mjs';
 import { configFingerprint, rosterFingerprint, runtimeEvidenceFingerprint, TRANSPORT_FINGERPRINT,
@@ -202,13 +203,29 @@ async function bounded(operation, deadline, now) {
   } finally { clearTimeout(timer); }
 }
 
+const defaultWait = (milliseconds, { signal } = {}) => delay(milliseconds, undefined, { signal });
+function validateActivationWait(wakeDelayMs, waitImpl) {
+  if (!Number.isInteger(wakeDelayMs) || wakeDelayMs < 0 || wakeDelayMs > 60_000) fail('READINESS_WAKE_DELAY_INVALID');
+  if (typeof waitImpl !== 'function') fail('READINESS_WAIT_INVALID');
+}
+
+async function settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, signal }) {
+  if (signal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
+  const remaining = deadlineAtMs - now();
+  if (remaining <= 0) fail('READINESS_DEADLINE_EXPIRED');
+  await waitImpl(Math.min(wakeDelayMs, remaining), { signal });
+  if (signal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
+  if (remaining <= wakeDelayMs || now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
+}
+
 /** Construction, plan and status never read credentials or contact Maritime. */
 export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs, cleanupDeadlineAtMs,
-  apiKey, chain, fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+  apiKey, chain, fetchImpl = globalThis.fetch, now = Date.now, wakeDelayMs = 10_000, waitImpl = defaultWait } = {}) {
   validateMaritimeRoster(config?.roster);
   if (config.chain_id !== 84532 || config.roster.length !== 10 ||
       ['openclaw','hermes'].some(team => config.roster.filter(seat => seat.team === team).length !== 5)) fail('READINESS_TEN_SEATS_REQUIRED');
   if (typeof now !== 'function') fail('READINESS_CLOCK_INVALID');
+  validateActivationWait(wakeDelayMs, waitImpl);
   config = structuredClone(config);
   artifacts = checkedArtifacts(config, artifacts);
   const rows = config.roster;
@@ -354,6 +371,9 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
             agentStatus(activatedAgent, seat, 'active');
             await getStatus(seat, 'active');
           } catch { lifecycleAmbiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
+          // An active lifecycle response can precede the guest exec service.
+          // Match the launch/transport settle without extending this run's cutoff.
+          await operation('activation-settle', seat, () => settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now }));
           // Restore can rematerialize harness config. Only exact source-bound
           // configure commands run, after public artifact integrity succeeds.
           await verifyPublicArtifactIntegrity(artifact, command => execute(seat, command));
@@ -478,7 +498,9 @@ export async function validateReadinessRunState({ config, evidence, runtimeDir, 
 /** Read-only inspection never wakes agents. Verification is a separate, durable,
  * explicit serial wake/inspect/sleep operation; it never changes the certificate. */
 export async function verifyReadinessCurrent({ config, evidence, runtimeDir, apiKey, fetchImpl = globalThis.fetch,
-  chain, deadlineAtMs, cleanupDeadlineAtMs, verificationDir, artifacts, readOnly = false, signal, now = Date.now } = {}) {
+  chain, deadlineAtMs, cleanupDeadlineAtMs, verificationDir, artifacts, readOnly = false, signal, now = Date.now,
+  wakeDelayMs = 10_000, waitImpl = defaultWait } = {}) {
+  validateActivationWait(wakeDelayMs, waitImpl);
   if (signal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
   const identity = await validateReadinessRunState({ config, evidence, runtimeDir, now });
   if (evidence.producer_version !== READINESS_PRODUCER_VERSION ||
@@ -567,6 +589,7 @@ export async function verifyReadinessCurrent({ config, evidence, runtimeDir, api
         agentStatus(await request('activation', seat, `${prefix(seat)}/start`, 'POST'), seat, 'active');
         agentStatus(await request('lifecycle-read', seat, prefix(seat)), seat, 'active');
       } catch { ambiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
+      await operation('activation-settle', seat, () => settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, signal }));
       await operation('continuity-check', seat, () => continuity.verify({ seat,
         execute: command => request('runtime-read', seat, `${prefix(seat)}/exec`, 'POST', { command, timeout: 30 }),
         getAgent: async () => {

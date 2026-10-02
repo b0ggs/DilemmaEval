@@ -227,10 +227,11 @@ async function checkVerification(options, selected, config, evidence, current, p
         record.cleanup_deadline_at_ms !== Math.min(options.hardStopAtMs, options.stopNewGamesAtMs + 60_000) ||
         record.cleanup_deadline_at_ms <= record.deadline_at_ms || !Array.isArray(record.operations) || config.roster.length !== 10) fail('invalid');
     // This is the serial journal emitted by verifyReadinessCurrent: inventory,
-    // resume, confirmed lifecycle, the nested continuity checks, confirmed sleep.
+    // resume, confirmed lifecycle, activation settle, nested continuity checks,
+    // and confirmed sleep.
     // The nine runtime reads include both original diagnostic receipts.
     const expected = config.roster.flatMap(seat => [
-      ['inventory', null], ...['activation', 'lifecycle-read', 'continuity-check', 'lifecycle-read',
+      ['inventory', null], ...['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
         ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read'].map(kind => [kind, seat.seat_id])
     ]).concat([['inventory', null], ['chain-revalidation', null]]);
     if (record.operations.length !== expected.length) fail('invalid');

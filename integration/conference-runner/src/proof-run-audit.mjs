@@ -165,13 +165,13 @@ function verifyContinuityHistory(record, { config, evidence, binding, fuse }) {
   const expected = [];
   for (const seat of config.roster) {
     expected.push({ kind: 'inventory', seat_id: null });
-    for (const kind of ['activation', 'lifecycle-read', 'continuity-check', 'lifecycle-read',
+    for (const kind of ['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
       ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read']) {
       expected.push({ kind, seat_id: seat.seat_id });
     }
   }
   expected.push({ kind: 'inventory', seat_id: null }, { kind: 'chain-revalidation', seat_id: null });
-  ensure(config.roster.length === 10 && expected.length === 172 && operations.length === expected.length, code);
+  ensure(config.roster.length === 10 && expected.length === 182 && operations.length === expected.length, code);
   for (let index = 0; index < expected.length; index++) {
     const operation = operations[index], previous = operations[index - 1], next = operations[index + 1];
     ensure(exact(operation, ['sequence', 'kind', 'seat_id', 'status', 'started_at_ms', 'completed_at_ms']) &&
