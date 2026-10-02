@@ -16,6 +16,49 @@ export class MaritimeAdapterError extends Error {
   }
 }
 
+// Coordinator diagnostics only: keep control-flow errors and ambiguity intact.
+// These exact public labels never retain provider prose, command output or causes.
+const MARITIME_FAILURE_CODES = new Set([
+  'MARITIME_TIMEOUT', 'MARITIME_NETWORK_OUTCOME_UNKNOWN', 'MARITIME_RESPONSE_INVALID',
+  'MARITIME_RESPONSE_TOO_LARGE', 'MARITIME_HTTP_ERROR',
+  ...[400,401,403,404,405,408,409,410,413,414,415,422,425,429,431,451,
+    500,501,502,503,504,505,507,508,510,511].map(status => `MARITIME_HTTP_${status}`),
+  'MARITIME_AGENT_RESPONSE_INVALID', 'MARITIME_DIAGNOSTIC_RESPONSE_INVALID',
+  'MARITIME_PUBLIC_REQUEST_STAGE_FAILED', 'MARITIME_RUNTIME_CONTINUITY_FAILED',
+  'MARITIME_START_UNCONFIRMED', 'MARITIME_SLEEP_UNCONFIRMED',
+  'MARITIME_DISPATCH_EXPIRED', 'MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED',
+  'MARITIME_INVENTORY_INVALID', 'MARITIME_AWAKE_AGENT_BUSY', 'MARITIME_AWAKE_AGENT_INVALID',
+  'MARITIME_AWAKE_POOL_CLOSED', 'MARITIME_SEAT_BUSY', 'MARITIME_SEAT_MISMATCH',
+  'MARITIME_REQUEST_INVALID', 'MARITIME_DIAGNOSTIC_REQUEST_INVALID', 'MARITIME_REQUEST_ID_REUSED',
+  'MARITIME_DEADLINE_INVALID', 'MARITIME_SIGNAL_INVALID',
+  'MARITIME_RUNTIME_COMMAND_INVALID', 'MARITIME_RUNTIME_COMMAND_REQUIRED',
+  'HERMES_CONFIG_UPDATE_OUTCOME_UNKNOWN', 'MODEL_CONFIG_UPDATE_OUTCOME_UNKNOWN',
+  'INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH'
+]);
+const CONTINUITY_FAILURE_CODES = new Set([
+  'READINESS_ARTIFACTS_INVALID', 'READINESS_CONTINUITY_INPUT_INVALID', 'READINESS_EVIDENCE_INVALID',
+  'READINESS_DEADLINE_EXPIRED', 'READINESS_LIFECYCLE_UNCONFIRMED', 'READINESS_MIXED_GENERATION',
+  'READINESS_INSPECTION_FAILED', 'READINESS_MODEL_INVALID', 'READINESS_MODEL_ROUTE_UNVERIFIED',
+  'READINESS_DIAGNOSTIC_RECEIPT_INVALID', 'READINESS_PERMIT_UNVERIFIED'
+]);
+
+export function safeMaritimeErrorCode(code, fallback = null) {
+  return typeof code === 'string' && MARITIME_FAILURE_CODES.has(code) ? code : fallback;
+}
+
+export function safeMaritimeDiagnosticCode(code, fallback = null) {
+  return safePlayerErrorCode(code, typeof code === 'string' &&
+    (MARITIME_FAILURE_CODES.has(code) || CONTINUITY_FAILURE_CODES.has(code)) ? code : fallback);
+}
+
+function withFailureMetadata(failure, error) {
+  const transport = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
+  const diagnostic = safeMaritimeDiagnosticCode(error?.diagnostic_code, safeMaritimeDiagnosticCode(error?.code));
+  if (transport !== null) failure.transport_code = transport;
+  if (diagnostic !== null) failure.diagnostic_code = diagnostic;
+  return failure;
+}
+
 // Abort bounds our wait, but does NOT claim to cancel remote agent execution.
 export async function maritimeRequest({ apiKey, fetchImpl = globalThis.fetch, path, method = 'GET', body,
   timeoutMs = 120_000, signal } = {}) {
@@ -544,8 +587,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             Object.keys(result).sort().join('\0') !== 'schema_version\0verified' || result.schema_version !== 1 || result.verified !== true) {
           throw new Error('CONTINUITY_RESULT_INVALID');
         }
-      } catch {
-        throw new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted });
+      } catch (error) {
+        throw withFailureMetadata(new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted }), error);
       } finally {
         closed = true;
         clearTimeout(timer);
@@ -565,8 +608,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         try {
           identity(await post({ path: `${agentPath}/sleep` }), 'sleeping', 'MARITIME_SLEEP_UNCONFIRMED');
           await getAgent('sleeping', 'MARITIME_SLEEP_UNCONFIRMED');
-        } catch {
-          throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
+        } catch (error) {
+          throw withFailureMetadata(new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true }), error);
         }
       }
     };
@@ -666,7 +709,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
                 // it is never used for native chat, CLI execution, or signing.
                 if (!certified && attempt === 0 && error?.ambiguous && !signal?.aborted &&
                     (deadlineAtMs === undefined || Date.now() < deadlineAtMs)) continue;
-                throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
+                throw withFailureMetadata(new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED'), error);
               }
             }
           }
@@ -746,7 +789,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           if (awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
           if (certified && boundary.remotePostStarted && !error?.ambiguous) {
-            throw new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true });
+            throw withFailureMetadata(new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true }), error);
           }
           throw error;
         } finally { busy.delete(assigned.seat_id); }
@@ -845,7 +888,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             } catch (error) {
               if (!certified && attempt < diagnosticStageRetries && error?.ambiguous && !signal?.aborted &&
                   (deadlineAtMs === undefined || Date.now() < deadlineAtMs)) continue;
-              throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
+              throw withFailureMetadata(new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED'), error);
             }
           }
           const payload = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/chat`,
@@ -887,7 +930,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           if (awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
           if (certified && boundary.remotePostStarted && !error?.ambiguous) {
-            throw new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true });
+            throw withFailureMetadata(new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true }), error);
           }
           throw error;
         } finally { busy.delete(assigned.seat_id); }

@@ -2,6 +2,7 @@ import { open, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { safePlayerErrorCode } from '../../../integration/conference-runner/src/maritime/diagnostics.mjs';
+import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../../../integration/conference-runner/src/maritime/transport.mjs';
 
 const TERMINAL_STATUSES = new Set([
   'submitted',
@@ -152,13 +153,13 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
         : stopController.signal.aborted && error?.ambiguous === true && failure !== null
           ? 'cancelled-after-submit'
           : 'ambiguous';
+      const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
       await finish(record, {
         status,
         transaction_hash: null,
         error_code: safeTransportCode(error),
-        diagnostic_code: error?.code === 'MARITIME_AGENT_RESPONSE_INVALID'
-          ? safePlayerErrorCode(error?.diagnostic_code, null)
-          : null,
+        ...(transportCode ? { transport_code: transportCode } : {}),
+        diagnostic_code: safeMaritimeDiagnosticCode(error?.diagnostic_code),
         has_team_message: false,
       });
       stopFor(record);

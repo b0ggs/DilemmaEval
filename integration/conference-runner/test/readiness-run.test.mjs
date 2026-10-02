@@ -770,7 +770,9 @@ test('failed operation metadata retains only exact adapter codes and never provi
     assert.equal(failed.length,1,row.name);
     assert.equal(failed[0].error_code,row.expected,row.name);assert.equal(failed[0].ambiguous,row.ambiguous,row.name);
     assert.deepEqual(Object.keys(failed[0]).sort(),[
-      'sequence','kind','seat_id','status','started_at_ms','completed_at_ms','error_code','ambiguous'].sort());
+      'sequence','kind','seat_id','status','started_at_ms','completed_at_ms','error_code','ambiguous',
+      ...(row.expected==='READINESS_OPERATION_FAILED'?[]:['transport_code'])].sort());
+    assert.equal(failed[0].transport_code,row.expected==='READINESS_OPERATION_FAILED'?undefined:row.expected);
     assert.equal(journal.all_seats_sleeping,!row.ambiguous,row.name);
     assert.ok(f.agents.every(agent=>agent.status==='sleeping'));
     assert.doesNotMatch(saved,/unpublished-provider|private_key|MARITIME_HTTP_599/);
@@ -867,4 +869,35 @@ test('interrupted durable journal is inspectable without replaying a lifecycle i
   assert.equal((await restored.status()).status,'incomplete-no-replay');
   assert.equal(f.calls.length,count);
   await assert.rejects(restored.run(),/DIRECTORY_ALREADY_EXISTS/);
+});
+
+
+test('diagnostic validation retains fixed stage and CLI metadata without relaxing failure cleanup',async t=>{
+  const cases=[
+    {name:'stage-http',transport:'MARITIME_HTTP_502',diagnostic:'MARITIME_HTTP_502',chat:false,
+      stage:()=>new Response('private-stage-fixture',{status:502})},
+    {name:'stage-result',transport:'MARITIME_PUBLIC_REQUEST_STAGE_FAILED',diagnostic:'MARITIME_PUBLIC_REQUEST_STAGE_FAILED',chat:false,
+      stage:()=>jsonResponse({exitCode:1,stdout:'private-stage-fixture',stderr:''})},
+    {name:'cli-code',transport:'MARITIME_DIAGNOSTIC_RESPONSE_INVALID',diagnostic:'PLAYER_TOOL_FAILED',chat:true,
+      reply:()=>({response:JSON.stringify({ok:false,error:{code:'PLAYER_TOOL_FAILED'}})})}
+  ];
+  for(const row of cases) {
+    let stages=0;
+    const f=await fixture(t,{...(row.reply?{chatResult:row.reply}:{}),onCall:({path,body})=>{
+      if(path.endsWith('/exec')&&body.command?.[3]?.includes('stagePublicRequest')) {
+        stages++;if(row.stage)return row.stage();
+      }
+    }});
+    await assert.rejects(f.runner.run(),/READINESS_RUN_FAILED_SLEEP_UNCONFIRMED/);
+    const saved=await readFile(join(f.runtimeDir,READINESS_FILES.journal),'utf8'),journal=JSON.parse(saved);
+    const failed=journal.operations.find(operation=>operation.kind==='diagnostic-validation'&&operation.status==='unknown');
+    assert.ok(failed,row.name);assert.equal(failed.error_code,'READINESS_OPERATION_FAILED');assert.equal(failed.ambiguous,true);
+    assert.equal(failed.transport_code,row.transport);assert.equal(failed.diagnostic_code,row.diagnostic);
+    assert.equal(stages,1);assert.equal(f.calls.filter(call=>call.path.endsWith('/chat')).length,row.chat?1:0);
+    assert.equal(f.calls.filter(call=>call.path.endsWith('/sleep')).length,1);
+    assert.equal(journal.all_seats_sleeping,false);assert.ok(f.agents.every(agent=>agent.status==='sleeping'));
+    assert.doesNotMatch(saved,/private-stage-fixture|stdout|stderr|private_key/);
+    await assert.rejects(readFile(join(f.runtimeDir,READINESS_FILES.evidence)),/ENOENT/);
+    const before=f.calls.length;await assert.rejects(f.runner.run(),/READINESS_RUN_ALREADY_STARTED/);assert.equal(f.calls.length,before);
+  }
 });

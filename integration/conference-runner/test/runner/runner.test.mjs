@@ -379,6 +379,37 @@ test('invalid CLI responses preserve only fixed diagnostics and remain unknown a
   assert.ok(!contents.includes('raw_response'));
 });
 
+test('transport metadata survives discussion failure and restart without changing unknown states or replaying', async t => {
+  const secret = 'fixture-private-native-error';
+  const f = await fixture(t, { dispatch: ({ request }) => {
+    const metadata = request.seat_id === 'oc-1'
+      ? { code: 'PROOF_AGENT_OPERATION_FAILED', transport_code: 'MARITIME_HTTP_502', diagnostic_code: 'MARITIME_REPLY_PROVIDER_ERROR' }
+      : request.seat_id === 'hs-1'
+        ? { code: 'MARITIME_AGENT_RESPONSE_INVALID', diagnostic_code: 'PLAYER_CHOICE_LOCATION_INVALID' }
+        : { code: `MARITIME_HTTP_502_${secret}`, transport_code: `MARITIME_TIMEOUT_${secret}`,
+          diagnostic_code: `MARITIME_REPLY_PROVIDER_ERROR_${secret}` };
+    throw Object.assign(new Error(secret), { ...metadata, ambiguous: true, retryable: false, raw_response: secret });
+  } });
+  await f.runner.tick();
+  await f.restart();
+  await f.runner.tick();
+  assert.equal(f.dispatches.length, 3, 'unknown discussions are not replayed after restart');
+  assert.ok(f.dispatches.every(row => row.request.type === 'discussion'));
+  const store = createDurableStore({ directory: path.join(f.runtimeDir, 'coordinator') });
+  assert.deepEqual(await store.entries('response:'), []);
+  for (const { value } of await store.entries('dispatch:')) {
+    assert.equal(value.state, 'unknown');
+    assert.equal(value.error_code, value.seat_id === 'hs-1' ? 'PLAYER_CHOICE_LOCATION_INVALID' : undefined);
+    assert.equal(value.transport_code, value.seat_id === 'oc-1' ? 'MARITIME_HTTP_502'
+      : value.seat_id === 'hs-1' ? 'MARITIME_AGENT_RESPONSE_INVALID' : undefined);
+    assert.equal(value.diagnostic_code, value.seat_id === 'oc-1' ? 'MARITIME_REPLY_PROVIDER_ERROR'
+      : value.seat_id === 'hs-1' ? 'PLAYER_CHOICE_LOCATION_INVALID' : undefined);
+    assert.equal(value.transaction_hash, undefined);
+  }
+  const saved = await fs.readFile(path.join(f.runtimeDir, 'coordinator/records.json'), 'utf8');
+  assert.ok(!saved.includes(secret)); assert.ok(!saved.includes('raw_response'));
+});
+
 test('reported player errors retain only allowlisted codes across restart without replay', async (t) => {
   const privateMessage = 'Internal provider fixture details must never persist';
   const unknownCode = 'UNKNOWN_ERROR_FIXTURE_SECRET_MUST_NEVER_PERSIST';

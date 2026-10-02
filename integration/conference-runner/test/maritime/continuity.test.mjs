@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { buildInstallArtifact } from '../../src/maritime/install.mjs';
 import { createRuntimeContinuity } from '../../src/maritime/continuity.mjs';
+import { MaritimeAdapterError } from '../../src/maritime/transport.mjs';
 import { buildControlledRuntimeEvidence, runtimeEvidenceFingerprint } from '../../src/readiness.mjs';
 import { buildDiagnosticReceiptReadCommand } from '../../src/maritime/diagnostic-receipt.mjs';
 import { executionPermitFingerprint } from '../../src/maritime/execution-permit.mjs';
@@ -192,4 +193,27 @@ test('constructor pins copies against caller mutation and noncooperative reads r
   const hung = fixture(); hung.overrides.agent = () => new Promise(() => {});
   await assert.rejects(hung.continuity.prepareAction({ ...hung.forSeat(config.roster[0]), request: poke('commit', config.roster[0]), deadlineAtMs: start + 20 }), /READINESS_DEADLINE_EXPIRED/);
   assert.equal(hung.stages.length, 0);
+});
+
+
+test('continuity reconstruction retains safe native causes through artifact and permit wrappers', async () => {
+  for(const phase of ['agent','hash','model','stage']) {
+    const f=fixture(),seat=config.roster[0];
+    f.overrides[phase]=()=>{const error=new MaritimeAdapterError('MARITIME_HTTP_502',{ambiguous:true});
+      error.message='private-continuity-fixture';error.cause={private_key:'private-continuity-fixture'};throw error;};
+    const expected={agent:'READINESS_LIFECYCLE_UNCONFIRMED',hash:'READINESS_ARTIFACTS_INVALID',model:'READINESS_MODEL_INVALID',stage:'READINESS_PERMIT_UNVERIFIED'}[phase];
+    await assert.rejects(f.continuity.prepareAction({...f.forSeat(seat),request:poke('commit',seat),deadlineAtMs:start+60_000}),error=>{
+      assert.equal(error.code,expected);assert.equal(error.transport_code,'MARITIME_HTTP_502');
+      assert.equal(error.diagnostic_code,'MARITIME_HTTP_502');
+      assert.equal(error.ambiguous,undefined);assert.equal(error.retryable,undefined);assert.equal(error.cause,undefined);
+      assert.doesNotMatch(JSON.stringify(error),/private-continuity|private_key/);return true;
+    });
+    assert.equal(f.stages.length,phase==='stage'?1:0);
+  }
+  const f=fixture();f.overrides.model=()=>{throw Object.assign(new Error('private-continuity-fixture'),{
+    code:'MARITIME_HTTP_599',transport_code:'MARITIME_HTTP_502_private-fixture',diagnostic_code:'PLAYER_TOOL_FAILED_private-fixture'});};
+  await assert.rejects(f.continuity.verify(f.forSeat(config.roster[0])),error=>{
+    assert.equal(error.code,'READINESS_MODEL_INVALID');assert.equal(error.transport_code,undefined);assert.equal(error.diagnostic_code,undefined);
+    assert.doesNotMatch(JSON.stringify(error),/private-fixture|HTTP_599/);return true;
+  });
 });

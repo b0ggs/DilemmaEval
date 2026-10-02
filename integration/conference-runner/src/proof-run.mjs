@@ -3,6 +3,7 @@ import { hostname } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createConferenceRunner } from './runner/index.mjs';
+import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './maritime/transport.mjs';
 import { createGuardedLauncher, validatePreparedProof } from './proof-control.mjs';
 import { createProofDispatchJournal, writeProofReport } from '../../../conference/operations/saved-helpers/proof-dispatch-journal.mjs';
 
@@ -169,7 +170,12 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
     try {
       return await Promise.race([Promise.resolve().then(callback).catch(error => {
         const known = error?.message === 'READINESS_REMOTE_GENERATION_UNATTESTED' ? error.message : code;
-        throw fixedError(known, mutation && error?.ambiguous !== false);
+        const wrapped = fixedError(known, mutation && error?.ambiguous !== false);
+        const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
+        const diagnosticCode = safeMaritimeDiagnosticCode(error?.diagnostic_code);
+        if (transportCode) wrapped.transport_code = transportCode;
+        if (diagnosticCode) wrapped.diagnostic_code = diagnosticCode;
+        throw wrapped;
       }), aborted]);
     } finally { deadlineController.signal.removeEventListener('abort', onAbort); }
   }

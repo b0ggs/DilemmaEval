@@ -275,6 +275,44 @@ test('one ambiguous join preserves nine late outcomes and stops without another 
   assert.ok(!JSON.stringify(report).includes('provider-secret'));
 });
 
+test('fixed proof wrappers retain only native transport metadata in reports and durable unknown records', async t => {
+  const f = await fixture(t);
+  const secret = 'fixture-private-transport-detail';
+  let started = 0, release;
+  const allStarted = new Promise(resolve => { release = resolve; });
+  f.dependencies.agents.dispatch = async ({ seat }) => {
+    started++; if (started === 10) release(); await allStarted;
+    const metadata = seat.seat_id === 'oc-1'
+      ? { code: 'MARITIME_HTTP_502', diagnostic_code: 'MARITIME_REPLY_PROVIDER_ERROR' }
+      : seat.seat_id === 'oc-2'
+        ? { code: 'MARITIME_HTTP_502', transport_code: 'MARITIME_TIMEOUT' }
+        : { code: `MARITIME_HTTP_502_${secret}`, transport_code: `MARITIME_TIMEOUT_${secret}`,
+          diagnostic_code: `MARITIME_REPLY_PROVIDER_ERROR_${secret}` };
+    throw Object.assign(new Error(secret), { ...metadata, ambiguous: true, retryable: true, raw_response: secret });
+  };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(started, 10);
+  assert.equal(report.status, 'stopped');
+  assert.equal(report.failure.code, 'PROOF_AGENT_OPERATION_UNCERTAIN');
+  assert.equal(report.pending_dispatches, 0);
+  assert.equal(f.counts().creates, 1); assert.equal(f.counts().advances, 0);
+  const records = JSON.parse(await readFile(path.join(f.options.directory, 'runtime/coordinator/records.json'), 'utf8'));
+  for (const row of report.dispatches) {
+    const saved = records.entries.find(entry => entry.key === `dispatch:${row.request_id}`).value;
+    assert.ok(['ambiguous', 'cancelled-after-submit'].includes(row.status));
+    assert.equal(row.error_code, 'MARITIME_OPERATION_FAILED', 'fixed wrapper classification is unchanged');
+    assert.equal(saved.state, 'unknown');
+    assert.equal(saved.error_code, undefined, 'metadata does not reclassify the wrapper error');
+    const transport = row.seat_id === 'oc-1' ? 'MARITIME_HTTP_502' : row.seat_id === 'oc-2' ? 'MARITIME_TIMEOUT' : undefined;
+    const diagnostic = row.seat_id === 'oc-1' ? 'MARITIME_REPLY_PROVIDER_ERROR' : undefined;
+    assert.equal(row.transport_code, transport); assert.equal(saved.transport_code, transport);
+    assert.equal(row.diagnostic_code, diagnostic ?? null); assert.equal(saved.diagnostic_code, diagnostic);
+  }
+  assert.ok(!JSON.stringify(report).includes(secret));
+  assert.ok(!JSON.stringify(records).includes(secret));
+  assert.ok(!JSON.stringify(records).includes('raw_response'));
+});
+
 test('absolute hard deadline prevents further actions and preserves the consumed fuse', async t => {
   const f = await fixture(t, { hardStopOffset: 5000 });
   f.dependencies.pause = async () => { f.advanceClock(6000); };

@@ -89,7 +89,7 @@ test('Game 17 shape durably represents one transport failure and nine late succe
   assert.ok(evidence.dispatches.every(row => row.started_at && row.finished_at));
   assert.ok(evidence.dispatches.every(row => Object.keys(row).every(key => [
     'started_at', 'finished_at', 'request_id', 'seat_id', 'operation', 'game_id', 'round',
-    'status', 'transaction_hash', 'error_code', 'diagnostic_code', 'has_team_message',
+    'status', 'transaction_hash', 'error_code', 'transport_code', 'diagnostic_code', 'has_team_message',
   ].includes(key))));
   assert.equal(journal.getFailure()?.seat_id, 'oc-1');
   assert.equal(stopController.signal.aborted, true);
@@ -136,6 +136,29 @@ test('records explicit pre-submit rejection and controlled post-submit cancellat
   ]);
   assert.equal(persistCount, 6, 'each start and terminal outcome is persisted');
   assert.equal(JSON.stringify(report).includes('private '), false);
+});
+
+test('dispatch journal retains allowlisted native metadata through fixed wrappers without exposing raw codes', async () => {
+  const secret = 'fixture-private-provider-text';
+  for (const [error, expectedTransport, expectedDiagnostic] of [
+    [{ code: 'PROOF_AGENT_OPERATION_FAILED', transport_code: 'MARITIME_HTTP_502', diagnostic_code: 'MARITIME_REPLY_PROVIDER_ERROR' }, 'MARITIME_HTTP_502', 'MARITIME_REPLY_PROVIDER_ERROR'],
+    [{ code: 'MARITIME_HTTP_502', transport_code: 'MARITIME_TIMEOUT' }, 'MARITIME_TIMEOUT', null],
+    [{ code: 'MARITIME_HTTP_502' }, 'MARITIME_HTTP_502', null],
+    [{ code: `MARITIME_HTTP_502_${secret}`, transport_code: `MARITIME_TIMEOUT_${secret}`, diagnostic_code: `MARITIME_REPLY_PROVIDER_ERROR_${secret}` }, undefined, null],
+  ]) {
+    const report = { dispatches: [] }, stopController = new AbortController();
+    const journal = createProofDispatchJournal({ report, stopController, persist: async () => {},
+      adapter: { dispatch: async () => { throw Object.assign(new Error(secret), error, { ambiguous: true, retryable: true, raw_response: secret }); } } });
+    await assert.rejects(journal.dispatch({ seat: { seat_id: 'oc-1' }, request: {
+      request_id: `conference:${'a'.repeat(32)}`, game_id: '19', round: 3, type: 'discussion'
+    } }));
+    const row = report.dispatches[0];
+    assert.equal(row.status, 'ambiguous'); assert.equal(row.error_code, 'MARITIME_OPERATION_FAILED');
+    assert.equal(row.transport_code, expectedTransport); assert.equal(row.diagnostic_code, expectedDiagnostic);
+    assert.equal(stopController.signal.aborted, true);
+    assert.equal(journal.getFailure().transport_code, expectedTransport);
+    assert.ok(!JSON.stringify(report).includes(secret)); assert.ok(!JSON.stringify(report).includes('raw_response'));
+  }
 });
 
 test('normalizes every adapter response to a terminal proof status', async () => {

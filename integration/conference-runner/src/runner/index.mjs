@@ -7,6 +7,7 @@ import { TeamLogStore } from '../../../team-logs/src/index.js';
 import { parseAndValidateResponse, assertResponseIdentity } from '../../../maritime-transport/src/index.mjs';
 import { discussionToLogResponse } from '../maritime/index.mjs';
 import { safePlayerErrorCode } from '../maritime/diagnostics.mjs';
+import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../maritime/transport.mjs';
 import { createDurableStore } from './store.mjs';
 import { acquireRunnerLock } from './lock.mjs';
 
@@ -429,8 +430,12 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       }
       const diagnosticCode = error?.code === 'MARITIME_AGENT_RESPONSE_INVALID'
         ? safePlayerErrorCode(error.diagnostic_code, null) : null;
+      const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
+      const transportDiagnostic = safeMaritimeDiagnosticCode(error?.diagnostic_code);
       await store.set(key, { ...record, state: 'unknown',
-        ...(diagnosticCode ? { error_code: diagnosticCode } : {}) });
+        ...(diagnosticCode ? { error_code: diagnosticCode } : {}),
+        ...(transportCode ? { transport_code: transportCode } : {}),
+        ...(transportDiagnostic ? { diagnostic_code: transportDiagnostic } : {}) });
       clear('AGENT_DISPATCH_EXPIRED', { seat_id: seat.seat_id, game_id: snapshot.game_id });
       flag('AGENT_ACTION_UNCERTAIN', { seat_id: seat.seat_id, game_id: snapshot.game_id });
       return 'unknown';

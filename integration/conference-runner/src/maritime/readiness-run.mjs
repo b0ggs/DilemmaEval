@@ -7,7 +7,8 @@ import { REPOSITORY_ROOT } from '../config.mjs';
 import { atomicWrite } from '../runner/store.mjs';
 import { configFingerprint, rosterFingerprint, runtimeEvidenceFingerprint, TRANSPORT_FINGERPRINT,
   RUNTIME_EVIDENCE_MAX_AGE_MS, buildControlledRuntimeEvidence, validateControlledRuntimeEvidence } from '../readiness.mjs';
-import { createMaritimeAdapter, createMaritimeAwakeLeasePool, maritimeRequest, MaritimeAdapterError } from './transport.mjs';
+import { createMaritimeAdapter, createMaritimeAwakeLeasePool, maritimeRequest, MaritimeAdapterError,
+  safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './transport.mjs';
 import { verifyPublicArtifactIntegrity } from './install.mjs';
 import { reconcileRoster, validateMaritimeRoster } from './roster.mjs';
 import { buildDiagnosticReceiptReadCommand, validateDiagnosticReceipt } from './diagnostic-receipt.mjs';
@@ -28,12 +29,18 @@ const KNOWN_MARITIME_FAILURES = new Set([
     500,501,502,503,504,505,507,508,510,511].map(status => `MARITIME_HTTP_${status}`)
 ]);
 function operationFailure(error) {
+  const metadata = {};
+  if (error instanceof MaritimeAdapterError && safeMaritimeErrorCode(error.code) !== null) {
+    metadata.transport_code = safeMaritimeErrorCode(error.transport_code, error.code);
+    const diagnostic = safeMaritimeDiagnosticCode(error.diagnostic_code);
+    if (diagnostic !== null) metadata.diagnostic_code = diagnostic;
+  }
   // Provider messages and even code-shaped strings are untrusted. Only the
   // adapter's exact bounded vocabulary may enter this public failure record.
   if (error instanceof MaritimeAdapterError && KNOWN_MARITIME_FAILURES.has(error.code)) {
-    return { error_code: error.code, ambiguous: error.ambiguous !== false };
+    return { error_code: error.code, ambiguous: error.ambiguous !== false, ...metadata };
   }
-  return { error_code: 'READINESS_OPERATION_FAILED', ambiguous: true };
+  return { error_code: 'READINESS_OPERATION_FAILED', ambiguous: true, ...metadata };
 }
 
 // Observational continuity, NOT a provider-issued activation generation. A VM
@@ -622,8 +629,12 @@ export async function verifyReadinessCurrent({ config, evidence, runtimeDir, api
       if (abandoned && !cleanupOperation) fail('READINESS_RUN_ABANDONED');
       if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
       entry.status = 'complete'; entry.completed_at_ms = now(); await persist(); return value;
-    } catch {
+    } catch (error) {
       entry.status = 'unknown'; entry.completed_at_ms = now();
+      // Preserve diagnostics without changing verification's ambiguity decisions.
+      const { transport_code, diagnostic_code } = operationFailure(error);
+      if (transport_code !== undefined) entry.transport_code = transport_code;
+      if (diagnostic_code !== undefined) entry.diagnostic_code = diagnostic_code;
       if (dispatched && ['activation','sleep','runtime-read','continuity-check'].includes(kind)) ambiguous = true;
       if (!cleanupOperation) stop();
       await persist();

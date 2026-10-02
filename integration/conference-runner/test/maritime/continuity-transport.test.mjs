@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fixtureConfig } from '../../src/fixture.mjs';
-import { createMaritimeAdapter } from '../../src/maritime/transport.mjs';
+import { createMaritimeAdapter, MaritimeAdapterError } from '../../src/maritime/transport.mjs';
 import { poke, reply, discussion, discussionReply, jsonResponse } from './fixtures.mjs';
 
 // Synthetic API and verifier fixtures only. No runtime files, agents or chain
@@ -289,4 +289,37 @@ test('malformed certified options fail before any HTTP mutation and require the 
   }
   for (const maxAwake of [undefined, 6]) assert.throws(() => createMaritimeAdapter({ ...f.adapterOptions, maxAwake }), /MARITIME_RUNTIME_CONTINUITY_INVALID/);
   assert.deepEqual(f.calls, []);
+});
+
+
+test('certified wrappers preserve fixed failure metadata without changing ambiguity or replay', async () => {
+  for (const action of ['dispatch', 'diagnose']) for (const phase of ['verify', 'stage', 'sleep']) {
+    const fault = () => { const error = new MaritimeAdapterError('MARITIME_HTTP_502', {ambiguous:true});
+      error.message='private-certified-fixture';error.cause={private_key:'private-certified-fixture'};throw error; };
+    const f = await setup(phase === 'verify' ? {verify:fault} : phase === 'sleep' ? {sleep:fault} : {stageFailure:true});
+    const seat=f.config.roster[0],request=action==='dispatch'?poke('join',seat):diagnostic(f.config,seat);
+    const invoke=()=>f.adapter[action]({seat,request,deadline_at_ms:Date.now()+3000});
+    const code=phase==='verify'?'MARITIME_RUNTIME_CONTINUITY_FAILED':phase==='sleep'?'MARITIME_SLEEP_UNCONFIRMED':'MARITIME_PUBLIC_REQUEST_STAGE_FAILED';
+    const underlying=phase==='stage'?'MARITIME_NETWORK_OUTCOME_UNKNOWN':'MARITIME_HTTP_502';
+    const check=error=>{
+      assert.equal(error.code,code);assert.equal(error.ambiguous,true);assert.equal(error.retryable,false);
+      assert.equal(error.transport_code,underlying);assert.equal(error.diagnostic_code,underlying);
+      assert.equal(error.cause,undefined);assert.doesNotMatch(JSON.stringify(error),/private-certified|private_key|synthetic staging/);return true;
+    };
+    await assert.rejects(invoke(),check);
+    assert.equal(f.calls.filter(row=>row.kind==='chat').length,phase==='sleep'?1:0);
+    if(phase==='stage')assert.equal(f.calls.filter(row=>row.kind==='stage').length,1);
+    const count=f.calls.length;await assert.rejects(invoke(),check);assert.equal(f.calls.length,count);
+    await assert.rejects(f.dispatch(f.config.roster[1]),/MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED/);
+    assert.equal(f.calls.length,count);
+  }
+  for (const supplied of ['READINESS_MODEL_INVALID','READINESS_MODEL_INVALID_private-fixture']) {
+    const f=await setup({verify:async()=>{throw Object.assign(new Error('private-verifier-fixture'),{code:supplied});}});
+    await assert.rejects(f.dispatch(),error=>{
+      assert.equal(error.code,'MARITIME_RUNTIME_CONTINUITY_FAILED');assert.equal(error.ambiguous,true);
+      assert.equal(error.diagnostic_code,supplied==='READINESS_MODEL_INVALID'?supplied:undefined);
+      assert.equal(error.transport_code,undefined);assert.doesNotMatch(JSON.stringify(error),/private-fixture|private-verifier/);return true;
+    });
+    assert.equal(f.calls.filter(row=>row.kind==='chat').length,0);
+  }
 });

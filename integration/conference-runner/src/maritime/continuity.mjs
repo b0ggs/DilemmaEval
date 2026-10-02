@@ -3,6 +3,7 @@ import { posix } from 'node:path';
 import { PINNED_GAME_REVISION } from '../../../game-bridge/src/index.js';
 import { validateControlledRuntimeEvidence, runtimeEvidenceFingerprint } from '../readiness.mjs';
 import { verifyPublicArtifactIntegrity } from './install.mjs';
+import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './transport.mjs';
 import { buildDiagnosticReceiptReadCommand, validateDiagnosticReceipt } from './diagnostic-receipt.mjs';
 import { buildExecutionPermit, buildExecutionPermitStageCommand, executionPermitFingerprint } from './execution-permit.mjs';
 
@@ -12,7 +13,13 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) &&
   Object.keys(value).sort().join('\0') === [...keys].sort().join('\0');
 const equal = (left, right) => runtimeEvidenceFingerprint(left) === runtimeEvidenceFingerprint(right);
-function fail(code) { throw Object.assign(new Error(code), { code }); }
+function failureMetadata(error) {
+  const transport = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
+  const diagnostic = safeMaritimeDiagnosticCode(error?.diagnostic_code, safeMaritimeDiagnosticCode(error?.code));
+  return { ...(transport !== null ? { transport_code: transport } : {}),
+    ...(diagnostic !== null ? { diagnostic_code: diagnostic } : {}) };
+}
+function fail(code, error) { throw Object.assign(new Error(code), { code }, failureMetadata(error)); }
 
 function checkedArtifact(config, seat, evidence, artifacts) {
   const matches = artifacts.filter(artifact => artifact?.seat_id === seat.seat_id);
@@ -110,8 +117,8 @@ export function createRuntimeContinuity({ config, evidence, artifacts, hardStopA
       })]);
       time(deadline); return result;
     } catch (error) {
-      if (error?.code === 'READINESS_DEADLINE_EXPIRED') fail('READINESS_DEADLINE_EXPIRED');
-      fail(code);
+      if (error?.code === 'READINESS_DEADLINE_EXPIRED') fail('READINESS_DEADLINE_EXPIRED', error);
+      fail(code, error);
     } finally { clearTimeout(timer); }
   }
 
@@ -138,8 +145,12 @@ try {
     };
     await agent();
     // The module performing the incarnation check must itself be the pinned bytes.
-    try { await verifyPublicArtifactIntegrity(artifact, command => run(command, 'READINESS_ARTIFACTS_INVALID')); }
-    catch (error) { fail(error?.code === 'READINESS_DEADLINE_EXPIRED' ? error.code : 'READINESS_ARTIFACTS_INVALID'); }
+    let artifactFailure;
+    try { await verifyPublicArtifactIntegrity(artifact, async command => {
+      try { return await run(command, 'READINESS_ARTIFACTS_INVALID'); }
+      catch (error) { artifactFailure = failureMetadata(error); throw error; }
+    }); }
+    catch (error) { fail(error?.code === 'READINESS_DEADLINE_EXPIRED' ? error.code : 'READINESS_ARTIFACTS_INVALID', artifactFailure ?? error); }
     await instance();
     const direct = jsonResult(await run(artifact.inspect_command, 'READINESS_INSPECTION_FAILED'), 'READINESS_INSPECTION_FAILED');
     if (!exact(direct, ['schema_version', 'seat_id', 'wallet_address', 'chain_id', 'persistent_storage_writable', 'gameplay_execution_proven']) ||
@@ -167,8 +178,12 @@ try {
     }
     // Detect replacement or lifecycle changes while the checks ran. Player CLI
     // rechecks the incarnation inside its lock before any signing operation.
-    try { await verifyPublicArtifactIntegrity(artifact, command => run(command, 'READINESS_ARTIFACTS_INVALID')); }
-    catch (error) { fail(error?.code === 'READINESS_DEADLINE_EXPIRED' ? error.code : 'READINESS_ARTIFACTS_INVALID'); }
+    artifactFailure = undefined;
+    try { await verifyPublicArtifactIntegrity(artifact, async command => {
+      try { return await run(command, 'READINESS_ARTIFACTS_INVALID'); }
+      catch (error) { artifactFailure = failureMetadata(error); throw error; }
+    }); }
+    catch (error) { fail(error?.code === 'READINESS_DEADLINE_EXPIRED' ? error.code : 'READINESS_ARTIFACTS_INVALID', artifactFailure ?? error); }
     await instance(); await agent();
     return VERIFIED;
   }
@@ -190,7 +205,7 @@ try {
         envelope = buildExecutionPermit({ config: pinnedConfig, evidence: pinnedEvidence, artifact,
           request: pinnedRequest, expiresAtMs: Math.min(deadline, current + 300_000), nowMs: current, hardStopAtMs: endAtMs });
         command = buildExecutionPermitStageCommand({ artifact, permit: envelope });
-      } catch (error) { fail(error?.code === 'READINESS_DEADLINE_EXPIRED' ? error.code : 'READINESS_PERMIT_UNVERIFIED'); }
+      } catch (error) { fail(error?.code === 'READINESS_DEADLINE_EXPIRED' ? error.code : 'READINESS_PERMIT_UNVERIFIED', error); }
       const staged = jsonResult(await bounded(() => execute(structuredClone(command)), deadline, 'READINESS_PERMIT_UNVERIFIED'), 'READINESS_PERMIT_UNVERIFIED');
       if (!exact(staged, ['schema_version', 'staged', 'request_id', 'permit_sha256']) || staged.schema_version !== 1 ||
           staged.staged !== true || staged.request_id !== pinnedRequest.request_id ||

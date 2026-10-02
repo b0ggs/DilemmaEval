@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAgentPrompt, createMaritimeAdapter as rawMaritimeAdapter, reconcileRoster } from '../../src/maritime/index.mjs';
 import { buildPublicRequestArtifact, buildGameplayShellCommand, stagePublicRequest,
-  buildRuntimeDiagnosticArtifact, buildRuntimeDiagnosticShellCommand, createMaritimeAwakeLeasePool } from '../../src/maritime/transport.mjs';
+  buildRuntimeDiagnosticArtifact, buildRuntimeDiagnosticShellCommand, createMaritimeAwakeLeasePool,
+  safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../../src/maritime/transport.mjs';
 import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -945,4 +946,50 @@ test('an already-aborted unsent dispatch is safely retryable with the same reque
   assert.equal(calls.length, 0);
   assert.deepEqual(await adapter.dispatch({ seat: roster[0], request, signal: new AbortController().signal }), reply(request));
   assert.equal(calls.length, 1);
+});
+
+
+test('fixed Maritime metadata allowlists reject arbitrary codes without inspecting provider text', () => {
+  for (const code of ['MARITIME_HTTP_502', 'MARITIME_TIMEOUT', 'MARITIME_PUBLIC_REQUEST_STAGE_FAILED']) {
+    assert.equal(safeMaritimeErrorCode(code), code);
+    assert.equal(safeMaritimeDiagnosticCode(code), code);
+  }
+  for (const code of ['PLAYER_TOOL_FAILED', 'MARITIME_REPLY_PROTOCOL_INVALID', 'READINESS_MODEL_INVALID']) {
+    assert.equal(safeMaritimeErrorCode(code), null);
+    assert.equal(safeMaritimeDiagnosticCode(code), code);
+  }
+  for (const code of ['MARITIME_HTTP_599', 'MARITIME_HTTP_502_private-fixture', 'READINESS_PRIVATE_FIXTURE',
+    'PLAYER_TOOL_FAILED\nprivate-fixture', null, 502, {code:'MARITIME_HTTP_502'}]) {
+    assert.equal(safeMaritimeErrorCode(code), null);
+    assert.equal(safeMaritimeDiagnosticCode(code), null);
+    assert.equal(safeMaritimeErrorCode(code, 'fallback'), 'fallback');
+    assert.equal(safeMaritimeDiagnosticCode(code, 'fallback'), 'fallback');
+  }
+});
+
+test('staging wrappers retain fixed HTTP metadata and preserve existing retry and ambiguity semantics', async () => {
+  for (const action of ['dispatch', 'diagnose']) for (const status of [401, 502]) {
+    let calls = 0;
+    const adapter = rawMaritimeAdapter({config,apiKey:'fixture-credential',runtimeEvidence:runtimeEvidenceV2(),
+      diagnosticStageRetries:0,fetchImpl:async url => {
+        assert.ok(new URL(url).pathname.endsWith('/exec'), 'a failed stage never reaches chat');
+        calls++;
+        return new Response('private-provider-fixture', {status});
+      }});
+    const request = action === 'dispatch' ? poke('join') : diagnostic();
+    const invoke = () => adapter[action]({seat:roster[0],request});
+    const check = error => {
+      assert.equal(error.code, 'MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
+      assert.equal(error.ambiguous, false); assert.equal(error.retryable, false);
+      assert.equal(error.transport_code, `MARITIME_HTTP_${status}`);
+      assert.equal(error.diagnostic_code, `MARITIME_HTTP_${status}`);
+      assert.doesNotMatch(JSON.stringify(error), /private-provider-fixture/);
+      assert.equal(error.cause, undefined); return true;
+    };
+    await assert.rejects(invoke(), check);
+    const count = action === 'dispatch' && status === 502 ? 2 : 1;
+    assert.equal(calls, count);
+    await assert.rejects(invoke(), check);
+    assert.equal(calls, count, 'cached failed requests do not repeat their remote work');
+  }
 });
