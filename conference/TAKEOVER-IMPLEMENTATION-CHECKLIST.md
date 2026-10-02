@@ -47,7 +47,7 @@ This checklist replaces launch-first debugging. Do not create another game until
 - [x] Determine whether the third Hermes configuration write is required for a new activation generation or is an unintended replay. It is required after the confirmed sleep/reload generation boundary can rematerialize configuration.
 - [x] Correct the implementation or the invariant—not merely the assertion—and add a test proving ambiguous repair is inspected before any repeat mutation. The test also proves a stable rerun performs no fourth write.
 - [x] Make the conference-runner default test command deterministic. The package default now uses `--test-concurrency=1`.
-- [x] Run the conference-runner suite to zero failures and zero cancellations. Inherited 255/255 reproduced; October 2 final continuity/default suite: **518/518** (earlier diagnostic tranche 378/378).
+- [x] Run the conference-runner suite to zero failures and zero cancellations. Inherited 255/255 reproduced; October 2 post-live-boundary correction/default suite: **520/520** (previous continuity tranche 518/518; earlier diagnostic tranche 378/378).
 - [x] Run the site suite and the changed shared package suites: game bridge, harness adapters, Maritime transport, orchestrator core, and team logs. October 2 default suites: **199/199**, zero failures or cancellations.
 - [x] Run `git diff --check`.
 
@@ -76,13 +76,13 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 ### 3.3 Fresh evidence
 
-- [x] Implement the durable all-ten readiness-v2 producer with run/config/roster/source/artifact/chain/model/lifecycle bindings, independent sanitized CLI receipts, exclusive external state, and atomic evidence publication. Repeated fixture runs pass; no live readiness record has been collected.
+- [x] Implement the durable all-ten readiness-v2 producer with run/config/roster/source/artifact/chain/model/lifecycle bindings, independent sanitized CLI receipts, exclusive external state, and atomic evidence publication. Repeated fixture runs pass. October 2 real diagnostics passed both modes for hs-1, then stopped on an unknown hs-2 runtime exec; no all-ten readiness record was published.
 - [x] Enforce a short maximum evidence age, initially ten minutes, at game preparation and again immediately before creation.
 - [x] Reject changed roster/config/artifacts/runtime/transport/model/chain/defaults and observed mixed generations in local tests. `activation_generation` identifies a durable diagnostic-run activation intent. Producer v2 uses observed-runtime-continuity-v1: fresh VM-incarnation/source/model/wallet checks and both original diagnostic receipts after every resume. Provider generation attestation remains false; timestamps are never substituted for generation.
 - [x] Require all ten seats and both diagnostic modes in one bounded run; missing seats, stale results, private fields, model-only replies, timeouts and incomplete publication fail local fixtures.
-- [x] Require final sleeping inventory plus per-seat sleep response/readback. Unresolved lifecycle operations or abort-ignoring late work prevent readiness; interrupted runs are inspectable without replay. These are local fixture results; fresh live sleep evidence remains required.
+- [x] Require final sleeping inventory plus per-seat sleep response/readback. Unresolved lifecycle operations or abort-ignoring late work prevent readiness; interrupted runs are inspectable without replay. October 2 live cleanup observed all ten sleeping, but an unknown hs-2 runtime-read invalidates certainty. The local correction conservatively blocks certification and retains only allowlisted error codes; its targeted and complete default regressions passed. Fresh all-ten live sleep evidence remains required.
 
-**Live exit condition remains unmet:** no live diagnostic run has occurred. Producer v2 fixture evidence is explicitly `diagnostics_complete:true`, `remote_generation_attested:false`, and ready only under the observed-runtime continuity policy. Preparation and final creation perform separate durable all-ten wake/inspect/sleep checks against the unchanged original digest. Read-only status cannot establish runtime continuity. An invisible restore to identical state is not distinguishable and is not claimed as provider attestation.
+**Live exit condition remains unmet:** the October 2 authorized run passed two diagnostics on hs-1, then stopped before hs-2 chat on an unknown runtime-integrity exec. All ten were observed sleeping afterward, but unresolved execution prevents sleep certification. No all-ten readiness evidence was published. Producer v2 fixture evidence is explicitly `diagnostics_complete:true`, `remote_generation_attested:false`, and ready only under the observed-runtime continuity policy. Preparation and final creation perform separate durable all-ten wake/inspect/sleep checks against the unchanged original digest. Read-only status cannot establish runtime continuity. An invisible restore to identical state is not distinguishable and is not claimed as provider attestation.
 
 **Exit condition:** all ten agents pass the exact chat-to-tool-to-stdin path without a transaction, and the creation path refuses missing, stale, mixed-generation, or mismatched evidence.
 
@@ -95,7 +95,7 @@ This checklist replaces launch-first debugging. Do not create another game until
 - [x] Add a regression for the Game 17 shape: one transport failure, nine late successful outcomes, and complete evidence for all ten attempted seats.
 - [x] Bind the one-game creation fuse to the exact config digest and fresh readiness-evidence digest.
 - [x] Refuse preparation/creation for unresolved operator transactions, any pending owner/player nonce, an active game, or unrelated live locks. The creation guard accepts only exact in-memory ownership descriptors for the intended runner/operator and rechecks them before submission.
-- [x] Add versioned `conference-control.mjs` diagnostic/plan/status/proof-preparation commands with explicit paths and absolute deadlines. Historical launch entrypoints are disabled; no game-creation CLI is exposed while remote generation remains unverifiable.
+- [x] Add versioned `conference-control.mjs` diagnostic/plan/status/proof-preparation commands with explicit paths and absolute deadlines. Historical launch entrypoints are disabled. Version 2 exposes guarded `proof-run` under observed continuity, durable all-ten revalidation and independent audit; no live creation is authorized by its availability.
 - [x] Require a fresh exclusive external directory and refuse to overwrite existing fuses, journals, evidence or runtime state; partial writes remain for inspection.
 - [x] Add local read-only `plan`/`status` with no credentials/network/writes, plus read-only proof checks. Only allowlisted error codes cross the CLI; signing keys are never loaded.
 - [x] Keep `candidate_proof_complete` non-authoritative. Only the independent chain/Telegram audit may mark a proof complete.
@@ -129,9 +129,9 @@ This phase is read-only except for waking/configuring agents as required by the 
 - [ ] Confirm exactly one designated live operator and no stale local runner, signer, proof helper, or spectator process.
 - [ ] Refresh Base Sepolia chain ID, contract code hash, owner, auth/registry wiring, active game, current game ID, defaults, admissions, causes, balances, and confirmed block.
 - [ ] Confirm 10/10 defaults and the reviewed entry fee/timing values. Do not reconfigure them merely because old documentation differs.
-- [ ] Confirm latest and pending nonces match for the owner and all ten players.
-- [ ] Confirm the ten expected Maritime agents exist with no unknown replacement or unrelated awake capacity consumer.
-- [ ] Review/update the exact deployed artifacts without replacing agents or private state, then run the complete Phase 3 readiness gate for all ten seats in an authorized diagnostic window.
+- [ ] Confirm latest and pending nonces match for the owner and all ten players. The preserved matching owner journal was located October 2 with 46 confirmed-stage records and one broadcast-stage record; canonical receipt/nonce reconciliation remains required, with no journal reset.
+- [x] Confirm the ten expected Maritime agents exist with no unknown replacement or unrelated awake capacity consumer. October 2 authorized observations matched all ten; unrelated awake count zero. Recheck before every activation/creation.
+- [ ] Review/update the exact deployed artifacts without replacing agents or private state, then run the complete Phase 3 readiness gate for all ten seats in an authorized diagnostic window. October 2: all ten public artifacts refreshed, hash/flush verified and independently audited; hs-1 both modes passed, hs-2 runtime-integrity request unknown, no all-ten certificate. See [live observation](evidence/live-diagnostic-preflight-2026-10-02.json).
 - [ ] Verify both Telegram destinations, existing pinned message IDs, spectator permissions, fresh outbox identity, and scoreboard series identity.
 - [ ] Have an independent reviewer inspect the gate results, creation fuse inputs, deadlines, cleanup path, and absence of unresolved ambiguity.
 - [ ] Start the single owner/operator only after every preceding item passes.

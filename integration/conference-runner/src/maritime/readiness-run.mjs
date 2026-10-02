@@ -6,7 +6,7 @@ import { REPOSITORY_ROOT } from '../config.mjs';
 import { atomicWrite } from '../runner/store.mjs';
 import { configFingerprint, rosterFingerprint, runtimeEvidenceFingerprint, TRANSPORT_FINGERPRINT,
   RUNTIME_EVIDENCE_MAX_AGE_MS, buildControlledRuntimeEvidence, validateControlledRuntimeEvidence } from '../readiness.mjs';
-import { createMaritimeAdapter, maritimeRequest } from './transport.mjs';
+import { createMaritimeAdapter, maritimeRequest, MaritimeAdapterError } from './transport.mjs';
 import { verifyPublicArtifactIntegrity } from './install.mjs';
 import { reconcileRoster, validateMaritimeRoster } from './roster.mjs';
 import { buildDiagnosticReceiptReadCommand, validateDiagnosticReceipt } from './diagnostic-receipt.mjs';
@@ -20,6 +20,20 @@ const MODEL = Object.freeze({ model_endpoint: 'https://api.maritime.sh/api/llm/v
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) &&
   Object.keys(value).sort().join('\0') === [...keys].sort().join('\0');
+const KNOWN_MARITIME_FAILURES = new Set([
+  'MARITIME_TIMEOUT', 'MARITIME_NETWORK_OUTCOME_UNKNOWN', 'MARITIME_RESPONSE_INVALID',
+  'MARITIME_RESPONSE_TOO_LARGE', 'MARITIME_HTTP_ERROR',
+  ...[400,401,403,404,405,408,409,410,413,414,415,422,425,429,431,451,
+    500,501,502,503,504,505,507,508,510,511].map(status => `MARITIME_HTTP_${status}`)
+]);
+function operationFailure(error) {
+  // Provider messages and even code-shaped strings are untrusted. Only the
+  // adapter's exact bounded vocabulary may enter this public failure record.
+  if (error instanceof MaritimeAdapterError && KNOWN_MARITIME_FAILURES.has(error.code)) {
+    return { error_code: error.code, ambiguous: error.ambiguous !== false };
+  }
+  return { error_code: 'READINESS_OPERATION_FAILED', ambiguous: true };
+}
 
 // Observational continuity, NOT a provider-issued activation generation. A VM
 // snapshot can preserve these values. Current-generation revalidation therefore
@@ -278,8 +292,9 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
           if (now() >= deadline()) fail('READINESS_DEADLINE_EXPIRED');
           entry.status = 'complete'; entry.completed_at_ms = now(); await persist();
           return result;
-        } catch {
+        } catch (error) {
           entry.status = 'unknown'; entry.completed_at_ms = now();
+          Object.assign(entry, operationFailure(error));
           if (abandoned && !cleanupOperation) fail('READINESS_OPERATION_FAILED');
           await persist(); fail('READINESS_OPERATION_FAILED');
         }
@@ -422,7 +437,9 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
           try { await sleep(seat); } catch { /* fixed failure below; never emit raw provider exceptions */ }
         }
         try { journal.all_seats_sleeping = (await getInventory()).seats.every(row => row.status === 'sleeping') && !lifecycleAmbiguous &&
-          !journal.operations.some(row => ['activation-intent','sleep','diagnostic-chat','diagnostic-validation'].includes(row.kind) && row.status === 'unknown'); }
+          !journal.operations.some(row => row.status === 'unknown' &&
+            (['activation-intent','sleep','diagnostic-chat','diagnostic-validation'].includes(row.kind) ||
+              row.kind === 'runtime-read' && row.ambiguous !== false)); }
         catch { journal.all_seats_sleeping = false; }
         journal.status = 'failed'; await persist();
         fail(journal.all_seats_sleeping ? 'READINESS_RUN_FAILED' : 'READINESS_RUN_FAILED_SLEEP_UNCONFIRMED');

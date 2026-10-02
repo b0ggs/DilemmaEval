@@ -9,6 +9,7 @@ import { buildInstallArtifact } from '../src/maritime/install.mjs';
 import { createReadinessRun, validateReadinessRunState, verifyReadinessCurrent, READINESS_FILES,
   RUNTIME_INSTANCE_COMMAND } from '../src/maritime/readiness-run.mjs';
 import { validateRuntimeDiagnosticInput } from '../src/maritime/protocol.mjs';
+import { MaritimeAdapterError } from '../src/maritime/transport.mjs';
 import { main as playerCli } from '../src/maritime/player-cli.mjs';
 import { writeDiagnosticReceipt, diagnosticReceiptPath } from '../src/maritime/diagnostic-receipt.mjs';
 import { validateControlledRuntimeEvidence, runtimeEvidenceFingerprint } from '../src/readiness.mjs';
@@ -493,6 +494,88 @@ test('mixed runtime instance, changed model and deployed artifact corruption inv
     assert.equal(f.calls.filter(row=>row.path.endsWith('/reload-env')).length,1);
     assert.equal(f.calls.filter(row=>row.path.endsWith('/sleep')).length,1);
   }
+});
+
+test('unknown runtime exec prevents confirmed sleep after cleanup and cannot publish or replay readiness',async t=>{
+  let failedReads=0;
+  const target=roster[1];
+  const f=await fixture(t,{onCall:({path,seat})=>{
+    if(path.endsWith('/exec')&&seat.seat_id===target.seat_id) {
+      failedReads++;throw new Error('unpublished runtime provider connection detail');
+    }
+  }});
+  await assert.rejects(f.runner.run(),error=>error.message==='READINESS_RUN_FAILED_SLEEP_UNCONFIRMED');
+  assert.equal(failedReads,1,'the uncertain exec is never retried');
+  assert.deepEqual(f.cliInputs.map(row=>row.seat_id),[roster[0].seat_id,roster[0].seat_id],
+    'the first seat completed both diagnostics; the failed second seat never reached chat');
+  assert.ok(f.agents.every(row=>row.status==='sleeping'),'cleanup and final inventory did observe sleeping agents');
+  const file=join(f.runtimeDir,READINESS_FILES.journal),saved=await readFile(file,'utf8'),journal=JSON.parse(saved);
+  const failed=journal.operations.filter(row=>row.status==='unknown');
+  assert.equal(failed.length,1);
+  assert.equal(failed[0].kind,'runtime-read');assert.equal(failed[0].seat_id,target.seat_id);
+  assert.equal(failed[0].error_code,'MARITIME_NETWORK_OUTCOME_UNKNOWN');assert.equal(failed[0].ambiguous,true);
+  assert.equal(journal.status,'failed');assert.equal(journal.all_seats_sleeping,false);
+  assert.equal((await f.runner.status()).all_seats_sleeping,false);
+  assert.equal(f.calls.filter(row=>row.path.endsWith('/sleep')).length,2);
+  assert.doesNotMatch(saved,/unpublished runtime provider connection detail/);
+  await assert.rejects(readFile(join(f.runtimeDir,READINESS_FILES.evidence)),/ENOENT/);
+  await assert.rejects(readFile(join(f.runtimeDir,READINESS_FILES.state)),/ENOENT/);
+  await assert.rejects(createReadinessRun(f.runOptions).run(),/DIRECTORY_ALREADY_EXISTS/);
+  const before=f.calls.length;
+  f.agents[1].status='active'; // A simulated late exec demonstrates why the observation was insufficient.
+  assert.equal((await f.runner.status()).all_seats_sleeping,false);
+  assert.equal(f.calls.length,before);assert.equal(await readFile(file,'utf8'),saved);
+});
+
+test('failed operation metadata retains only exact adapter codes and never provider-shaped secrets',async t=>{
+  const secret='unpublished-provider-private-key-fixture';
+  const cases=[
+    {name:'http',expected:'MARITIME_HTTP_503',ambiguous:true,
+      fail:()=>new Response(secret,{status:503})},
+    {name:'rejected',expected:'MARITIME_HTTP_401',ambiguous:false,
+      fail:()=>new Response(secret,{status:401})},
+    {name:'timeout',expected:'MARITIME_TIMEOUT',ambiguous:true,fail:()=>{
+      const error=new MaritimeAdapterError('MARITIME_TIMEOUT',{ambiguous:true});
+      error.message=secret;error.cause={private_key:secret};throw error;
+    }},
+    {name:'untrusted-code',expected:'MARITIME_NETWORK_OUTCOME_UNKNOWN',ambiguous:true,fail:()=>{
+      throw Object.assign(new Error(secret),{code:'MARITIME_HTTP_503',ambiguous:false});
+    }},
+    {name:'typed-private-code',expected:'READINESS_OPERATION_FAILED',ambiguous:true,fail:()=>{
+      throw new MaritimeAdapterError(`MARITIME_HTTP_503_${secret}`,{ambiguous:false});
+    }},
+    {name:'typed-unknown-code',expected:'READINESS_OPERATION_FAILED',ambiguous:true,fail:()=>{
+      throw new MaritimeAdapterError('MARITIME_HTTP_599',{ambiguous:false});
+    }}
+  ];
+  for(const row of cases) {
+    let reached=0;
+    const f=await fixture(t,{onCall:({path})=>{
+      if(path.endsWith('/exec')){reached++;return row.fail();}
+    }});
+    await assert.rejects(f.runner.run(),error=>error.message===(row.ambiguous?
+      'READINESS_RUN_FAILED_SLEEP_UNCONFIRMED':'READINESS_RUN_FAILED'));
+    assert.equal(reached,1,row.name);
+    const saved=await readFile(join(f.runtimeDir,READINESS_FILES.journal),'utf8'),journal=JSON.parse(saved);
+    const failed=journal.operations.filter(operation=>operation.status==='unknown');
+    assert.equal(failed.length,1,row.name);
+    assert.equal(failed[0].error_code,row.expected,row.name);assert.equal(failed[0].ambiguous,row.ambiguous,row.name);
+    assert.deepEqual(Object.keys(failed[0]).sort(),[
+      'sequence','kind','seat_id','status','started_at_ms','completed_at_ms','error_code','ambiguous'].sort());
+    assert.equal(journal.all_seats_sleeping,!row.ambiguous,row.name);
+    assert.ok(f.agents.every(agent=>agent.status==='sleeping'));
+    assert.doesNotMatch(saved,/unpublished-provider|private_key|MARITIME_HTTP_599/);
+    assert.equal(f.cliInputs.length,0);assert.equal(f.calls.filter(call=>call.path.endsWith('/sleep')).length,1);
+    await assert.rejects(readFile(join(f.runtimeDir,READINESS_FILES.evidence)),/ENOENT/);
+  }
+  const f=await fixture(t,{chain:{preflight:async()=>{
+    throw Object.assign(new Error(secret),{code:'MARITIME_HTTP_503',ambiguous:false});
+  }}});
+  await assert.rejects(f.runner.run(),/READINESS_RUN_FAILED/);
+  const saved=await readFile(join(f.runtimeDir,READINESS_FILES.journal),'utf8'),journal=JSON.parse(saved);
+  const failed=journal.operations.find(row=>row.status==='unknown');
+  assert.equal(failed.kind,'chain-preflight');assert.equal(failed.error_code,'READINESS_OPERATION_FAILED');
+  assert.equal(failed.ambiguous,true);assert.doesNotMatch(saved,/unpublished-provider|MARITIME_HTTP_503/);
 });
 
 test('unknown wake, unknown sleep and deadlines never replay; failure cleanup stays bounded',async t=>{

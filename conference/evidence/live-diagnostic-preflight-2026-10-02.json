@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "live-diagnostic-preflight-observation",
+  "status": "blocked",
+  "source_checkpoint": "639601f",
+  "authorization": {
+    "scope": "bounded existing-ten-agent runtime refresh and no-transaction diagnostics",
+    "started_at": "2026-10-02T16:18:47.149Z",
+    "activation_chat_cutoff": "2026-10-02T16:43:47.149Z",
+    "cleanup_hard_stop": "2026-10-02T16:48:47.149Z",
+    "external_operations_stopped_at": "2026-10-02T16:35:30.272Z"
+  },
+  "chain": {
+    "chain_id": 84532,
+    "game_address": "0x42892BEc3d1d926Db25FfB6A144ee363AaE40A1a",
+    "block_number": "47594872",
+    "block_hash": "0x8bdd005ef5ebe6bef40f1ffd90cc0a1e3cc592cb65b4a89ed5ae687337ddbf1b",
+    "code_hash": "0x0229b422ca8d4c8262ac3aab7fffc68e9a556c4f5a4fdeae36bc5d395cb90742",
+    "active_game_id": "0",
+    "config": {
+      "entryFeeWei": "100000000000000",
+      "creatorFeeBps": "100",
+      "causeFeeBps": "100",
+      "joinDurationSeconds": "300",
+      "commitDurationBlocks": "300",
+      "revealDurationBlocks": "180",
+      "minPlayers": "10",
+      "maxPlayers": "10",
+      "maxCauses": "2"
+    }
+  },
+  "player_admissions": 10,
+  "public_runtime_refresh": {
+    "completed_seats": 10,
+    "uncertain_operations": 0,
+    "sleep_confirmed_seats": 10,
+    "independent_local_audit": "passed",
+    "artifacts": [
+      {
+        "seat_id": "hs-1",
+        "artifact_sha256": "2a1e3078690e048d5c87b2554a7c1798c8179860b5af3143adf4a73ce1acb688",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "hs-2",
+        "artifact_sha256": "0298c843253336d43a7b1685edded09a6c856927abea45ea42b2f2e0afff137f",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "hs-3",
+        "artifact_sha256": "a732a799cc793da7deed0b071567722a77c854d5011ef5e1758dfd7e92f2e6fb",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "hs-4",
+        "artifact_sha256": "c3d310c35ff833a2ca5a7b61452706235acc523fa4da42af598fac6ca597820b",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "hs-5",
+        "artifact_sha256": "62b85c2f8ccb7995371dfa6af0a72d4dea8c27b3633d5022fa52fccdd8ad217e",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "oc-1",
+        "artifact_sha256": "c50dada02613a5ef0286c889f9a9ab7a7234a27ee3744b9c7a2a3af1fb8408e0",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "oc-2",
+        "artifact_sha256": "2faffddff89acecdb242aff5357dafefabf659a88a56f5d97935d04c4a2d9585",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "oc-3",
+        "artifact_sha256": "61e94e97d7e7996dda02bf95e0a164881434fd06ff27501a62ad42ce6d84e038",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "oc-4",
+        "artifact_sha256": "c0f09a692a9ce269ba51f30f33dafca299d07b72431b5b58587a3073ca3b23d9",
+        "sleep_confirmed": true
+      },
+      {
+        "seat_id": "oc-5",
+        "artifact_sha256": "41c0e5ff32c11d8f3a47df6b8a96cebd1b22904e576d2b84597f47b03a59adf9",
+        "sleep_confirmed": true
+      }
+    ]
+  },
+  "diagnostics": {
+    "attempted_chats": 2,
+    "completed_chats": 2,
+    "validated_modes": [
+      {
+        "seat_id": "hs-1",
+        "modes": [
+          "gameplay-input",
+          "commit-input"
+        ]
+      }
+    ],
+    "failed_seat": "hs-2",
+    "failed_sequence": 48,
+    "failed_boundary": "first public artifact hash exec after confirmed reload-env activation",
+    "operation_status": "unknown",
+    "provider_cause_retained": false,
+    "readiness_evidence_written": false,
+    "ready_for_game": false
+  },
+  "cleanup": {
+    "observed_at": "2026-10-02T16:35:30.272Z",
+    "all_ten_observed_sleeping": true,
+    "account_awake_count": 0,
+    "unresolved_runtime_request": true,
+    "confirmed_sleep_certification": false,
+    "coordinator_reporting_defect": "Original failed journal overstates sleep certainty by excluding unknown runtime-read; original record is preserved."
+  },
+  "game_created": false,
+  "transaction_attempted": false,
+  "telegram_message_attempted": false,
+  "models_changed": false,
+  "agents_replaced": false,
+  "private_state_replaced": false,
+  "evidence_sha256": {
+    "authorization.json": "67bc6ebf62a9acc7f1abf691af4198510402e66aa540db8f4461136918c24150",
+    "chain-preflight.json": "4dd66696aab1b466c16f75bfa41f53b4ed2378334d47f7173bddf8cc7fc79cbf",
+    "refresh-results.json": "6799a07e011dc0f921fc50348df1142a788e37f79d3dc6cbb7876519a36436ec",
+    "refresh-operations.json": "e0977c5ed47155f23832c6f3f8125a3758914494554639e3fac38356371ea057",
+    "diagnostic-plan.json": "9b61eb14790e0922ef2e6f2c004ade5b814c0af006e2eea8c86e6a388dea8557",
+    "diagnostic/readiness-journal.json": "9326cbba3b5a3631a2c3a6810f8287123b5774af20495c48b6cf41e59fafdec9",
+    "final-observation.json": "b168bb9be2d097caf1235b0cdaf9a570b998e944578845fef4f70b1a8a5f2acd"
+  },
+  "preserved_operator_journal": {
+    "read_only": true,
+    "record_count": 47,
+    "confirmed_stage_count": 46,
+    "broadcast_stage_count": 1,
+    "chain_receipts_rechecked": false,
+    "journal_modified": false,
+    "ready_for_game": false
+  },
+  "followup_local_correction": {
+    "unknown_runtime_exec_blocks_sleep_certification": true,
+    "failure_codes_allowlisted": true,
+    "targeted_tests_passed": 4,
+    "independent_review_tests_passed": 3,
+    "default_runner_tests_passed": 520,
+    "default_site_shared_tests_passed": 199,
+    "default_test_failures": 0,
+    "live_retested": false
+  }
+}

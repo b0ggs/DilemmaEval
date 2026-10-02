@@ -1,6 +1,6 @@
 # Canonical conference status
 
-**As of:** October 2, 2026 local takeover implementation
+**As of:** October 2, 2026 authorized live diagnostic preflight
 
 **Active target:** one independently audited 5v5 game using the five existing OpenClaw agents and five existing Hermes agents on Base Sepolia.
 
@@ -22,13 +22,14 @@ These attempts establish that agent inventory, model/tool probes, and isolated c
 
 ## Safe checkpoint
 
-- Current continuity/execution implementation checkpoint: `641f4ee` (`Complete runtime continuity and guarded 5v5 proof execution`). All **717** documented default tests passed; all **32** intended files passed Gitleaks with zero findings, and the staged whitespace check passed.
+- Latest local correction: unknown runtime exec now blocks sleep certification and records only allowlisted failure metadata. Complete documented suites passed **520/520 runner + 199/199 site/shared = 719/719**, with zero failures, cancellations or skips. This correction has not been rerun against live agents.
+- Previous continuity/execution implementation checkpoint: `641f4ee` (`Complete runtime continuity and guarded 5v5 proof execution`). All **717** documented default tests passed; all **32** intended files passed Gitleaks with zero findings, and the staged whitespace check passed.
 - Previous diagnostic implementation checkpoint: `7d8e025` (`Implement durable ten-seat diagnostics and audited fixture coverage`), with all 577 documented default tests passing and all 36 intended files scanned before commit.
 - Recoverable source checkpoint: commit `688f3b9` (`Checkpoint conference implementation before takeover hardening`), created after the intended tree passed the takeover secret scan.
 - Takeover-hardening implementation: commit `8d0656f` (`Harden conference prelaunch diagnostics and proof evidence`), with the deterministic local baseline and no live mutations.
 - Canonical status checkpoint `c54b8b0` was verified before this tranche; the branch and starting working tree matched the handoff.
-- Latest historical read-only Base Sepolia observation (September 25): Game 17 is terminal and `active_game_id` is `0`.
-- All ten existing Maritime agents were observed sleeping at that historical checkpoint. Do not replace or reprovision them.
+- Latest read-only Base Sepolia observation (October 2, block `47594872`): `active_game_id` is `0`, defaults require 10/10 players, and all ten players are admitted with whitelisted causes.
+- All ten existing Maritime agents were observed sleeping at `2026-10-02T16:35:30.272Z`. An uncertain diagnostic runtime request remains unresolved; this observation is not readiness or guaranteed lifecycle certainty. Do not replace or reprovision the agents.
 - A completed 5v5 game remains unproven. No further game should be created from the historical launch instructions or expired execution windows.
 
 ## October 2 continuation
@@ -43,10 +44,18 @@ The version 2 [operator CLI](../integration/conference-runner/README.md#current-
 
 Only the separate independent chain and scoreboard audit can mark a proof complete. Repeated fixtures cover discussion, joins, commits, reveals, results, claims/refunds, capacity, failures, restart recovery, Telegram isolation/recovery, scoreboards, and deliberate audit corruption.
 
+## October 2 live preflight
+
+The user authorized the reviewed 30-minute existing-agent preflight. The fixed window began `16:18:47.149Z`, with an activation/chat cutoff at `16:43:47.149Z` and cleanup hard stop at `16:48:47.149Z`. External operations stopped early after failure; these deadlines must not be reused or extended.
+
+All ten existing identities, roots, public settings, operations manifest, pinned mini model and provider route matched. The lead refreshed only declared public runtime artifacts, enabled execution permits, verified hashes and durable flushes, and confirmed each sleep. Independent local audit matched all ten deployed artifact digests to the repository CLI plan: 191 returned operations, zero uncertain refresh operations, and all ten sleeping. No installer, dependency reinstall, game checkout replacement, model change, private-state replacement, new agent, signing, game, or Telegram message was used.
+
+The real repository diagnostic CLI then passed both `gameplay-input` and `commit-input` for **hs-1**, including independently validated CLI receipts. It stopped on **hs-2** at the first public-artifact hash exec after confirmed environment reload. That request became unknown after 530 ms; the provider cause was not retained. No hs-2 chat was sent. Total diagnostic chats: **2**, not 20. No readiness-v2 certificate was published.
+
+Cleanup sleep/readbacks and a separate final read observed all ten sleeping. The original failed journal incorrectly labels sleep as confirmed despite the unknown `runtime-read`; it is preserved unchanged. The [sanitized observation](evidence/live-diagnostic-preflight-2026-10-02.json) explicitly retains that uncertainty. A narrow local correction retains only fixed allowlisted failure codes and prevents unknown runtime exec from establishing sleep certainty. Targeted regressions and independent review passed, followed by **520/520 runner and 199/199 site/shared default tests**. The seven intended files passed Gitleaks with zero findings and `git diff --check`. The correction is local only; no second live attempt was made. No uncertain request was replayed.
+
 ## Remaining live gate
 
-**A correct live 5v5 game is still unproven.** No agent wake, model call, install, transaction, game, Telegram message, or live-state observation has occurred during this continuation. The historical sleeping/idle observations above remain historical.
+**A correct live 5v5 game is still unproven.** The immediate blocker is the unresolved hs-2 runtime-integrity request, followed by the missing nine-seat exact-path diagnostics. The next controlled operation must reconcile that boundary and run a fresh complete all-ten diagnostic with new deadlines and evidence; the stopped run cannot be resumed or promoted into readiness. The prior authorization does not permit replay of uncertain work or more than its 20-chat budget.
 
-Local read-only input review matched all ten identities in the committed 5v5 config to the preserved canonical launch records and recovered all ten recorded installation roots. The historical temporary prepared-proof directory is absent. Its execution window is expired; operator journal and scoreboard/outbox locations still need to be located or explicitly reconciled. No private state was changed.
-
-Before a live diagnostic window, review the exact public config and artifact plan against the existing ten installed roots and refresh the changed player source/settings only under explicit authorization, preserving private state. Run one bounded all-ten no-transaction diagnostic and confirm sleep. Then, within fresh evidence lifetime, refresh chain/code/defaults/admissions/causes/balances/nonces, process ownership/operator journal, and Telegram rooms/pins/permissions/outbox/scoreboard identity; run durable preparation and obtain an independent gate review. A separately authorized bounded one-game window may then use `proof-run`, followed by `proof-audit` and cleanup. No existing authorization permits these live mutations, and no historical launch command/window is reusable.
+A local read-only follow-up located the preserved owner journal: 47 records, with 46 in confirmed stage and one still in broadcast stage. Its receipts have not been refreshed, so that record is an additional creation blocker. Four outbox candidates were located; the required scoreboard/series bindings remain unresolved, and the historical temporary proof directory is absent. Before game authorization, reconcile those preserved records without resetting them. Refresh chain/code/defaults/admissions/causes/balances/nonces, process ownership, and Telegram rooms/pins/permissions/series identity. Run durable preparation and independent gate review against fresh all-ten readiness, then revalidate the same evidence digest and continuity immediately before creation. A game requires separate authorization and an independent audit afterward. No historical launch command or expired execution window is reusable.
