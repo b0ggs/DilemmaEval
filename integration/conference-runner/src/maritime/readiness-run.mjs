@@ -7,7 +7,7 @@ import { REPOSITORY_ROOT } from '../config.mjs';
 import { atomicWrite } from '../runner/store.mjs';
 import { configFingerprint, rosterFingerprint, runtimeEvidenceFingerprint, TRANSPORT_FINGERPRINT,
   RUNTIME_EVIDENCE_MAX_AGE_MS, buildControlledRuntimeEvidence, validateControlledRuntimeEvidence } from '../readiness.mjs';
-import { createMaritimeAdapter, maritimeRequest, MaritimeAdapterError } from './transport.mjs';
+import { createMaritimeAdapter, createMaritimeAwakeLeasePool, maritimeRequest, MaritimeAdapterError } from './transport.mjs';
 import { verifyPublicArtifactIntegrity } from './install.mjs';
 import { reconcileRoster, validateMaritimeRoster } from './roster.mjs';
 import { buildDiagnosticReceiptReadCommand, validateDiagnosticReceipt } from './diagnostic-receipt.mjs';
@@ -192,21 +192,49 @@ function chainFacts(value, config) {
     chain_defaults_fingerprint: runtimeEvidenceFingerprint(value.config) };
 }
 
-async function bounded(operation, deadline, now) {
+async function bounded(operation, deadline, now, signal) {
   if (!Number.isSafeInteger(deadline) || now() >= deadline) fail('READINESS_DEADLINE_EXPIRED');
-  let timer;
+  if (signal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
+  let timer, onAbort;
   try {
     return await Promise.race([Promise.resolve().then(operation), new Promise((_, reject) => {
       timer = setTimeout(() => reject(Object.assign(new Error('READINESS_DEADLINE_EXPIRED'), { code: 'READINESS_DEADLINE_EXPIRED' })),
         Math.max(1, deadline - now()));
-    })]);
-  } finally { clearTimeout(timer); }
+    }), ...(signal ? [new Promise((_, reject) => {
+      onAbort = () => reject(new Error('READINESS_VERIFICATION_ABORTED'));
+      if (signal.aborted) onAbort(); else signal.addEventListener('abort', onAbort, {once:true});
+    })] : [])]);
+  } finally { clearTimeout(timer); if (onAbort) signal.removeEventListener('abort', onAbort); }
 }
 
 const defaultWait = (milliseconds, { signal } = {}) => delay(milliseconds, undefined, { signal });
 function validateActivationWait(wakeDelayMs, waitImpl) {
   if (!Number.isInteger(wakeDelayMs) || wakeDelayMs < 0 || wakeDelayMs > 60_000) fail('READINESS_WAKE_DELAY_INVALID');
   if (typeof waitImpl !== 'function') fail('READINESS_WAIT_INVALID');
+}
+
+function validateAwakeLimit(maxAwake) {
+  if (!Number.isInteger(maxAwake) || maxAwake < 1 || maxAwake > 5) fail('READINESS_MAX_AWAKE_INVALID');
+}
+
+function trackOperations(perform) {
+  const pending = new Set();
+  const operation = (...args) => {
+    const promise = perform(...args);
+    pending.add(promise);
+    promise.then(() => pending.delete(promise), () => pending.delete(promise));
+    return promise;
+  };
+  return { operation, async drain() { while (pending.size) await Promise.allSettled([...pending]); } };
+}
+
+async function runSeats(seats, task, stop) {
+  const results = await Promise.allSettled(seats.map(async (seat, index) => {
+    try { return await task(seat, index); }
+    catch (error) { stop(); throw error; }
+  }));
+  if (results.some(result => result.status === 'rejected')) fail('READINESS_OPERATION_FAILED');
+  return results.map(result => result.value);
 }
 
 async function settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, signal }) {
@@ -220,12 +248,14 @@ async function settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, sign
 
 /** Construction, plan and status never read credentials or contact Maritime. */
 export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs, cleanupDeadlineAtMs,
-  apiKey, chain, fetchImpl = globalThis.fetch, now = Date.now, wakeDelayMs = 10_000, waitImpl = defaultWait } = {}) {
+  apiKey, chain, fetchImpl = globalThis.fetch, now = Date.now, wakeDelayMs = 10_000, waitImpl = defaultWait,
+  maxAwake = 5, signal } = {}) {
   validateMaritimeRoster(config?.roster);
   if (config.chain_id !== 84532 || config.roster.length !== 10 ||
       ['openclaw','hermes'].some(team => config.roster.filter(seat => seat.team === team).length !== 5)) fail('READINESS_TEN_SEATS_REQUIRED');
   if (typeof now !== 'function') fail('READINESS_CLOCK_INVALID');
   validateActivationWait(wakeDelayMs, waitImpl);
+  validateAwakeLimit(maxAwake);
   config = structuredClone(config);
   artifacts = checkedArtifacts(config, artifacts);
   const rows = config.roster;
@@ -233,7 +263,7 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
   const plan = () => ({ schema_version: 1, producer_version: READINESS_PRODUCER_VERSION, read_only: true,
     run_id: config.run_id, roster_fingerprint: rosterFingerprint(config), config_fingerprint: configFingerprint(config),
     transport_fingerprint: TRANSPORT_FINGERPRINT, requested_seats: 10, max_account_awake: 5,
-    schedule: 'serial-account-capacity-checked', modes: ['gameplay-input','commit-input'],
+    schedule: 'leased-account-capacity-checked', modes: ['gameplay-input','commit-input'],
     generation_scope: 'diagnostic-run-intent-v1', remote_generation_attested: false,
     continuity_policy: 'observed-runtime-continuity-v1',
     verification_required: true,
@@ -293,33 +323,55 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
         return persistence;
       };
       await persist();
-      const activated = new Set(), sleepAttempted = new Set(), completed = [];
+      const activated = new Set(), sleepAttempted = new Set();
       let cleanup = false, abandoned = false, lifecycleAmbiguous = false, sequence = 0;
-      const deadline = () => cleanup ? cleanupDeadlineAtMs : deadlineAtMs;
-      const operation = async (kind, seat, task) => {
+      const stopping = new AbortController(), workSignal = signal ? AbortSignal.any([signal, stopping.signal]) : stopping.signal;
+      let pool;
+      const stop = () => { abandoned = true; pool?.close(); stopping.abort(); };
+      const tracked = trackOperations(async (kind, seat, task) => {
         const cleanupOperation = cleanup;
+        const end = cleanupOperation ? cleanupDeadlineAtMs : deadlineAtMs;
+        const operationSignal = cleanupOperation ? undefined : workSignal;
         if (abandoned && !cleanupOperation) fail('READINESS_RUN_ABANDONED');
-        if (now() >= deadline()) fail('READINESS_DEADLINE_EXPIRED');
+        if (operationSignal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
+        if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
         const entry = { sequence: ++sequence, kind, seat_id: seat?.seat_id ?? null, status: 'intent', started_at_ms: now() };
         journal.operations.push(entry);
-        await persist();
+        let dispatched = false;
         try {
-          const result = await bounded(task, deadline(), now);
+          await persist();
+          const result = await bounded(() => {
+            if (abandoned && !cleanupOperation || operationSignal?.aborted) fail('READINESS_RUN_ABANDONED');
+            dispatched = true;
+            return task({deadlineAtMs:end, signal:operationSignal, entry});
+          }, end, now, operationSignal);
           if (abandoned && !cleanupOperation) fail('READINESS_RUN_ABANDONED');
-          if (now() >= deadline()) fail('READINESS_DEADLINE_EXPIRED');
+          if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
           entry.status = 'complete'; entry.completed_at_ms = now(); await persist();
           return result;
         } catch (error) {
           entry.status = 'unknown'; entry.completed_at_ms = now();
           Object.assign(entry, operationFailure(error));
-          if (abandoned && !cleanupOperation) fail('READINESS_OPERATION_FAILED');
+          if (!dispatched) entry.ambiguous = false;
+          if (!cleanupOperation) stop();
           await persist(); fail('READINESS_OPERATION_FAILED');
         }
-      };
-      const request = (kind, seat, path, method = 'GET', body) => operation(kind, seat, () => maritimeRequest({
-        apiKey, fetchImpl, path, method, body, timeoutMs: Math.max(1, Math.min(120_000, deadline() - now())) }));
+      });
+      const {operation} = tracked;
+      const request = (kind, seat, path, method = 'GET', body, beforeDispatch) => operation(kind, seat, context => {
+        beforeDispatch?.(context.entry);
+        return maritimeRequest({apiKey, fetchImpl, path, method, body, signal:context.signal,
+          timeoutMs: Math.max(1, Math.min(120_000, context.deadlineAtMs - now())) });
+      });
       const prefix = seat => `/api/agents/${encodeURIComponent(seat.agent_id)}`;
       const getInventory = async () => inventory(await request('inventory', null, '/api/agents'), config);
+      pool = createMaritimeAwakeLeasePool({maxAwake, agentIds:rows.map(seat => seat.agent_id), now,
+        readInventory:async ({agentId}) => {
+          const seat = rows.find(row => row.agent_id === agentId);
+          const raw = await request('inventory', seat, '/api/agents'), report = inventory(raw, config);
+          if (report.seats.some(row => row.status !== 'sleeping' && !activated.has(row.seat_id))) fail('READINESS_INITIAL_LIFECYCLE_INVALID');
+          return Array.isArray(raw) ? raw : raw.agents;
+        }});
       const getStatus = async (seat, expected) => agentStatus(await request('lifecycle-read', seat, prefix(seat)), seat, expected);
       const execute = (seat, command) => request('runtime-read', seat, `${prefix(seat)}/exec`, 'POST', { command, timeout: 30 });
       const inspect = async (seat, artifact, previous) => {
@@ -343,37 +395,37 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
       };
       const sleep = async seat => {
         if (sleepAttempted.has(seat.seat_id)) fail('READINESS_SLEEP_REPLAY_FORBIDDEN');
-        sleepAttempted.add(seat.seat_id);
         try {
-          const response = await request('sleep', seat, `${prefix(seat)}/sleep`, 'POST');
+          const response = await request('sleep', seat, `${prefix(seat)}/sleep`, 'POST', undefined,
+            () => sleepAttempted.add(seat.seat_id));
           agentStatus(response, seat, 'sleeping');
           await getStatus(seat, 'sleeping');
-        } catch { lifecycleAmbiguous = true; fail('READINESS_SLEEP_UNCONFIRMED'); }
+        } catch { if (sleepAttempted.has(seat.seat_id)) lifecycleAmbiguous = true; fail('READINESS_SLEEP_UNCONFIRMED'); }
       };
       try {
         const first = await getInventory();
         if (first.seats.some(seat => seat.status !== 'sleeping') || first.awake > 5) fail('READINESS_INITIAL_LIFECYCLE_INVALID');
+        if (first.awake >= maxAwake) fail('READINESS_CAPACITY_UNAVAILABLE');
         const initial = chainFacts(await operation('chain-preflight', null, () => chain.preflight()), config);
         const snapshot = await operation('chain-snapshot', null, () => chain.readSnapshot({ gameId: '0' }));
         if (snapshot?.chain_id !== 84532 || snapshot.game_address?.toLowerCase() !== config.game_address.toLowerCase() ||
             snapshot.active_game_id !== '0' || snapshot.phase !== 'idle') fail('READINESS_CHAIN_INVALID');
         if (await operation('chain-canonical', null, () => chain.readBlockHash({ blockNumber: initial.block_number })) !== initial.block_hash) fail('READINESS_CHAIN_CHANGED');
-        for (let index = 0; index < rows.length; index++) {
-          const seat = rows[index], artifact = artifacts[index];
-          const capacity = await getInventory();
-          if (capacity.awake >= 5 || capacity.seats.some(row => row.status !== 'sleeping')) fail('READINESS_CAPACITY_UNAVAILABLE');
+        const completed = await runSeats(rows, async (seat, index) => {
+          const artifact = artifacts[index];
+          const release = await pool.acquire({agentId:seat.agent_id, deadlineAtMs, signal:workSignal});
           // This number is the durable intent's sequence in THIS diagnostic run,
           // not a copied launch-journal counter or a fabricated remote epoch.
-          const generation = sequence + 1;
-          activated.add(seat.seat_id);
+          let generation;
           try {
-            const activatedAgent = await request('activation-intent', seat, `${prefix(seat)}/reload-env`, 'POST');
+            const activatedAgent = await request('activation-intent', seat, `${prefix(seat)}/reload-env`, 'POST', undefined,
+              entry => { generation = entry.sequence; activated.add(seat.seat_id); });
             agentStatus(activatedAgent, seat, 'active');
             await getStatus(seat, 'active');
-          } catch { lifecycleAmbiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
+          } catch { if (activated.has(seat.seat_id)) lifecycleAmbiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
           // An active lifecycle response can precede the guest exec service.
           // Match the launch/transport settle without extending this run's cutoff.
-          await operation('activation-settle', seat, () => settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now }));
+          await operation('activation-settle', seat, () => settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, signal:workSignal }));
           // Restore can rematerialize harness config. Only exact source-bound
           // configure commands run, after public artifact integrity succeeds.
           await verifyPublicArtifactIntegrity(artifact, command => execute(seat, command));
@@ -404,31 +456,34 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
               chain_state: { chain_id: 84532, game_address: config.game_address.toLowerCase(),
                 confirmed_block_number: initial.block_number, confirmed_block_hash: initial.block_hash } };
             diagnostics[key] = await operation('diagnostic-validation', seat,
-              () => adapter.diagnose({ seat, request: diagnostic, deadline_at_ms: deadlineAtMs }));
+              () => adapter.diagnose({ seat, request: diagnostic, deadline_at_ms: deadlineAtMs, signal:workSignal }));
             const receipt = execJson(await execute(seat, buildDiagnosticReceiptReadCommand(artifact,diagnostic)));
             validateDiagnosticReceipt(receipt,diagnostic,diagnostics[key]);
             diagnosticGenerations[key] = generation;
             instance = await inspect(seat, artifact, instance);
           }
           await sleep(seat);
-          completed.push({ seat_id: seat.seat_id, agent_id: seat.agent_id, harness: seat.harness,
+          release();
+          return { seat_id: seat.seat_id, agent_id: seat.agent_id, harness: seat.harness,
             wallet_address: seat.wallet_address.toLowerCase(), framework_status_verified: true,
             direct_runtime_inspection_verified: true, wallet_identity_verified: true, persistent_storage_verified: true,
             tool_execution_verified: true, gameplay_command: artifact.gameplay_command,
             artifact_sha256: artifact.artifact_sha256, activation_generation: generation,
             final_agent_status: 'sleeping', sleep_confirmed: true, lifecycle_ambiguous: false,
             model_profile: { ...MODEL }, diagnostics, runtime_instance_fingerprint: instance,
-            diagnostic_generations: diagnosticGenerations });
-        }
+            diagnostic_generations: diagnosticGenerations };
+        }, stop);
+        pool.close(); await tracked.drain();
         const end = await getInventory();
         if (end.seats.some(row => row.status !== 'sleeping')) fail('READINESS_SLEEP_UNCONFIRMED');
         const final = chainFacts(await operation('chain-preflight', null, () => chain.preflight()), config);
         if (final.chain_defaults_fingerprint !== initial.chain_defaults_fingerprint || final.game_code_hash !== initial.game_code_hash ||
             await operation('chain-canonical', null, () => chain.readBlockHash({ blockNumber: initial.block_number })) !== initial.block_hash) fail('READINESS_CHAIN_CHANGED');
-        if (now() >= deadlineAtMs || now() - startedAt >= RUNTIME_EVIDENCE_MAX_AGE_MS) fail('READINESS_DEADLINE_EXPIRED');
+        if (workSignal.aborted || now() >= deadlineAtMs || now() - startedAt >= RUNTIME_EVIDENCE_MAX_AGE_MS) fail('READINESS_DEADLINE_EXPIRED');
         journal.all_seats_sleeping = true;
         journal.status = 'complete';
         await persist();
+        if (workSignal.aborted) fail('READINESS_VERIFICATION_ABORTED');
         const state = { schema_version: 1, diagnostic_run_id: runId, config_fingerprint: configFingerprint(config),
           roster_fingerprint: rosterFingerprint(config), transport_fingerprint: TRANSPORT_FINGERPRINT,
           generation_scope: 'diagnostic-run-intent-v1', journal_sha256: runtimeEvidenceFingerprint(journal),
@@ -444,12 +499,12 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
             continuity_policy: 'observed-runtime-continuity-v1', lifecycle_state_digest: runtimeEvidenceFingerprint(state) } });
         await atomicWrite(join(runtimeDir, READINESS_FILES.state), state);
         const evidencePath = join(runtimeDir, READINESS_FILES.evidence);
-        if (now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
+        if (workSignal.aborted || now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
         await atomicWrite(evidencePath, evidence);
-        if (now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
+        if (workSignal.aborted || now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
         return { evidence, evidencePath, evidenceDigest: runtimeEvidenceFingerprint(evidence) };
       } catch {
-        abandoned = true;
+        stop(); await tracked.drain();
         cleanup = true;
         // Each activated seat gets at most one sleep request. An ambiguous sleep
         // is never replayed merely because a later read still says active.
@@ -496,11 +551,12 @@ export async function validateReadinessRunState({ config, evidence, runtimeDir, 
 }
 
 /** Read-only inspection never wakes agents. Verification is a separate, durable,
- * explicit serial wake/inspect/sleep operation; it never changes the certificate. */
+ * explicit capacity-bounded wake/inspect/sleep operation; it never changes the certificate. */
 export async function verifyReadinessCurrent({ config, evidence, runtimeDir, apiKey, fetchImpl = globalThis.fetch,
   chain, deadlineAtMs, cleanupDeadlineAtMs, verificationDir, artifacts, readOnly = false, signal, now = Date.now,
-  wakeDelayMs = 10_000, waitImpl = defaultWait } = {}) {
+  wakeDelayMs = 10_000, waitImpl = defaultWait, maxAwake = 5 } = {}) {
   validateActivationWait(wakeDelayMs, waitImpl);
+  validateAwakeLimit(maxAwake);
   if (signal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
   const identity = await validateReadinessRunState({ config, evidence, runtimeDir, now });
   if (evidence.producer_version !== READINESS_PRODUCER_VERSION ||
@@ -536,37 +592,58 @@ export async function verifyReadinessCurrent({ config, evidence, runtimeDir, api
   const journalPath = join(verificationDir, 'continuity-verification.json');
   let writes = Promise.resolve(), sequence = 0, abandoned = false, cleaning = false, ambiguous = false;
   const activated = new Set(), slept = new Set();
+  const stopping = new AbortController(), workSignal = signal ? AbortSignal.any([signal, stopping.signal]) : stopping.signal;
+  let pool;
+  const stop = () => { abandoned = true; pool?.close(); stopping.abort(); };
   const persist = () => {
     const snapshot = structuredClone(journal);
     writes = writes.then(() => atomicWrite(journalPath, snapshot));
     return writes;
   };
   await persist();
-  const operation = async (kind, seat, task) => {
+  const tracked = trackOperations(async (kind, seat, task) => {
     const cleanupOperation = cleaning;
-    const end = cleaning ? cleanupDeadlineAtMs : deadlineAtMs;
-    if (signal?.aborted && !cleaning) fail('READINESS_VERIFICATION_ABORTED');
-    if (abandoned && !cleaning) fail('READINESS_RUN_ABANDONED');
+    const end = cleanupOperation ? cleanupDeadlineAtMs : deadlineAtMs;
+    const operationSignal = cleanupOperation ? undefined : workSignal;
+    if (operationSignal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
+    if (abandoned && !cleanupOperation) fail('READINESS_RUN_ABANDONED');
     if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
     const entry = { sequence: ++sequence, kind, seat_id: seat?.seat_id ?? null, status: 'intent', started_at_ms: now() };
-    journal.operations.push(entry); await persist();
+    journal.operations.push(entry);
+    let dispatched = false;
     try {
-      const value = await bounded(task, end, now);
-      if (signal?.aborted && !cleanupOperation) fail('READINESS_VERIFICATION_ABORTED');
+      await persist();
+      const value = await bounded(() => {
+        if (abandoned && !cleanupOperation || operationSignal?.aborted) fail('READINESS_RUN_ABANDONED');
+        dispatched = true;
+        return task({deadlineAtMs:end, signal:operationSignal, entry});
+      }, end, now, operationSignal);
+      if (operationSignal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
       if (abandoned && !cleanupOperation) fail('READINESS_RUN_ABANDONED');
       if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
       entry.status = 'complete'; entry.completed_at_ms = now(); await persist(); return value;
     } catch {
       entry.status = 'unknown'; entry.completed_at_ms = now();
-      if (['activation','sleep','runtime-read','continuity-check'].includes(kind)) ambiguous = true;
-      if (!(abandoned && !cleanupOperation)) await persist();
+      if (dispatched && ['activation','sleep','runtime-read','continuity-check'].includes(kind)) ambiguous = true;
+      if (!cleanupOperation) stop();
+      await persist();
       fail('READINESS_OPERATION_FAILED');
     }
-  };
+  });
+  const {operation} = tracked;
   const prefix = seat => `/api/agents/${encodeURIComponent(seat.agent_id)}`;
-  const request = (kind, seat, path, method = 'GET', body) => operation(kind, seat, () => maritimeRequest({
-    apiKey, fetchImpl, path, method, body, signal: cleaning ? undefined : signal,
-    timeoutMs: Math.max(1, Math.min(120_000, (cleaning ? cleanupDeadlineAtMs : deadlineAtMs) - now())) }));
+  const request = (kind, seat, path, method = 'GET', body, beforeDispatch) => operation(kind, seat, context => {
+    beforeDispatch?.();
+    return maritimeRequest({apiKey, fetchImpl, path, method, body, signal:context.signal,
+      timeoutMs: Math.max(1, Math.min(120_000, context.deadlineAtMs - now())) });
+  });
+  pool = createMaritimeAwakeLeasePool({maxAwake, agentIds:config.roster.map(seat => seat.agent_id), now,
+    readInventory:async ({agentId}) => {
+      const seat = config.roster.find(row => row.agent_id === agentId);
+      const raw = await request('inventory', seat, '/api/agents'), report = inventory(raw, config);
+      if (report.seats.some(row => row.status !== 'sleeping' && !activated.has(row.seat_id))) fail('READINESS_INITIAL_LIFECYCLE_INVALID');
+      return Array.isArray(raw) ? raw : raw.agents;
+    }});
   const sleepingInventory = async () => {
     const value = inventory(await request('inventory', null, '/api/agents'), config);
     if (value.seats.some(row => row.status !== 'sleeping')) fail('READINESS_SLEEP_UNCONFIRMED');
@@ -574,22 +651,22 @@ export async function verifyReadinessCurrent({ config, evidence, runtimeDir, api
   };
   const sleep = async seat => {
     if (slept.has(seat.seat_id)) fail('READINESS_SLEEP_REPLAY_FORBIDDEN');
-    slept.add(seat.seat_id);
     try {
-      agentStatus(await request('sleep', seat, `${prefix(seat)}/sleep`, 'POST'), seat, 'sleeping');
+      agentStatus(await request('sleep', seat, `${prefix(seat)}/sleep`, 'POST', undefined,
+        () => slept.add(seat.seat_id)), seat, 'sleeping');
       agentStatus(await request('lifecycle-read', seat, prefix(seat)), seat, 'sleeping');
-    } catch { ambiguous = true; fail('READINESS_SLEEP_UNCONFIRMED'); }
+    } catch { if (slept.has(seat.seat_id)) ambiguous = true; fail('READINESS_SLEEP_UNCONFIRMED'); }
   };
   try {
-    for (const seat of config.roster) {
-      const capacity = await sleepingInventory();
-      if (capacity.awake >= 5) fail('READINESS_CAPACITY_UNAVAILABLE');
-      activated.add(seat.seat_id);
+    if (initial.awake >= maxAwake) fail('READINESS_CAPACITY_UNAVAILABLE');
+    await runSeats(config.roster, async seat => {
+      const release = await pool.acquire({agentId:seat.agent_id, deadlineAtMs, signal:workSignal});
       try {
-        agentStatus(await request('activation', seat, `${prefix(seat)}/start`, 'POST'), seat, 'active');
+        agentStatus(await request('activation', seat, `${prefix(seat)}/start`, 'POST', undefined,
+          () => activated.add(seat.seat_id)), seat, 'active');
         agentStatus(await request('lifecycle-read', seat, prefix(seat)), seat, 'active');
-      } catch { ambiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
-      await operation('activation-settle', seat, () => settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, signal }));
+      } catch { if (activated.has(seat.seat_id)) ambiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
+      await operation('activation-settle', seat, () => settleActivation({ wakeDelayMs, waitImpl, deadlineAtMs, now, signal:workSignal }));
       await operation('continuity-check', seat, () => continuity.verify({ seat,
         execute: command => request('runtime-read', seat, `${prefix(seat)}/exec`, 'POST', { command, timeout: 30 }),
         getAgent: async () => {
@@ -598,7 +675,9 @@ export async function verifyReadinessCurrent({ config, evidence, runtimeDir, api
           return { id: value.id, framework: seat.harness, status: value.status };
         } }));
       await sleep(seat);
-    }
+      release();
+    }, stop);
+    pool.close(); await tracked.drain();
     await sleepingInventory();
     await operation('chain-revalidation', null, assertChain);
     await validateReadinessRunState({ config, evidence, runtimeDir, now });
@@ -609,7 +688,7 @@ export async function verifyReadinessCurrent({ config, evidence, runtimeDir, api
     return { ...identity, ready: true, read_only: false, continuity_policy: evidence.continuity_policy,
       verification_sha256: runtimeEvidenceFingerprint(journal), verification_path: journalPath };
   } catch {
-    abandoned = true; cleaning = true;
+    stop(); await tracked.drain(); cleaning = true;
     for (const seat of config.roster.filter(row => activated.has(row.seat_id) && !slept.has(row.seat_id))) {
       try { await sleep(seat); } catch { /* preserve uncertainty; no blind replay */ }
     }

@@ -57,8 +57,8 @@ async function fixture(t, options = {}) {
     if (path.endsWith('/reload-env')) {
       // Persisted intent must precede the actual external operation.
       const journal = JSON.parse(await readFile(join(runtimeDir, READINESS_FILES.journal),'utf8'));
-      assert.equal(journal.operations.at(-1).kind, 'activation-intent');
-      assert.equal(journal.operations.at(-1).status, 'intent');
+      const intent = journal.operations.findLast(row => row.seat_id === seat.seat_id && row.kind === 'activation-intent');
+      assert.equal(intent.status, 'intent');
       agent.status = 'active'; maxAwake = Math.max(maxAwake, agents.filter(row => row.status === 'active').length);
       return jsonResponse(agent);
     }
@@ -148,6 +148,8 @@ async function fixture(t, options = {}) {
   };
   const runOptions = { config,runtimeDir,artifacts,apiKey:'fixture-credential',fetchImpl,chain,
     deadlineAtMs:startedAtMs+duration,cleanupDeadlineAtMs:startedAtMs+duration+10_000,now,waitImpl,
+    maxAwake:options.maxAwake ?? (options.unrelated ? 5 : 1),
+    ...(options.signal ? {signal:options.signal} : {}),
     ...(options.wakeDelayMs === undefined ? {} : {wakeDelayMs:options.wakeDelayMs}) };
   const runner=createReadinessRun(runOptions);
   const controlledRunner={...runner,async run(){
@@ -194,7 +196,110 @@ test('activation settle options reject invalid inputs before any remote operatio
   }
   assert.throws(() => createReadinessRun({...f.runOptions,waitImpl:null}), /READINESS_WAIT_INVALID/);
   await assert.rejects(verifyReadinessCurrent({...f.runOptions,waitImpl:null}), /READINESS_WAIT_INVALID/);
+  for (const maxAwake of [0, 6, 1.5, '5']) {
+    assert.throws(() => createReadinessRun({...f.runOptions,maxAwake}), /READINESS_MAX_AWAKE_INVALID/);
+    await assert.rejects(verifyReadinessCurrent({...f.runOptions,maxAwake}), /READINESS_MAX_AWAKE_INVALID/);
+  }
   assert.equal(f.calls.length, 0);
+});
+
+test('five awake seats complete twenty diagnostics and both continuity passes inside the unchanged synthetic lifetime', async t => {
+  let clock = Date.now();
+  const startedAt = clock;
+  const barrier = milliseconds => {
+    let waiting = [];
+    return () => new Promise(resolve => {
+      waiting.push(resolve);
+      if (waiting.length === 5) {
+        const batch = waiting; waiting = [];
+        clock += milliseconds;
+        batch.forEach(done => done());
+      }
+    });
+  };
+  const settle = barrier(10_000), chat = barrier(30_000);
+  const f = await fixture(t,{maxAwake:5,duration:600_000,now:() => clock,
+    waitImpl:async milliseconds => { assert.equal(milliseconds,10_000); await settle(); },
+    onCall:async ({path}) => { if (path.endsWith('/chat')) await chat(); }
+  });
+  const result = await f.runner.run();
+  assert.equal(f.cliInputs.length,20);
+  assert.equal(f.maxAwake(),5);
+  assert.deepEqual(result.evidence.seats.map(row => row.seat_id),roster.map(row => row.seat_id));
+  assert.equal(Date.parse(result.evidence.expires_at)-Date.parse(result.evidence.verified_at),600_000);
+  for (const name of ['preparation','immediate-precreation']) {
+    const args = verificationOptions(f,result.evidence,name,{deadlineAtMs:startedAt+600_000,cleanupDeadlineAtMs:startedAt+610_000});
+    const begin = f.calls.length;
+    assert.equal((await verifyReadinessCurrent(args)).ready,true);
+    const calls = f.calls.slice(begin);
+    assert.equal(calls.filter(row => row.path.endsWith('/start')).length,10);
+    assert.equal(calls.filter(row => row.path.endsWith('/sleep')).length,10);
+    const journal = JSON.parse(await readFile(join(args.verificationDir,'continuity-verification.json'),'utf8'));
+    assert.deepEqual(journal.operations.filter(row => row.seat_id === null).map(row => row.kind),['inventory','chain-revalidation']);
+    assert.ok(journal.operations.every((row,index) => row.sequence === index+1 && row.status === 'complete'));
+    for (const seat of roster) {
+      const rows = journal.operations.filter(row => row.seat_id === seat.seat_id);
+      const activation = rows.findIndex(row => row.kind === 'activation');
+      assert.ok(activation >= 1 && rows.slice(0,activation).every(row => row.kind === 'inventory'));
+      assert.deepEqual(rows.slice(activation).map(row => row.kind),['activation','lifecycle-read','activation-settle',
+        'continuity-check','lifecycle-read',...Array(9).fill('runtime-read'),'lifecycle-read','sleep','lifecycle-read']);
+    }
+  }
+  assert.equal(clock-startedAt,180_000);
+  assert.equal(f.cliInputs.length,20,'both continuity passes reuse the original diagnostic receipts');
+  assert.ok(f.agents.every(row => row.status === 'sleeping'));
+});
+
+test('concurrent peer failure stops queued activations, drains late work and sleeps each issued activation once', async t => {
+  let releaseLate, lateStarted;
+  const started = new Promise(resolve => { lateStarted=resolve; });
+  const f = await fixture(t,{maxAwake:5,onCall:async ({path,seat,body}) => {
+    if (!path.endsWith('/exec') || body.command[0] !== 'sha256sum') return;
+    if (seat.seat_id === 'oc-1') {
+      lateStarted();
+      return new Promise(resolve => { releaseLate=resolve; });
+    }
+    if (seat.seat_id === 'oc-2') {
+      await started;
+      return new Response('{}',{status:502});
+    }
+  }});
+  await assert.rejects(f.runner.run(),/READINESS_RUN_FAILED_SLEEP_UNCONFIRMED/);
+  const journalPath=join(f.runtimeDir,READINESS_FILES.journal),saved=await readFile(journalPath,'utf8');
+  const journal=JSON.parse(saved),activations=f.calls.filter(row=>row.path.endsWith('/reload-env'));
+  assert.ok(activations.length >= 2 && activations.length <= 5);
+  assert.equal(f.calls.some(row=>row.seat?.startsWith('hs-')&&row.method==='POST'),false);
+  for(const activation of activations)assert.equal(f.calls.filter(row=>row.seat===activation.seat&&row.path.endsWith('/sleep')).length,1);
+  assert.equal(journal.all_seats_sleeping,false);
+  assert.ok(journal.operations.some(row=>row.kind==='runtime-read'&&row.status==='unknown'));
+  assert.equal(f.cliInputs.length,0);
+  assert.ok(f.agents.every(row=>row.status==='sleeping'));
+  releaseLate(jsonResponse({exitCode:0,stdout:'late fixture output',stderr:''}));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(await readFile(journalPath,'utf8'),saved);
+  const count=f.calls.length;
+  await assert.rejects(createReadinessRun(f.runOptions).run(),/DIRECTORY_ALREADY_EXISTS/);
+  assert.equal(f.calls.length,count);
+  await assert.rejects(readFile(join(f.runtimeDir,READINESS_FILES.evidence)),/ENOENT/);
+});
+
+test('producer cancellation during final publication cannot return or retain usable readiness', async t => {
+  const controller = new AbortController();
+  let observed=false, f;
+  const at=Date.now();
+  f = await fixture(t,{signal:controller.signal,now:() => {
+    if (f) try {
+      if (JSON.parse(readFileSync(join(f.runtimeDir,READINESS_FILES.journal),'utf8')).status==='complete') {
+        observed=true;controller.abort();
+      }
+    } catch { /* Publication has not reached its terminal journal yet. */ }
+    return at;
+  }});
+  await assert.rejects(f.runner.run(),/READINESS_RUN_FAILED/);
+  assert.equal(observed,true);
+  assert.equal((await f.runner.status()).status,'failed');
+  assert.ok(f.agents.every(row=>row.status==='sleeping'));
+  await assert.rejects(validateReadinessRunState({config,evidence:{},runtimeDir:f.runtimeDir,now:()=>at}),/READINESS_STATE_INVALID/);
 });
 
 test('producer and current verification journal the default settle before guest file or exec access', async t => {
@@ -259,7 +364,7 @@ test('verification cutoff or abort during activation settle prevents exec and pr
       waitImpl:async (milliseconds,{signal}) => {
         waited = true;
         assert.equal(milliseconds, 5_000);
-        assert.equal(signal, controller.signal);
+        assert.equal(signal.aborted, false);
         const journal = JSON.parse(await readFile(join(args.verificationDir,'continuity-verification.json'),'utf8'));
         assert.equal(journal.operations.at(-1).kind, 'activation-settle');
         if (kind === 'deadline') clock += milliseconds;
@@ -322,11 +427,10 @@ test('all ten exact CLI paths run both diagnostics in one persisted activation w
     assert.deepEqual(await originalPublication(f),original);
     if (repeat === 0) {
       const args = verificationOptions(f,result.evidence,'serial-verification');
-      f.options.onCall = async ({path}) => {
+      f.options.onCall = async ({path,seat}) => {
         if (!path.endsWith('/start')) return;
         const journal = JSON.parse(await readFile(join(args.verificationDir,'continuity-verification.json'),'utf8'));
-        assert.equal(journal.operations.at(-1).kind,'activation');
-        assert.equal(journal.operations.at(-1).status,'intent');
+        assert.equal(journal.operations.findLast(row => row.seat_id === seat.seat_id && row.kind === 'activation').status,'intent');
       };
       const begin = f.calls.length;
       const verified = await verifyReadinessCurrent(args);

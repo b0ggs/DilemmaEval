@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAgentPrompt, createMaritimeAdapter as rawMaritimeAdapter, reconcileRoster } from '../../src/maritime/index.mjs';
 import { buildPublicRequestArtifact, buildGameplayShellCommand, stagePublicRequest,
-  buildRuntimeDiagnosticArtifact, buildRuntimeDiagnosticShellCommand } from '../../src/maritime/transport.mjs';
+  buildRuntimeDiagnosticArtifact, buildRuntimeDiagnosticShellCommand, createMaritimeAwakeLeasePool } from '../../src/maritime/transport.mjs';
 import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -373,6 +373,132 @@ test('maxAwake bounds a synchronous burst and queues the sixth lease', async () 
   for (let i = 0; i < 100 && sleeping < 5; i++) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(reloads, 5); assert.equal(chats, 5); assert.equal(sleeping, 5);
   releaseBatch(); await Promise.all(calls); assert.equal(reloads, 6); assert.equal(sleeping, 6);
+});
+
+const leaseTurn = () => new Promise(resolve => setImmediate(resolve));
+function leaseDeferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+function leaseInventory(ids, extra = []) { return [...ids.map(id => ({ id, status: 'sleeping' })), ...extra]; }
+
+test('shared lease pool serializes capacity reads and reserves before synchronous bursts activate', async t => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const gates = [], observed = [], releases = [];
+  let reads = 0, inFlight = 0, maximumReads = 0;
+  const pool = createMaritimeAwakeLeasePool({ maxAwake: 5, agentIds: ids, readInventory: async ({ agentId }) => {
+    reads++; inFlight++; maximumReads = Math.max(maximumReads, inFlight);
+    const gate = leaseDeferred(); gates.push(gate); observed.push(agentId);
+    await gate.promise; inFlight--;
+    // Provider status deliberately lags every reservation.
+    return leaseInventory(ids, [{ id: 'unrelated', status: 'restoring' }]);
+  } });
+  t.after(() => { pool.close(); gates.forEach(gate => gate.resolve()); });
+  const results = ids.map(agentId => pool.acquire({ agentId }).then(release => { releases.push({ agentId, release }); return release; }));
+  for (let index = 0; index < 5; index++) {
+    await leaseTurn(); assert.equal(reads, index + 1); gates[index].resolve();
+  }
+  await leaseTurn();
+  assert.deepEqual(releases.map(row => row.agentId), ids.slice(0, 4));
+  assert.equal(maximumReads, 1); assert.equal(reads, 5);
+  releases[0].release(); await leaseTurn(); gates[5].resolve();
+  await leaseTurn(); gates[6].resolve(); await leaseTurn();
+  assert.deepEqual(releases.map(row => row.agentId), ids.slice(0, 5));
+  releases[1].release(); await leaseTurn(); gates[7].resolve();
+  await Promise.all(results);
+  assert.equal(maximumReads, 1); assert.equal(observed.at(-1), 'f');
+  releases.forEach(row => row.release());
+});
+
+test('shared lease release is idempotent and an old release cannot erase a new lease for the same agent', async t => {
+  const ids = ['a', 'b'];
+  const pool = createMaritimeAwakeLeasePool({ maxAwake: 1, agentIds: ids, readInventory: async () => leaseInventory(ids) });
+  t.after(() => pool.close());
+  const first = await pool.acquire({ agentId: 'a' });
+  await assert.rejects(pool.acquire({ agentId: 'a' }), error => error.code === 'MARITIME_AWAKE_AGENT_BUSY' && !error.ambiguous);
+  first(); first();
+  const replacement = await pool.acquire({ agentId: 'a' });
+  let admitted = false;
+  const pending = pool.acquire({ agentId: 'b' }).then(release => { admitted = true; return release; });
+  first(); await leaseTurn(); assert.equal(admitted, false);
+  replacement(); (await pending)();
+});
+
+test('shared lease close rejects inspecting and queued callers and fences late inventory', async () => {
+  const gate = leaseDeferred(), ids = ['a', 'b'];
+  const signals = [];
+  const pool = createMaritimeAwakeLeasePool({ maxAwake: 2, agentIds: ids, readInventory: ({ signal }) => {
+    signals.push(signal); return gate.promise;
+  } });
+  const a = pool.acquire({ agentId: 'a' }), b = pool.acquire({ agentId: 'b' });
+  const rejected = Promise.all([a, b].map(promise => assert.rejects(promise, error => error.code === 'MARITIME_AWAKE_POOL_CLOSED' && !error.ambiguous)));
+  await leaseTurn(); pool.close(); pool.close(); await rejected;
+  assert.equal(signals.length, 1); assert.equal(signals[0].aborted, true);
+  gate.resolve(leaseInventory(ids)); await leaseTurn();
+  await assert.rejects(pool.acquire({ agentId: 'a' }), /MARITIME_AWAKE_POOL_CLOSED/);
+  assert.equal(signals.length, 1);
+});
+
+test('shared lease abort and deadline reject promptly despite ignored inventory cancellation', async t => {
+  for (const stop of ['abort', 'deadline']) {
+    const gate = leaseDeferred(), ids = ['a', 'b'], controller = new AbortController();
+    let reads = 0, firstSignal;
+    const pool = createMaritimeAwakeLeasePool({ maxAwake: 1, agentIds: ids, readInventory: ({ signal }) => {
+      if (++reads === 1) { firstSignal = signal; return gate.promise; }
+      return leaseInventory(ids);
+    } });
+    t.after(() => pool.close());
+    const waiting = pool.acquire({ agentId: 'a', signal: controller.signal,
+      ...(stop === 'deadline' ? { deadlineAtMs: Date.now() + 30 } : {}) });
+    const rejected = assert.rejects(waiting, error => error.code === 'MARITIME_DISPATCH_EXPIRED' && error.retryable && !error.ambiguous);
+    await leaseTurn(); if (stop === 'abort') controller.abort();
+    await rejected; assert.equal(firstSignal.aborted, true);
+    const release = await pool.acquire({ agentId: 'b' });
+    gate.resolve(leaseInventory(ids)); await leaseTurn();
+    await assert.rejects(pool.acquire({ agentId: 'b' }), /MARITIME_AWAKE_AGENT_BUSY/);
+    release();
+  }
+});
+
+test('shared lease queue observes non-head aborts and granted permits survive later abort and deadline', async t => {
+  const ids = ['a', 'b', 'c'], owner = new AbortController(), queued = new AbortController();
+  let reads = 0;
+  const pool = createMaritimeAwakeLeasePool({ maxAwake: 1, agentIds: ids, readInventory: async () => { reads++; return leaseInventory(ids); } });
+  t.after(() => pool.close());
+  const release = await pool.acquire({ agentId: 'a', signal: owner.signal, deadlineAtMs: Date.now() + 25 });
+  let secondAdmitted = false;
+  const second = pool.acquire({ agentId: 'b' }).then(done => { secondAdmitted = true; return done; });
+  const third = pool.acquire({ agentId: 'c', signal: queued.signal });
+  const rejection = assert.rejects(third, /MARITIME_DISPATCH_EXPIRED/);
+  queued.abort(); owner.abort(); await rejection;
+  await new Promise(resolve => setTimeout(resolve, 35));
+  assert.equal(secondAdmitted, false); assert.equal(reads, 1);
+  release(); (await second)();
+});
+
+test('shared lease pool validates complete inventory, membership and duplicate pending requests', async t => {
+  const ids = ['a', 'b'];
+  for (const inventory of [null, {}, leaseInventory(['a']), [...leaseInventory(ids), { id: 'a', status: 'stopped' }],
+    [{ id: 'a', status: '' }, { id: 'b', status: 'sleeping' }]]) {
+    const pool = createMaritimeAwakeLeasePool({ maxAwake: 1, agentIds: ids, readInventory: async () => inventory });
+    await assert.rejects(pool.acquire({ agentId: 'a' }), /MARITIME_INVENTORY_INVALID/); pool.close();
+  }
+  const gate = leaseDeferred();
+  const pool = createMaritimeAwakeLeasePool({ maxAwake: 1, agentIds: ids, readInventory: () => gate.promise });
+  t.after(() => pool.close());
+  await assert.rejects(pool.acquire({ agentId: 'unknown' }), /MARITIME_AWAKE_AGENT_INVALID/);
+  const first = pool.acquire({ agentId: 'a' });
+  await assert.rejects(pool.acquire({ agentId: 'a' }), /MARITIME_AWAKE_AGENT_BUSY/);
+  gate.resolve(leaseInventory(ids)); (await first)();
+});
+
+test('shared lease pool rechecks injected clock after inventory and never grants an expired permit', async () => {
+  let clock = 100;
+  const pool = createMaritimeAwakeLeasePool({ maxAwake: 1, agentIds: ['a'], now: () => clock,
+    readInventory: async () => { clock = 201; return leaseInventory(['a']); } });
+  await assert.rejects(pool.acquire({ agentId: 'a', deadlineAtMs: 200 }), /MARITIME_DISPATCH_EXPIRED/);
+  pool.close();
 });
 
 test('maxAwake parks on unrelated capacity and expires without POST spin', async () => {

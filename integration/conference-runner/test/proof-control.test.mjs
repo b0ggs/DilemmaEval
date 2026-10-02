@@ -94,7 +94,7 @@ async function setupContinuity(t) {
     const record = kind => operations.push({ sequence: operations.length + 1, kind, seat_id: null,
       status: 'complete', started_at_ms: at, completed_at_ms: at });
     for (const seat of f.config.roster) {
-      record('inventory');
+      record('inventory'); operations.at(-1).seat_id = seat.seat_id;
       for (const kind of ['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
         ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read']) {
         record(kind); operations.at(-1).seat_id = seat.seat_id;
@@ -115,6 +115,50 @@ async function setupContinuity(t) {
   };
   return f;
 }
+
+
+// Timed fixture: overlap complete seat lifecycles without changing their order.
+function interleaveLifecycles(record, seats, width = 5, repeatCapacityRead = false) {
+  const histories = seats.map(seat => record.operations.filter(row => row.seat_id === seat.seat_id));
+  if (repeatCapacityRead) histories[0].unshift(structuredClone(histories[0][0]));
+  const tail = record.operations.slice(-2), output = [];
+  let clock = record.started_at_ms;
+  const append = row => { row.started_at_ms = clock++; row.completed_at_ms = clock++; output.push(row); };
+  for (let first = 0; first < histories.length; first += width) {
+    const batch = histories.slice(first, first + width);
+    for (let step = 0; step < Math.max(...batch.map(rows => rows.length)); step++) {
+      for (const rows of batch) if (rows[step]) append(rows[step]);
+    }
+    for (const rows of batch) {
+      const check = rows.findIndex(row => row.kind === 'continuity-check');
+      rows[check].completed_at_ms = rows[check + 11].completed_at_ms;
+    }
+  }
+  tail.forEach(append);
+  output.forEach((row, index) => { row.sequence = index + 1; });
+  record.operations = output; record.completed_at_ms = clock;
+}
+
+test('v2 gate accepts five overlapping complete lifecycles and repeated preactivation capacity reads', async t => {
+  const f = await setupContinuity(t);
+  f.mutateVerification = record => { interleaveLifecycles(record, f.config.roster, 5, true); f.setNow(record.completed_at_ms); };
+  const prepared = await prepareControlledProof(f.options);
+  assert.equal(prepared.preflight.runtime_verified, true);
+});
+
+test('v2 gate rejects six overlapping lifecycles and capacity probes after activation', async t => {
+  for (const kind of ['six-awake', 'late-capacity', 'early-final-inventory']) await t.test(kind, async t => {
+    const f = await setupContinuity(t);
+    f.mutateVerification = record => {
+      interleaveLifecycles(record, f.config.roster, kind === 'six-awake' ? 6 : 5);
+      if (kind === 'late-capacity') record.operations.find(row => row.kind === 'activation-settle').kind = 'inventory';
+      if (kind === 'early-final-inventory') record.operations.at(-3).completed_at_ms = record.operations.at(-2).started_at_ms + 1;
+      f.setNow(record.completed_at_ms);
+    };
+    await assert.rejects(prepareControlledProof(f.options), /PROOF_CURRENT_READINESS_UNVERIFIED/);
+    await assert.rejects(access(f.options.directory), { code: 'ENOENT' });
+  });
+});
 
 test('v2 creation rereads complete ten-seat verification and forwards the cancellation signal', async t => {
   const f = await setupContinuity(t), controller = new AbortController();

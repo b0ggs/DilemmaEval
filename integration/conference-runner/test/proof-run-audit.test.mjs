@@ -68,7 +68,7 @@ async function fixture(t) {
     verification.operations.push(operation); return operation;
   };
   for (const seat of source.roster) {
-    record('inventory'); record('activation', seat.seat_id); record('lifecycle-read', seat.seat_id);
+    record('inventory', seat.seat_id); record('activation', seat.seat_id); record('lifecycle-read', seat.seat_id);
     record('activation-settle', seat.seat_id);
     const continuity = record('continuity-check', seat.seat_id);
     record('lifecycle-read', seat.seat_id);
@@ -117,6 +117,56 @@ async function fixture(t) {
   return { root, directory, readiness, bindings, fuse, verification, source, prepared, evidence, lifecycle, journal, report, options, calls, chain, scores, documents,
     save: async (filename, value) => writeFile(filename, json(value), { mode: 0o600 }) };
 }
+
+
+// Timed fixture: overlap complete seat lifecycles without changing their order.
+function interleaveLifecycles(record, seats, width = 5, repeatCapacityRead = false) {
+  const histories = seats.map(seat => record.operations.filter(row => row.seat_id === seat.seat_id));
+  if (repeatCapacityRead) histories[0].unshift(structuredClone(histories[0][0]));
+  const tail = record.operations.slice(-2), output = [];
+  let clock = record.started_at_ms;
+  const append = row => { row.started_at_ms = clock++; row.completed_at_ms = clock++; output.push(row); };
+  for (let first = 0; first < histories.length; first += width) {
+    const batch = histories.slice(first, first + width);
+    for (let step = 0; step < Math.max(...batch.map(rows => rows.length)); step++) {
+      for (const rows of batch) if (rows[step]) append(rows[step]);
+    }
+    for (const rows of batch) {
+      const check = rows.findIndex(row => row.kind === 'continuity-check');
+      rows[check].completed_at_ms = rows[check + 11].completed_at_ms;
+    }
+  }
+  tail.forEach(append);
+  output.forEach((row, index) => { row.sequence = index + 1; });
+  record.operations = output; record.completed_at_ms = clock;
+}
+
+test('independent audit accepts complete five-seat interleaving and extra preactivation capacity reads', async t => {
+  const f = await fixture(t);
+  interleaveLifecycles(f.verification, f.source.roster, 5, true);
+  await f.save(f.fuse.verification_path, f.verification);
+  f.fuse.verification_sha256 = runtimeEvidenceFingerprint(f.verification);
+  await f.save(path.join(f.directory, 'launch-once.json'), f.fuse);
+  const result = await auditProofRun(f.options);
+  assert.equal(result.proof_complete, true, JSON.stringify(result));
+  assert.deepEqual(f.calls, ['chain', 'scoreboard']);
+});
+
+test('independent audit refuses a sixth occupied slot or a premature final inventory', async t => {
+  for (const kind of ['six-awake', 'early-final-inventory', 'late-capacity']) await t.test(kind, async t => {
+    const f = await fixture(t);
+    interleaveLifecycles(f.verification, f.source.roster, kind === 'six-awake' ? 6 : 5);
+    if (kind === 'early-final-inventory') f.verification.operations.at(-3).completed_at_ms = f.verification.operations.at(-2).started_at_ms + 1;
+    if (kind === 'late-capacity') f.verification.operations.find(row => row.kind === 'activation-settle').kind = 'inventory';
+    await f.save(f.fuse.verification_path, f.verification);
+    f.fuse.verification_sha256 = runtimeEvidenceFingerprint(f.verification);
+    await f.save(path.join(f.directory, 'launch-once.json'), f.fuse);
+    const result = await auditProofRun(f.options);
+    assert.equal(result.proof_complete, false);
+    assert.deepEqual(result.issues, ['PROOF_RUN_AUDIT_VERIFICATION_MISMATCH']);
+    assert.deepEqual(f.calls, []);
+  });
+});
 
 test('expired original readiness can be audited after completion with both independent auditors and immutable inputs', async t => {
   const f = await fixture(t);

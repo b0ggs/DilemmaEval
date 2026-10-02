@@ -87,6 +87,128 @@ function assertDispatchBoundary({ deadlineAtMs, signal, remotePostStarted }) {
   throw new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous: true });
 }
 
+/** Account-wide reservations. Only the caller's confirmed cleanup releases an admitted lease. */
+export function createMaritimeAwakeLeasePool({ maxAwake, agentIds, readInventory, now = Date.now } = {}) {
+  if (!Number.isInteger(maxAwake) || maxAwake < 1 || maxAwake > 20) throw new TypeError('MARITIME_MAX_AWAKE_INVALID');
+  if (!Array.isArray(agentIds) || !agentIds.length || agentIds.some(id => typeof id !== 'string' || !id) ||
+      new Set(agentIds).size !== agentIds.length) throw new TypeError('MARITIME_AWAKE_AGENT_IDS_INVALID');
+  if (typeof readInventory !== 'function' || typeof now !== 'function') throw new TypeError('MARITIME_AWAKE_POOL_CALLBACK_INVALID');
+  const members = new Set(agentIds), reserved = new Set(), pending = new Map(), queue = [];
+  const cancelled = Symbol('cancelled');
+  let closed = false, running = false, scheduled = false, rerun = false;
+  const expired = () => new MaritimeAdapterError('MARITIME_DISPATCH_EXPIRED', { retryable: true });
+  const closedError = () => new MaritimeAdapterError('MARITIME_AWAKE_POOL_CLOSED');
+  function boundary(item) {
+    if (closed) throw closedError();
+    if (item.signal?.aborted || item.deadlineAtMs !== undefined && now() >= item.deadlineAtMs) throw expired();
+  }
+  function detach(item) {
+    clearTimeout(item.timer);
+    item.signal?.removeEventListener('abort', item.onAbort);
+    pending.delete(item.agentId);
+    const index = queue.indexOf(item);
+    if (index >= 0) queue.splice(index, 1);
+    item.settled = true;
+  }
+  function reject(item, error) {
+    if (item.settled) return;
+    detach(item);
+    item.cancelRead(cancelled);
+    item.controller.abort();
+    item.reject(error);
+    pumpSoon();
+  }
+  function deadline(item) {
+    if (item.settled || item.deadlineAtMs === undefined) return;
+    const remaining = item.deadlineAtMs - now();
+    if (remaining <= 0) { reject(item, expired()); return; }
+    item.timer = setTimeout(() => deadline(item), Math.min(remaining, 2 ** 31 - 1));
+  }
+  function pumpSoon() {
+    if (closed) return;
+    rerun = true;
+    if (running || scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => { scheduled = false; void pump(); });
+  }
+  async function pump() {
+    if (closed || running) return;
+    running = true; rerun = false;
+    try {
+      while (!closed && queue.length) {
+        const item = queue[0];
+        try {
+          boundary(item);
+          if (reserved.size >= maxAwake) break;
+          const agents = await Promise.race([
+            Promise.resolve().then(() => {
+              if (item.settled || closed) return cancelled;
+              boundary(item);
+              return readInventory({ agentId: item.agentId, deadlineAtMs: item.deadlineAtMs, signal: item.controller.signal });
+            }), item.cancelled
+          ]);
+          if (item.settled || agents === cancelled) continue;
+          boundary(item);
+          if (!Array.isArray(agents) || agents.some(agent => !agent || typeof agent.id !== 'string' || !agent.id ||
+              typeof agent.status !== 'string' || !agent.status) || new Set(agents.map(agent => agent.id)).size !== agents.length ||
+              [...members].some(id => !agents.some(agent => agent.id === id))) {
+            throw new MaritimeAdapterError('MARITIME_INVENTORY_INVALID');
+          }
+          // In-flight reservations count even when inventory still reports sleeping.
+          // Every other non-sleeping account agent also occupies one slot.
+          const otherAwake = agents.filter(agent => !reserved.has(agent.id) &&
+            !['sleeping', 'stopped'].includes(agent.status.toLowerCase())).length;
+          if (otherAwake + reserved.size >= maxAwake) break;
+          reserved.add(item.agentId); // Reserve before promise continuations may start activation.
+          detach(item);
+          let released = false;
+          item.resolve(() => {
+            if (released) return;
+            released = true;
+            reserved.delete(item.agentId);
+            pumpSoon();
+          });
+        } catch (error) {
+          if (!item.settled) {
+            try { boundary(item); } catch (stopped) { error = stopped; }
+            reject(item, error);
+          }
+        }
+      }
+    } finally {
+      running = false;
+      if (rerun) pumpSoon();
+    }
+  }
+  return Object.freeze({
+    async acquire({ agentId, deadlineAtMs, signal } = {}) {
+      if (closed) throw closedError();
+      if (!members.has(agentId)) throw new MaritimeAdapterError('MARITIME_AWAKE_AGENT_INVALID');
+      if (deadlineAtMs !== undefined && (!Number.isSafeInteger(deadlineAtMs) || deadlineAtMs < 0)) throw new MaritimeAdapterError('MARITIME_DEADLINE_INVALID');
+      if (signal !== undefined && (!signal || typeof signal !== 'object' || typeof signal.aborted !== 'boolean' ||
+          typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) throw new MaritimeAdapterError('MARITIME_SIGNAL_INVALID');
+      boundary({ deadlineAtMs, signal });
+      if (pending.has(agentId) || reserved.has(agentId)) throw new MaritimeAdapterError('MARITIME_AWAKE_AGENT_BUSY', { retryable: true });
+      return new Promise((resolve, rejectPromise) => {
+        const item = { agentId, deadlineAtMs, signal, resolve, reject: rejectPromise, settled: false, controller: new AbortController() };
+        item.cancelled = new Promise(resolveCancelled => { item.cancelRead = resolveCancelled; });
+        item.onAbort = () => reject(item, expired());
+        queue.push(item); pending.set(agentId, item);
+        signal?.addEventListener('abort', item.onAbort, { once: true });
+        if (signal?.aborted) item.onAbort();
+        deadline(item);
+        pumpSoon();
+      });
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      for (const item of [...queue]) reject(item, closedError());
+      // Do not release granted leases: an unknown remote outcome still occupies its slot.
+    }
+  });
+}
+
 function requestTimeout({ deadlineAtMs, signal, remotePostStarted, timeoutMs }) {
   assertDispatchBoundary({ deadlineAtMs, signal, remotePostStarted });
   if (deadlineAtMs === undefined) return timeoutMs;
@@ -368,78 +490,12 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
   const bindings = runtimeBindings(runtimeEvidence, roster, config.run_id);
   const attempts = new Map(), busy = new Set();
   let rotationQueue = Promise.resolve(), rotationBlocked = false;
-  let awakeLeases = 0;
-  const leasedAgentIds = new Set();
-  const leaseQueue = [];
-  let leasePumpRunning = false;
-  let leaseWakeTimer;
-  const scheduleLeaseDeadline = () => {
-    const deadlines = leaseQueue.map(row => row.boundary.deadlineAtMs).filter(Number.isSafeInteger);
-    if (!deadlines.length) return;
-    const delay = Math.max(0, Math.min(...deadlines) - Date.now());
-    clearTimeout(leaseWakeTimer);
-    leaseWakeTimer = setTimeout(() => { leaseWakeTimer = undefined; pumpLeases(); }, delay);
-  };
-  const acquireLease = async (boundary, agentId) => {
-    // The legacy oneAwake path retains its established serial queue and does
-    // not need an inventory probe; maxAwake is the account-wide scheduler.
-    if (maxAwake === undefined) return () => {};
-    await new Promise((resolve, reject) => { leaseQueue.push({ boundary, agentId, resolve, reject }); pumpLeases(); });
-    return () => {
-      awakeLeases--; leasedAgentIds.delete(agentId);
-      // Queue a later turn so a release that occurs inside the active pump is
-      // not lost behind leasePumpRunning.
-      queueMicrotask(pumpLeases);
-    };
-  };
-  const pumpLeases = () => {
-    if (leasePumpRunning || awakeLimit === undefined) return;
-    leasePumpRunning = true;
-    (async () => {
-      try {
-        while (leaseQueue.length) {
-          const item = leaseQueue[0];
-          try {
-            assertDispatchBoundary(item.boundary);
-            if (awakeLeases >= awakeLimit) {
-              scheduleLeaseDeadline();
-              break;
-            }
-            leaseQueue.shift();
-            // Inventory is read-only and deliberately conservative: every
-            // non-sleeping unrelated agent consumes a slot.
-            const agents = await maritimeRequest({ apiKey, fetchImpl,
-              timeoutMs: continuity ? requestTimeout({ ...item.boundary, timeoutMs }) : timeoutMs,
-              path: '/api/agents', signal: item.boundary.signal });
-            if (continuity) assertDispatchBoundary(item.boundary);
-            if (!Array.isArray(agents) || agents.some(agent => !agent || typeof agent.id !== 'string' || !agent.id ||
-                typeof agent.status !== 'string') || new Set(agents.map(agent => agent.id)).size !== agents.length ||
-                roster.some(seat => !agents.some(agent => agent.id === seat.agent_id))) {
-              throw new MaritimeAdapterError('MARITIME_INVENTORY_INVALID');
-            }
-            const unrelatedAwake = agents.filter(agent => !leasedAgentIds.has(agent.id) &&
-              !['sleeping', 'stopped'].includes(String(agent.status).toLowerCase())).length;
-            if (unrelatedAwake + awakeLeases >= awakeLimit) {
-              leaseQueue.unshift(item);
-              scheduleLeaseDeadline();
-              break;
-            }
-            // Reserve before resolving: resolving runs continuations in a
-            // later microtask, while this pump can otherwise admit all waiters.
-            awakeLeases++;
-            leasedAgentIds.add(item.agentId);
-            item.resolve();
-          } catch (error) {
-            if (leaseQueue[0] === item) leaseQueue.shift();
-            if (continuity) {
-              try { assertDispatchBoundary(item.boundary); } catch (expired) { error = expired; }
-            }
-            item.reject(error);
-          }
-        }
-      } finally { leasePumpRunning = false; }
-    })();
-  };
+  // Legacy oneAwake retains its established serial queue without account inventory probes.
+  const leasePool = maxAwake === undefined ? null : createMaritimeAwakeLeasePool({ maxAwake,
+    agentIds: roster.map(seat => seat.agent_id), readInventory: ({ deadlineAtMs, signal }) => maritimeRequest({
+      apiKey, fetchImpl, timeoutMs: continuity ? requestTimeout({ deadlineAtMs, signal, remotePostStarted: false, timeoutMs }) : timeoutMs,
+      path: '/api/agents', signal }) });
+  const acquireLease = (boundary, agentId) => leasePool.acquire({ agentId, deadlineAtMs: boundary.deadlineAtMs, signal: boundary.signal });
   function certifiedLifecycle(assigned, boundary, post) {
     const agentPath = `/api/agents/${encodeURIComponent(assigned.agent_id)}`;
     const identity = (agent, status, code) => {

@@ -144,7 +144,7 @@ function cleanAudit(value, gameId, scoreboard) {
   return result;
 }
 
-// Independently reconstruct the complete serial continuity journal. A matching
+// Independently reconstruct each complete continuity lifecycle and capacity bound. A matching
 // digest authenticates a particular record; it does not establish its coverage.
 function verifyContinuityHistory(record, { config, evidence, binding, fuse }) {
   const code = 'PROOF_RUN_AUDIT_VERIFICATION_MISMATCH';
@@ -162,30 +162,49 @@ function verifyContinuityHistory(record, { config, evidence, binding, fuse }) {
     record.cleanup_deadline_at_ms === Math.min(binding.hard_stop_at_ms, binding.stop_new_games_at_ms + 60_000) &&
     record.cleanup_deadline_at_ms > record.deadline_at_ms && Array.isArray(record.operations), code);
   const operations = record.operations;
-  const expected = [];
-  for (const seat of config.roster) {
-    expected.push({ kind: 'inventory', seat_id: null });
-    for (const kind of ['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
-      ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read']) {
-      expected.push({ kind, seat_id: seat.seat_id });
+  const bySeat = new Map(config.roster.map(seat => [seat.seat_id, []]));
+  const finalInventory = operations.at(-2), finalChain = operations.at(-1);
+  ensure(config.roster.length === 10 && operations.length >= 182 &&
+    finalInventory?.kind === 'inventory' && finalInventory.seat_id === null &&
+    finalChain?.kind === 'chain-revalidation' && finalChain.seat_id === null, code);
+  for (const [index, operation] of operations.entries()) {
+    ensure(exact(operation, ['sequence', 'kind', 'seat_id', 'status', 'started_at_ms', 'completed_at_ms']) &&
+      operation.sequence === index + 1 && operation.status === 'complete' &&
+      Number.isSafeInteger(operation.started_at_ms) && Number.isSafeInteger(operation.completed_at_ms) &&
+      operation.started_at_ms >= (operations[index - 1]?.started_at_ms ?? record.started_at_ms) &&
+      operation.completed_at_ms >= operation.started_at_ms && operation.completed_at_ms <= record.completed_at_ms, code);
+    if (index < operations.length - 2) {
+      ensure(bySeat.has(operation.seat_id), code);
+      bySeat.get(operation.seat_id).push(operation);
     }
   }
-  expected.push({ kind: 'inventory', seat_id: null }, { kind: 'chain-revalidation', seat_id: null });
-  ensure(config.roster.length === 10 && expected.length === 182 && operations.length === expected.length, code);
-  for (let index = 0; index < expected.length; index++) {
-    const operation = operations[index], previous = operations[index - 1], next = operations[index + 1];
-    ensure(exact(operation, ['sequence', 'kind', 'seat_id', 'status', 'started_at_ms', 'completed_at_ms']) &&
-      operation.sequence === index + 1 && operation.kind === expected[index].kind && operation.seat_id === expected[index].seat_id &&
-      operation.status === 'complete' && Number.isSafeInteger(operation.started_at_ms) && Number.isSafeInteger(operation.completed_at_ms) &&
-      operation.started_at_ms >= (previous?.started_at_ms ?? record.started_at_ms) &&
-      operation.completed_at_ms >= operation.started_at_ms && operation.completed_at_ms <= record.completed_at_ms, code);
-    if (operation.kind === 'continuity-check') {
-      // A continuity check encloses initial lifecycle, nine runtime reads and
-      // final lifecycle, then completes before the seat's sleep begins.
-      const finalNestedRead = operations[index + 11], sleep = operations[index + 12];
-      ensure(operation.completed_at_ms >= finalNestedRead?.completed_at_ms && operation.completed_at_ms <= sleep?.started_at_ms, code);
-    } else if (next) ensure(operation.completed_at_ms <= next.started_at_ms, code);
+  const required = ['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
+    ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read'];
+  const occupancy = [];
+  for (const seat of config.roster) {
+    const history = bySeat.get(seat.seat_id);
+    let capacityReads = 0;
+    while (history[capacityReads]?.kind === 'inventory') capacityReads++;
+    ensure(capacityReads > 0 && history.length === capacityReads + required.length &&
+      required.every((kind, index) => history[capacityReads + index].kind === kind), code);
+    for (const [index, operation] of history.entries()) {
+      if (operation.kind === 'continuity-check') {
+        ensure(operation.completed_at_ms >= history[index + 11].completed_at_ms &&
+          operation.completed_at_ms <= history[index + 12].started_at_ms, code);
+      } else if (history[index + 1]) ensure(operation.completed_at_ms <= history[index + 1].started_at_ms, code);
+    }
+    const activated = history[capacityReads].started_at_ms, slept = history.at(-1).completed_at_ms;
+    ensure(slept <= finalInventory.started_at_ms, code);
+    occupancy.push({ at: activated, sequence: history[capacityReads].sequence, change: 1 },
+      { at: slept, sequence: history.at(-1).sequence, change: -1 });
   }
+  ensure(finalInventory.completed_at_ms <= finalChain.started_at_ms, code);
+  let awake = 0;
+  for (const event of occupancy.sort((a, b) => a.at - b.at || a.sequence - b.sequence || a.change - b.change)) {
+    awake += event.change;
+    ensure(awake >= 0 && awake <= 5, code);
+  }
+  ensure(awake === 0, code);
 }
 
 /** Independent read-only audit of a completed prepared run. It deliberately does

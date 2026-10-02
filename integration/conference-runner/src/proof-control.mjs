@@ -226,32 +226,51 @@ async function checkVerification(options, selected, config, evidence, current, p
         record.deadline_at_ms !== options.stopNewGamesAtMs ||
         record.cleanup_deadline_at_ms !== Math.min(options.hardStopAtMs, options.stopNewGamesAtMs + 60_000) ||
         record.cleanup_deadline_at_ms <= record.deadline_at_ms || !Array.isArray(record.operations) || config.roster.length !== 10) fail('invalid');
-    // This is the serial journal emitted by verifyReadinessCurrent: inventory,
-    // resume, confirmed lifecycle, activation settle, nested continuity checks,
-    // and confirmed sleep.
-    // The nine runtime reads include both original diagnostic receipts.
-    const expected = config.roster.flatMap(seat => [
-      ['inventory', null], ...['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
-        ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read'].map(kind => [kind, seat.seat_id])
-    ]).concat([['inventory', null], ['chain-revalidation', null]]);
-    if (record.operations.length !== expected.length) fail('invalid');
+    // Capacity probes precede each seat's single activation. Seats may
+    // interleave, but their own lifecycle and nested continuity reads may not.
+    const perSeat = new Map(config.roster.map(seat => [seat.seat_id, []]));
+    const operations = record.operations, tail = operations.slice(-2);
+    if (operations.length < 182 || tail[0]?.kind !== 'inventory' || tail[1]?.kind !== 'chain-revalidation' ||
+        tail.some(operation => operation.seat_id !== null)) fail('invalid');
     let previousStarted = record.started_at_ms;
-    for (const [index, operation] of record.operations.entries()) {
+    for (const [index, operation] of operations.entries()) {
       if (!exact(operation, ['sequence', 'kind', 'seat_id', 'status', 'started_at_ms', 'completed_at_ms']) ||
-          operation.sequence !== index + 1 || operation.kind !== expected[index][0] || operation.seat_id !== expected[index][1] ||
-          operation.status !== 'complete' || !Number.isSafeInteger(operation.started_at_ms) || !Number.isSafeInteger(operation.completed_at_ms) ||
+          operation.sequence !== index + 1 || operation.status !== 'complete' ||
+          !Number.isSafeInteger(operation.started_at_ms) || !Number.isSafeInteger(operation.completed_at_ms) ||
           operation.started_at_ms < previousStarted || operation.completed_at_ms < operation.started_at_ms ||
           operation.completed_at_ms > record.completed_at_ms) fail('invalid');
       previousStarted = operation.started_at_ms;
-      // Only continuity-check encloses later journal operations. All other
-      // operations complete before the next begins.
-      const next = record.operations[index + 1];
-      if (operation.kind !== 'continuity-check' && next && operation.completed_at_ms > next.started_at_ms) fail('invalid');
-      if (operation.kind === 'continuity-check') {
-        const lastNested = record.operations[index + 11], sleep = record.operations[index + 12];
-        if (operation.completed_at_ms < lastNested.completed_at_ms || operation.completed_at_ms > sleep.started_at_ms) fail('invalid');
+      if (index < operations.length - 2) {
+        if (!perSeat.has(operation.seat_id)) fail('invalid');
+        perSeat.get(operation.seat_id).push(operation);
       }
     }
+    const expected = ['activation', 'lifecycle-read', 'activation-settle', 'continuity-check', 'lifecycle-read',
+      ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read'];
+    const intervals = [];
+    for (const history of perSeat.values()) {
+      const firstAction = history.findIndex(operation => operation.kind !== 'inventory');
+      if (firstAction < 1 || history.length !== firstAction + expected.length ||
+          history.slice(firstAction).some((operation, index) => operation.kind !== expected[index])) fail('invalid');
+      for (const [index, operation] of history.entries()) {
+        const next = history[index + 1];
+        if (operation.kind === 'continuity-check') {
+          if (operation.completed_at_ms < history[index + 11].completed_at_ms ||
+              operation.completed_at_ms > history[index + 12].started_at_ms) fail('invalid');
+        } else if (next && operation.completed_at_ms > next.started_at_ms) fail('invalid');
+      }
+      const begin = history[firstAction].started_at_ms, end = history.at(-1).completed_at_ms;
+      if (end > tail[0].started_at_ms) fail('invalid');
+      intervals.push([begin, history[firstAction].sequence, 1], [end, history.at(-1).sequence, -1]);
+    }
+    if (tail[0].completed_at_ms > tail[1].started_at_ms) fail('invalid');
+    // A slot remains occupied through the confirmed sleeping readback.
+    let active = 0;
+    for (const [, , delta] of intervals.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2])) {
+      active += delta;
+      if (active < 0 || active > 5) fail('invalid');
+    }
+    if (active !== 0) fail('invalid');
     return { path: filename, file_sha256: file.sha256, identity: after, not_before_ms: pinned?.not_before_ms ?? notBeforeMs };
   } catch { fail('PROOF_CURRENT_READINESS_UNVERIFIED'); }
 }
