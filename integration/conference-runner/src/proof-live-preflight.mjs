@@ -77,7 +77,7 @@ function validateLedger(ledger, expected, now) {
       ledger.schema_version !== 1 || !same(ledger.scope, expected)) fail('PROOF_SCOREBOARD_SCOPE_INVALID');
   if (!Array.isArray(ledger.results) || !Array.isArray(ledger.cancelled) || !Array.isArray(ledger.rejected_results) ||
       ledger.rejected_results.length || !exact(ledger.pins, TEAMS) || !ledger.defaults || Array.isArray(ledger.defaults) ||
-      typeof ledger.defaults !== 'object' || Object.entries(ledger.defaults).some(([game, rows]) => !UINT.test(game) || !Array.isArray(rows) || rows.length) ||
+      typeof ledger.defaults !== 'object' || Object.entries(ledger.defaults).some(([game, rows]) => !UINT.test(game) || !Array.isArray(rows)) ||
       !nonnegative(ledger.retry_at) || ledger.retry_at > now) fail('PROOF_SCOREBOARD_UNRESOLVED');
   const games = new Set(), resultIds = new Set();
   const walletTeams = new Map(expected.roster.map(row => [row.wallet, row.team]));
@@ -100,6 +100,18 @@ function validateLedger(ledger, expected, now) {
     }
     if (TEAMS.some(team => result.awards_wei[team] !== sums[team].toString()) ||
         result.winner !== (sums.openclaw === sums.hermes ? 'tie' : sums.openclaw > sums.hermes ? 'openclaw' : 'hermes')) fail('PROOF_SCOREBOARD_UNRESOLVED');
+  }
+  // Defaults from a completed historical game remain truthful series history;
+  // they do not certify healthy play for the separately audited current proof.
+  const completedGames = new Set(ledger.results.map(result => result.game_id));
+  const defaultRows = new Set();
+  for (const [game, rows] of Object.entries(ledger.defaults)) {
+    if (rows.length && !completedGames.has(game)) fail('PROOF_SCOREBOARD_UNRESOLVED');
+    for (const row of rows) {
+      const fields = typeof row === 'string' && /^(0x[0-9a-f]{64}):(0|[1-9][0-9]*):(0x[0-9a-f]{40})$/.exec(row);
+      if (!fields || fields[0] !== row || !Number.isSafeInteger(Number(fields[2])) || !walletTeams.has(fields[3]) || defaultRows.has(row)) fail('PROOF_SCOREBOARD_UNRESOLVED');
+      defaultRows.add(row);
+    }
   }
   if (ledger.stage !== null && (!exact(ledger.stage, ['game_id', 'round', 'phase']) || !UINT.test(ledger.stage.game_id ?? '') ||
       !nonnegative(ledger.stage.round) || !['idle', 'completed', 'cancelled'].includes(ledger.stage.phase))) fail('PROOF_SCOREBOARD_UNRESOLVED');

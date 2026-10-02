@@ -114,7 +114,7 @@ test('spectator send permissions and bot pin/admin rights must still be disabled
   }
 });
 
-test('unresolved historical deliveries, rejected/defaulted results and changed pin digests block before network reads', async t => {
+test('unresolved historical deliveries, rejected results, orphan defaults and changed pin digests block before network reads', async t => {
   for (const mutate of [
     ...['pending', 'inflight', 'uncertain', 'rejected'].map(status => f => { f.outbox.entries[0].status = status; }),
     f => { f.outbox.chats.openclaw = '-100999'; },
@@ -171,6 +171,49 @@ test('healthy historical accounting is accepted while duplicate results or incon
   ]) {
     const f = await fixture(t); addHistory(f); mutate(f); await f.write();
     await assert.rejects(verifyProofSpectators(f.options), /PROOF_SCOREBOARD_UNRESOLVED/);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('completed historical defaults remain valid series history without rewriting evidence or clearing unresolved records', async t => {
+  const addHistory = (f, gameId = '19', byte = 'ab') => {
+    const tx = `0x${byte.repeat(32)}`;
+    f.ledger.results.push({ game_id: gameId, result_id: `${tx}:2`, transaction_hash: tx, block_number: '100',
+      awards: f.ledger.scope.roster.map(row => ({ wallet: row.wallet, award_wei: '1' })),
+      awards_wei: { openclaw: '5', hermes: '5' }, winner: 'tie' });
+    f.ledger.stage = { game_id: gameId, round: 4, phase: 'completed' };
+    f.ledger.defaults[gameId] = f.ledger.scope.roster.slice(0, 2).map(row => `0x${'cd'.repeat(32)}:1:${row.wallet}`);
+  };
+  const healthy = await fixture(t); addHistory(healthy); await healthy.write();
+  const before = await fs.readFile(healthy.files.ledger, 'utf8');
+  assert.deepEqual(await verifyProofSpectators(healthy.options), { schema_version: 1, verified: true });
+  assert.equal(await fs.readFile(healthy.files.ledger, 'utf8'), before);
+  assert.equal(JSON.parse(before).defaults['19'].length, 2);
+  assert.deepEqual(healthy.calls.map(call => call.method), ['getMe', 'getChat', 'getChatMember', 'getChat', 'getChatMember']);
+  for (const mutate of [
+    f => { f.ledger.results = []; },
+    f => { f.ledger.cancelled.push({ game_id: '19', transaction_hash: f.ledger.results[0].transaction_hash, result_id: f.ledger.results[0].result_id }); f.ledger.results = []; },
+    f => { f.ledger.defaults['20'] = f.ledger.defaults['19']; delete f.ledger.defaults['19']; },
+    f => { f.ledger.stage.phase = 'commit'; },
+    f => { f.ledger.defaults['19'][0] = {}; },
+    f => { f.ledger.defaults['19'][0] = 'synthetic malformed default'; },
+    f => { f.ledger.defaults['19'][0] = f.ledger.defaults['19'][0].replace('cd', 'CD'); },
+    f => { f.ledger.defaults['19'][0] = f.ledger.defaults['19'][0].replace(/0x[0-9a-f]{40}$/, wallet => wallet.toUpperCase()); },
+    f => { f.ledger.defaults['19'][0] = f.ledger.defaults['19'][0].replace(/0x[0-9a-f]{40}$/, `0x${'f'.repeat(40)}`); },
+    f => { f.ledger.defaults['19'][0] = f.ledger.defaults['19'][0].replace(':1:', ':01:'); },
+    f => { f.ledger.defaults['19'][0] = f.ledger.defaults['19'][0].replace(':1:', ':-1:'); },
+    f => { f.ledger.defaults['19'][0] = f.ledger.defaults['19'][0].replace(':1:', ':9007199254740992:'); },
+    f => { f.ledger.defaults['19'][0] += ':extra'; },
+    f => { f.ledger.defaults['19'][0] += '\n'; },
+    f => { f.ledger.defaults['19'].push(f.ledger.defaults['19'][0]); },
+    f => { addHistory(f, '20', 'ef'); }, // The same event/wallet cannot belong to two games.
+    f => { f.ledger.results[0].awards_wei.openclaw = '6'; },
+    f => { f.ledger.rejected_results.push({ game_id: '19', reason: 'synthetic unresolved result' }); },
+    f => { f.ledger.pins.openclaw.status = 'inflight'; },
+    f => { f.outbox.entries[0].status = 'uncertain'; }
+  ]) {
+    const f = await fixture(t); addHistory(f); mutate(f); await f.write();
+    await assert.rejects(verifyProofSpectators(f.options), error => ['PROOF_SCOREBOARD_UNRESOLVED', 'PROOF_SPECTATOR_OUTBOX_UNRESOLVED'].includes(error.code));
     assert.equal(f.calls.length, 0);
   }
 });
