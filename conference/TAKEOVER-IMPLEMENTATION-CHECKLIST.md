@@ -8,6 +8,24 @@
 
 This checklist replaces launch-first debugging. Do not create another game until the prelaunch gate below passes for all ten seats during the same bounded preparation run. Local fixtures, direct runtime inspection, and cached transactions are useful evidence, but none alone proves readiness for a fresh game.
 
+## Three remaining milestones — active execution plan
+
+The phases below retain detailed acceptance requirements. They are not nine new implementation projects. Local implementation and fixture work are already green at `2950f11`; remaining work is these three live milestones.
+
+| Milestone | Completion evidence | Current blocker |
+|---|---|---|
+| M1 — all-ten runtime readiness | All ten existing seats pass both native diagnostic modes in one fresh bounded run; 20/20 inputs, verified receipts, no transaction, confirmed cleanup and valid readiness evidence. | hs-1 passed both modes; hs-2's first artifact-hash exec became unknown. Reporting is fixed locally; the underlying live cause is unresolved. All ten public artifacts were already refreshed. |
+| M2 — reconcile live operating state | Preserved operator transactions reconciled against chain, current nonces and idle state verified, correct Telegram rooms/pins/outbox/scoreboard bindings and existing operator ownership established. | One of 47 operator records is in broadcast stage; scoreboard/outbox bindings remain unresolved. Do not reset either to make the gate pass. |
+| M3 — one audited 5v5 game | Ten joins/discussions/commits/reveals, zero defaults, confirmed result/awards, correct isolated Telegram results/pins, independent audit and cleanup. | Depends on M1 and M2; no game currently authorized. |
+
+M1 diagnosis and M2 reconciliation can progress independently. Finish M2 before the final M1 certification so the ten-minute evidence lifetime is useful for preparation and immediate precreation verification. Do not extend that lifetime to accommodate delays. Stop this tranche after M3; continuous games, hosting, UI changes, framework migrations and general cleanup are deferred.
+
+Work one demonstrated failure at a time: identify the boundary, make the smallest necessary fix, run its targeted regression, then return to the authorized live check. A new failure may add a fix inside a milestone; it does not automatically add a new feature or acceptance gate. Retain the existing privacy, transaction, capacity, deadline and no-replay safeguards.
+
+Run the documented full suites once for a completed implementation tranche before checkpointing. Reuse verified results for unchanged source; documentation-only handoffs do not require another full run. Report progress as M1/M2/M3, live evidence gained, current blocker and next action—not as test volume. If a workstream has no new evidence or completed fix for 15 minutes, give a concise blocker/update and reconsider the current approach rather than opening more workstreams; this does not create a new approval requirement.
+
+At a session boundary or compaction, resume from [NEXT-SESSION.md](NEXT-SESSION.md), verify Git and saved evidence, and preserve the exact pending action and authorization limits. Do not restart planning, provisioning, baseline testing or historical launch procedures.
+
 ## Operating rules
 
 - [ ] One lead owns all Maritime, Telegram, contract, wallet, and signer mutations.

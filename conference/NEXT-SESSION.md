@@ -1,36 +1,60 @@
-**START HERE — latest user request:** Set up five OpenClaw vs five Hermes on the user-upgraded Starter plan, using **GPT-5.4 mini**. The user wants a fresh cheaper development session. Read [FIVE-V-FIVE-MINI-HANDOFF.md](FIVE-V-FIVE-MINI-HANDOFF.md) and the top of [RUN-STATUS.md](RUN-STATUS.md); the text below is historical. Mini has not been applied yet and ten-seat setup has not started.
+# Resume the three-milestone 5v5 proof
 
-**September 25 reliability update:** Games 12, 13 and 14 all passed independent real-game audits, including Telegram strategies/results and zero defaults. The controlled runner/operator restart during Game 13 passed without duplicate requests. Runner/operator are stopped, contract idle, and `http://127.0.0.1:8787` shows the saved Game 14 proof. Next: verify a user-purchased paid plan, test the same three agents concurrently, then consider five; larger rosters, live multi-round play and unattended hosting remain unproven. Read [current run status](RUN-STATUS.md) and [combined evidence](evidence/reliability-summary-2026-09-25.json) before historical notes below.
+Updated October 2, 2026. This replaces this file's obsolete startup instructions; Git preserves their history. The user requested a fresh session because the previous workflow was too slow and heavy. Continue concrete work within the existing plan; do not create another plan or broaden the prototype.
 
-# Resume the real three-agent proof
+## Start here
 
-**Overnight stop:** no new game was launched. Start with [TOMORROW-ONE-HOUR.md](TOMORROW-ONE-HOUR.md) for the timed plan, preserved commands, economical worker assignments and failure decision tree. The prepared `/private/tmp/hermes-game11-2026-09-25` directory has no launch fuse/runtime and its schedule will expire. Do not reuse it or start work again until the user returns.
+Workspace: `/Users/wade/Documents/DilemmaEval`.
+Branch: `codex/converge-demo-2026-09-25`.
+Last implementation checkpoint: **`2950f11`**. A later documentation-only checkpoint may be HEAD. Verify branch, history and working tree yourself; preserve every edit and all runtime state. Do not reset, clean, replace agents or recreate missing private state.
 
-Keep the original scope: three real Maritime agents play Share/Steal/Catch on Base Sepolia, with real strategy messages and results in Telegram, followed by the website and continuous games. The user rejected a reduced tool-only demo. Use the existing Hermes and two OpenClaw machines. Do not provision, replace agents, buy capacity, or develop further free-tier workarounds. Iteration is authorized, but every live attempt must be bounded and stopped on an ambiguous failure.
+Read `AGENTS.md`, `CURRENT-STATUS.md`, and the **three remaining milestones** at the top of `TAKEOVER-IMPLEMENTATION-CHECKLIST.md`. This file is the restart pointer; the checklist is the plan; current status holds the facts. Read relevant code/interfaces and the latest `RUN-STATUS.md` entry before acting. Older guide/handoff instructions describe historical stages, not new scope.
 
-Work on `codex/converge-demo-2026-09-25` in `/Users/wade/Documents/DilemmaEval`. Preserve all dirty and untracked work. Read `AGENTS.md` and the current top of `conference/RUN-STATUS.md`. Use lighter workers for bounded implementation/test tasks; the lead alone operates external mutations.
+## Exactly what remains
 
-## Verified state
+1. **M1: all-ten live readiness.** Resolve hs-2's observed runtime-integrity failure and obtain a fresh 20/20 diagnostic run. All ten public runtimes were already updated; do not reinstall or repeat model migration without evidence of drift.
+2. **M2: reconcile operating state.** Reconcile one preserved operator broadcast record and establish the correct existing Telegram/outbox/scoreboard bindings. M1 investigation and M2 read-only reconciliation can proceed independently. Finish M2 before collecting the final short-lived readiness certificate.
+3. **M3: one audited 5v5 game and cleanup.** Only after M1/M2 and explicit bounded game authorization. Use the existing repository CLI and independent auditor. Stop after this proof; continuous operation, hosting, UI expansion and general refactoring are deferred.
 
-- Local pinned upstream contract/auth tests passed **72/72**, using verified temporary Forge 1.8.3 and revision `955ce16a59b0efecf6ccdf2d391ede83de8902a8`. Existing upstream checkout: `/private/tmp/dilemma-conference-game`. These are simulated contract tests, not Maritime gameplay proof.
-- Game 10 cleanup is complete: active game **0**, dispatcher/operator stopped, operator port 8791 closed, and Telegram queue clear. The independent audit rejected all **9 defaulted actions** as expected; `proof_complete` remains false.
-- Real **Game 10** achieved **three joins and three delivered strategy messages**: Telegram IDs 32, 33, 34. It failed before any commit. Its defaulted cleanup result must never be counted as successful agent play. See `conference/evidence/hermes-game10b-2026-09-25.json` for the final live state and independent audit.
-- Exact new cause: Hermes placed its own valid `choice` inside `request`, while the CLI requires the two fields to be siblings. No Game 10 Hermes commit journal existed. The CLI's generic error wrapper became `MARITIME_AGENT_RESPONSE_INVALID`. Safe evidence: `conference/evidence/game10-commit-input-diagnostic-2026-09-25.json`.
-- Fix: explicit sibling-choice prompt; `PLAYER_CHOICE_LOCATION_INVALID` before filesystem/bridge work; allowlisted CLI diagnostic preserved through transport and runner without changing ambiguity/no-replay behavior. **95/95** player CLI/runtime, transport, runner and integration tests passed.
-- Actual Hermes uid 10000 reproduced the new specific error for the original malformed input. Corrected placement passed real runtime validation with signer absent and bridge execution disabled. Private choice remained inside Hermes; no transaction was submitted by that diagnostic.
-- Latest deployed files are verified on all three machines before/after sleep: `conference/evidence/player-choice-location-durable-patch-2026-09-25.json`. This supersedes the older error-code deployment hashes. Prompt/runner edits live in the local coordinator code.
-- All three agents were confirmed sleeping at 02:21 UTC in `conference/evidence/game10-final-maritime-state-2026-09-25.json`. No machine was reprovisioned or replaced.
-- Existing oc-1 was already funded to roughly 0.015 testnet ETH by `0xa52e9a26054a528b5fc756458fd2b7f5b13f2008b978173d5781086afb27eefa`. **Do not repeat that transfer.** Funding preflight now uses the actual pinned player fee policy.
+The code and repeated fixtures are built. Default suites passed **520 runner + 199 site/shared = 719/719** at `2950f11`; zero failures/cancellations/skips. Independent review, Gitleaks and whitespace checks passed. Do not rerun unchanged full suites just to start a session. For a real code fix, use targeted regressions, then the documented defaults once before its checkpoint. This documentation-only handoff does not require another application test run.
 
-## Remaining live gate
+## Proven live result and unresolved facts
 
-A clean controlled game must still demonstrate three joins, actual strategy messages, real commits and reveals without defaults, and a confirmed Telegram result. Do not present fixture tests, defaulted choices, or a submitted response alone as success.
+- The October 2 authorized preflight verified and refreshed all ten existing public artifacts, enabled execution permits, verified hashes/flushes, and confirmed sleeps. Independent local audit found 191 returned refresh operations and no uncertain refresh operations. Existing mini profiles/routes matched; no agent replacement, dependency reinstall or private-state replacement occurred.
+- The real CLI passed both diagnostic modes for **hs-1**. **hs-2** failed on the first public artifact-hash exec after confirmed `reload-env` activation: operation 48 became unknown after 530 ms. The old coordinator discarded its provider cause. No hs-2 chat was sent. **Two chats completed; no all-ten readiness certificate exists.**
+- `2950f11` fixes safe failure-code retention and incorrect sleep-certainty reporting. **It does not fix or explain the underlying hs-2 failure and has not been live-retested.** Do not assume a timeout, HTTP code, corrupt artifact or provider outage without evidence.
+- The old failed journal reports `all_seats_sleeping:true`; that claim is defective because runtime-read was unknown. Preserve the journal unchanged and treat the uncertainty as unresolved. A separate read observed all ten sleeping at `2026-10-02T16:35:30.272Z`; observation alone is not readiness.
+- Confirmed chain block `47594872` was idle, with 10/10 defaults and ten admitted/whitelisted players. These observations need refresh before use. No game, signing, transaction or Telegram message was attempted during this preflight.
+- The matching preserved owner journal contains 47 records: 46 confirmed-stage and one broadcast-stage. Receipts/nonces have not been refreshed. Four outbox candidates were located; required scoreboard/series bindings remain unresolved. Nothing was reset.
 
-1. Check final Game 10 evidence and current chain state. Do not create anything while an active game or ambiguous owner/player submission remains. Do not replay its failed round-1 commit request.
-2. Recheck the same Maritime roster and live chain/funding/nonces. A prior Maritime HTTP 500 service interruption recovered; it is separate from player input failures. No new agents are needed.
-3. For a future bounded fresh attempt, use a new private directory and public evidence filename with `/private/tmp/hermes-resumable-controlled-game.mjs prepare`, setting `PROOF_DIRECTORY` and `PROOF_EVIDENCE`. Never remove/reuse an existing `launch-once.json` fuse or expired schedule. The helper now validates the latest choice-location patch evidence.
-4. Start exactly one existing owner operator: `node --env-file=/Users/wade/.config/dilemmaeval-conference/launcher.env integration/conference-runner/src/chain/cli.mjs operator CONFIG /Users/wade/.local/state/dilemmaeval-conference/converge-rehearsal-2026-09-24-r8/operator 8791`. Run the bounded controller with the same proof environment.
-5. Stop dispatch on failure, extract only fixed safe codes/shape flags, and reconcile actual chain state. Do not use another game to discover a known input/runtime defect. Never copy private choices, salts, complete commands, sessions or journals into coordinator evidence.
-6. At terminal run `/private/tmp/dilemma-audit-controlled-proof.mjs` with the proof environment and actual `PROOF_GAME_ID`. Require `proof_complete: true`. Stop the bounded controller/operator after the attempt. Only then proceed to broader conference deployment.
+Public observation: [live-diagnostic-preflight-2026-10-02.json](evidence/live-diagnostic-preflight-2026-10-02.json). Games 12–14 are the proven three-agent baseline; Games 15–17 were failed 5v5 attempts. Do not infer the next chain game ID.
 
-Private credentials stay in the existing configuration paths. The owner key stays outside Maritime; each agent chooses its own move and keeps its own reveal material.
+## Pending action and authorization
+
+The proposed next live action is a **10-minute hs-2-only public-runtime inspection**: one start, public artifact hash/model/route checks, one cleanup sleep and final inventory. It allows **zero chats/model calls, uploads, environment changes, gameplay, signing, transactions or Telegram messages**. The exact reviewed requests are in the external review below. It is a proposal, not an executed operation or a repository CLI subcommand; do not invent a command name or silently run the all-ten diagnostic instead.
+
+**This action has NOT been authorized.** The user's later requests were to explain the plan and prepare a new session. The previous window ended `2026-10-02T16:48:47.149Z` and stopped early on uncertainty. No time/budget rolls over. A session change does not authorize remote mutation. Request authorization for the concrete new scope only; do not ask again after the user grants it. Local work and safe read-only reconciliation can proceed without another planning cycle.
+
+No game is authorized. When M1/M2 can be completed within a fresh evidence window, seek one concrete bounded diagnostic/preparation/one-game scope, rather than approval for every routine action inside it. Preserve all stop conditions; never replay uncertain signing or promote the failed diagnostic into readiness.
+
+## Evidence locations and existing tools
+
+External operation directory: `/private/tmp/conference-live-preflight-20261002-68cvahse`.
+
+- `next-hs2-inspection-review.json`: pending narrow scope, exact public commands, limits and stop conditions.
+- `authorization.json`, `refresh-results.json`, `refresh-operations.json`, `reviewed-*.json`: original window and verified refresh evidence.
+- `diagnostic/readiness-journal.json`, `final-observation.json`: failed run and later sleeping observation. Never rewrite these to match the fixed code.
+- `artifact-plan.json`, `operations-manifest.json`, `config.json`: reviewed inputs. Config deadlines are expired; preserve identities and derive fresh authorized deadlines when appropriate.
+- `preserved-state-path-review.json`, `operator-journal-stage-observation.json`: preserved-state locations and safe observations. Reconcile those records in place; never dump their contents.
+
+These are external runtime artifacts, not Git assets; verify existence. If missing, report the specific missing evidence rather than recreating successful history. Preserve canonical state under `/Users/wade/.local/state/dilemmaeval-conference`. The historical temporary prepared-proof directory was absent.
+
+Versioned operator: `integration/conference-runner/src/conference-control.mjs`; package README supplies exact arguments. `plan`/`status` are local and read-only; `diagnose`, `proof-prepare` and `proof-run` mutate live state and require the corresponding authorization. Never load signing credentials for runtime inspection.
+
+Completed default logs: `/private/tmp/conference-live-preflight-runner-default.log` and `/private/tmp/conference-live-preflight-{site,game-bridge,harness-adapters,maritime-transport,orchestrator-core,team-logs}-default.log`.
+
+## Prevent drift after restart or compaction
+
+Resume the pending action, not the original provisioning project. Every change must name M1, M2 or M3 and an observed blocker or existing acceptance requirement. One concrete failure/fix at a time; use workers only for independent disjoint implementation lanes under AGENTS.md. Lead owns external mutations.
+
+Report: milestone, new live evidence, blocker, next action. Unit-test totals are not live progress. At a checkpoint/session boundary, update this handoff/current status with changed facts, pending action, evidence location and authorization expiry. Do not generate overlapping handoffs or add acceptance gates to compensate for lost conversational context.

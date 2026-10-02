@@ -6,6 +6,8 @@
 
 **Canonical checklist:** [TAKEOVER-IMPLEMENTATION-CHECKLIST.md](TAKEOVER-IMPLEMENTATION-CHECKLIST.md)
 
+**Execution plan:** three remaining milestones—M1 all-ten live readiness, M2 operating-state reconciliation, M3 one audited game. Their exit criteria and scope limits are at the top of the canonical checklist. **New-session entry:** [NEXT-SESSION.md](NEXT-SESSION.md). A session change adds no live authorization.
+
 This page is the current operating summary. [RUN-STATUS.md](RUN-STATUS.md) is a chronological evidence archive, and [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) records the original three-agent design. Where either conflicts with this page, treat the older text as historical rather than as current instructions.
 
 ## Proven baseline
@@ -22,7 +24,7 @@ These attempts establish that agent inventory, model/tool probes, and isolated c
 
 ## Safe checkpoint
 
-- Latest local correction: unknown runtime exec now blocks sleep certification and records only allowlisted failure metadata. Complete documented suites passed **520/520 runner + 199/199 site/shared = 719/719**, with zero failures, cancellations or skips. This correction has not been rerun against live agents.
+- Latest implementation checkpoint: `2950f11` (`Record live diagnostic boundary and preserve runtime uncertainty`). Unknown runtime exec now blocks sleep certification and records only allowlisted failure metadata. Complete documented suites passed **520/520 runner + 199/199 site/shared = 719/719**, with zero failures, cancellations or skips. This correction has not been rerun against live agents.
 - Previous continuity/execution implementation checkpoint: `641f4ee` (`Complete runtime continuity and guarded 5v5 proof execution`). All **717** documented default tests passed; all **32** intended files passed Gitleaks with zero findings, and the staged whitespace check passed.
 - Previous diagnostic implementation checkpoint: `7d8e025` (`Implement durable ten-seat diagnostics and audited fixture coverage`), with all 577 documented default tests passing and all 36 intended files scanned before commit.
 - Recoverable source checkpoint: commit `688f3b9` (`Checkpoint conference implementation before takeover hardening`), created after the intended tree passed the takeover secret scan.
