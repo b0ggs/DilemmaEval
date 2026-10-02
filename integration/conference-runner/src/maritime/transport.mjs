@@ -342,7 +342,7 @@ function validateModelConfigurationResult(result, seat, apiKey) {
 
 export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchImpl = globalThis.fetch,
   timeoutMs = 120_000, oneAwake = false, maxAwake, maxAgents = 3, wakeDelayMs = 10_000,
-  verifyRecoveredResponse = verifyCompletedReceipt, diagnosticStageRetries = 1 } = {}) {
+  verifyRecoveredResponse = verifyCompletedReceipt, diagnosticStageRetries = 1, runtimeContinuity } = {}) {
   if (config?.chain_id !== 84532) throw new TypeError('BASE_SEPOLIA_REQUIRED');
   if (typeof apiKey !== 'string' || !apiKey || /[\r\n]/.test(apiKey)) throw new TypeError('MARITIME_CREDENTIAL_MISSING');
   validateMaritimeRoster(config.roster);
@@ -357,6 +357,13 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
   if (!Number.isInteger(wakeDelayMs) || wakeDelayMs < 0 || wakeDelayMs > 60_000) throw new TypeError('MARITIME_WAKE_DELAY_INVALID');
   if (typeof verifyRecoveredResponse !== 'function') throw new TypeError('MARITIME_RECOVERY_VERIFIER_INVALID');
   if (![0,1].includes(diagnosticStageRetries)) throw new TypeError('MARITIME_DIAGNOSTIC_RETRIES_INVALID');
+  if (runtimeContinuity !== undefined && (!runtimeContinuity || typeof runtimeContinuity !== 'object' ||
+      Array.isArray(runtimeContinuity) || Object.keys(runtimeContinuity).sort().join('\0') !== 'prepareAction\0verify' ||
+      typeof runtimeContinuity.verify !== 'function' || typeof runtimeContinuity.prepareAction !== 'function' ||
+      maxAwake === undefined || maxAwake > 5)) throw new TypeError('MARITIME_RUNTIME_CONTINUITY_INVALID');
+  const continuity = runtimeContinuity === undefined ? null : Object.freeze({
+    verify: runtimeContinuity.verify, prepareAction: runtimeContinuity.prepareAction
+  });
   const roster = structuredClone(config.roster);
   const bindings = runtimeBindings(runtimeEvidence, roster, config.run_id);
   const attempts = new Map(), busy = new Set();
@@ -401,7 +408,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             leaseQueue.shift();
             // Inventory is read-only and deliberately conservative: every
             // non-sleeping unrelated agent consumes a slot.
-            const agents = await maritimeRequest({ apiKey, fetchImpl, timeoutMs, path: '/api/agents', signal: item.boundary.signal });
+            const agents = await maritimeRequest({ apiKey, fetchImpl,
+              timeoutMs: continuity ? requestTimeout({ ...item.boundary, timeoutMs }) : timeoutMs,
+              path: '/api/agents', signal: item.boundary.signal });
+            if (continuity) assertDispatchBoundary(item.boundary);
             if (!Array.isArray(agents) || agents.some(agent => !agent || typeof agent.id !== 'string' || !agent.id ||
                 typeof agent.status !== 'string') || new Set(agents.map(agent => agent.id)).size !== agents.length ||
                 roster.some(seat => !agents.some(agent => agent.id === seat.agent_id))) {
@@ -421,12 +431,90 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             item.resolve();
           } catch (error) {
             if (leaseQueue[0] === item) leaseQueue.shift();
+            if (continuity) {
+              try { assertDispatchBoundary(item.boundary); } catch (expired) { error = expired; }
+            }
             item.reject(error);
           }
         }
       } finally { leasePumpRunning = false; }
     })();
   };
+  function certifiedLifecycle(assigned, boundary, post) {
+    const agentPath = `/api/agents/${encodeURIComponent(assigned.agent_id)}`;
+    const identity = (agent, status, code) => {
+      if (!agent || agent.id !== assigned.agent_id || agent.framework !== assigned.harness || agent.status !== status) {
+        throw new MaritimeAdapterError(code, { ambiguous: boundary.remotePostStarted });
+      }
+      // SDK/API Agent records may carry unrelated private metadata. The
+      // continuity verifier receives only the exact public identity it needs.
+      return { id: agent.id, framework: agent.framework, status: agent.status };
+    };
+    const getAgent = async (status = 'active', code = 'MARITIME_START_UNCONFIRMED') => {
+      const agent = await maritimeRequest({ apiKey, fetchImpl, timeoutMs: requestTimeout({ ...boundary, timeoutMs }),
+        signal: boundary.signal, path: agentPath });
+      assertDispatchBoundary(boundary);
+      return identity(agent, status, code);
+    };
+    const verify = async (method = 'verify', extra = {}) => {
+      let closed = false, pending = 0, timer, onAbort;
+      const operation = async action => {
+        if (closed) throw new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted });
+        pending++;
+        try { return await action(); } finally { pending--; }
+      };
+      try {
+        const waitMs = requestTimeout({ ...boundary, timeoutMs });
+        const result = await Promise.race([
+          Promise.resolve().then(() => continuity[method]({ seat: structuredClone(assigned), ...extra,
+            execute: command => operation(async () => {
+              if (!Array.isArray(command) || !command.length || command.some(arg => typeof arg !== 'string' || !arg || arg.includes('\0')) ||
+                  command.some(arg => ['--configure-model', '--configure-hermes-config', '--reload-env'].includes(arg))) {
+                throw new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted });
+              }
+              return post({ path: `${agentPath}/exec`, body: { command: [...command], timeout: 30 } });
+            }),
+            getAgent: () => operation(() => getAgent())
+          })),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('CONTINUITY_TIMEOUT')), waitMs); }),
+          ...(boundary.signal ? [new Promise((_, reject) => {
+            onAbort = () => reject(new Error('CONTINUITY_TIMEOUT'));
+            if (boundary.signal.aborted) onAbort();
+            else boundary.signal.addEventListener('abort', onAbort, { once: true });
+          })] : [])
+        ]);
+        assertDispatchBoundary(boundary);
+        if (!result || typeof result !== 'object' || Array.isArray(result) || pending !== 0 ||
+            Object.keys(result).sort().join('\0') !== 'schema_version\0verified' || result.schema_version !== 1 || result.verified !== true) {
+          throw new Error('CONTINUITY_RESULT_INVALID');
+        }
+      } catch {
+        throw new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted });
+      } finally {
+        closed = true;
+        clearTimeout(timer);
+        if (onAbort) boundary.signal.removeEventListener('abort', onAbort);
+      }
+    };
+    return {
+      async start() {
+        identity(await post({ path: `${agentPath}/start` }), 'active', 'MARITIME_START_UNCONFIRMED');
+        await dispatchDelay(wakeDelayMs, boundary);
+        await getAgent();
+        await verify();
+      },
+      verify: () => verify(),
+      prepareAction: request => verify('prepareAction', { request: structuredClone(request), deadlineAtMs: boundary.deadlineAtMs }),
+      async sleep() {
+        try {
+          identity(await post({ path: `${agentPath}/sleep` }), 'sleeping', 'MARITIME_SLEEP_UNCONFIRMED');
+          await getAgent('sleeping', 'MARITIME_SLEEP_UNCONFIRMED');
+        } catch {
+          throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
+        }
+      }
+    };
+  }
   return Object.freeze({
     async preflight() {
       const agents = await maritimeRequest({ apiKey, fetchImpl, timeoutMs, path: '/api/agents' });
@@ -476,6 +564,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         assertDispatchBoundary(boundary);
         return result;
       };
+      const certified = continuity && certifiedLifecycle(assigned, boundary, post);
       const execute = async () => {
         let releaseLease = () => {};
         let leaseAcquired = false;
@@ -486,7 +575,11 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             releaseLease = await acquireLease(boundary, assigned.agent_id);
             leaseAcquired = true;
           }
-          if (awakeLimit !== undefined) {
+          if (certified) {
+            if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
+            await certified.start();
+            if (!discussion) await certified.prepareAction(snapshot);
+          } else if (awakeLimit !== undefined) {
             // Maritime snapshots retain the encrypted control-plane value but
             // a restored process does not receive it until reload-env.
             await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/reload-env` });
@@ -505,7 +598,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           let staged;
           if (!discussion && binding) {
             staged = buildPublicRequestArtifact(snapshot, binding, assigned.harness);
-            for (let attempt = 0; attempt < 2; attempt++) {
+            for (let attempt = 0; attempt < (certified ? 1 : 2); attempt++) {
               try {
                 const result = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
                   body: { command: staged.command, timeout: 30 } });
@@ -515,7 +608,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               } catch (error) {
                 // This one replay can only repeat an idempotent public file write;
                 // it is never used for native chat, CLI execution, or signing.
-                if (attempt === 0 && error?.ambiguous && !signal?.aborted &&
+                if (!certified && attempt === 0 && error?.ambiguous && !signal?.aborted &&
                     (deadlineAtMs === undefined || Date.now() < deadlineAtMs)) continue;
                 throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
               }
@@ -569,7 +662,11 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               result = await recoverInvalid(invalid);
             }
           }
-          if (awakeLimit !== undefined) {
+          if (certified) {
+            await certified.verify();
+            await certified.sleep();
+            if (!rotationBlocked) { releaseLease(); leaseAcquired = false; }
+          } else if (awakeLimit !== undefined) {
             try {
               const sleeping = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` });
               if (String(sleeping?.status ?? '').toLowerCase() !== 'sleeping') {
@@ -591,7 +688,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           if (maxAwake !== undefined && leaseAcquired && !boundary.remotePostStarted) {
             releaseLease(); leaseAcquired = false;
           }
-          if (awakeLimit !== undefined && error?.ambiguous) rotationBlocked = true;
+          if (awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
+          if (certified && boundary.remotePostStarted && !error?.ambiguous) {
+            throw new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true });
+          }
           throw error;
         } finally { busy.delete(assigned.seat_id); }
       };
@@ -650,6 +750,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         assertDispatchBoundary(boundary);
         return result;
       };
+      const certified = continuity && certifiedLifecycle(assigned, boundary, post);
       const execute = async () => {
         let releaseLease = () => {};
         let leaseAcquired = false;
@@ -660,7 +761,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             releaseLease = await acquireLease(boundary, assigned.agent_id);
             leaseAcquired = true;
           }
-          if (awakeLimit !== undefined) {
+          if (certified) {
+            if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
+            await certified.start();
+          } else if (awakeLimit !== undefined) {
             await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/reload-env` });
             await dispatchDelay(wakeDelayMs, boundary);
             if (assigned.harness === 'hermes') {
@@ -673,7 +777,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             validateModelConfigurationResult(modelConfigured, assigned, apiKey);
           }
           const staged = buildRuntimeDiagnosticArtifact(snapshot, binding, assigned.harness);
-          for (let attempt = 0; attempt <= diagnosticStageRetries; attempt++) {
+          for (let attempt = 0; attempt <= (certified ? 0 : diagnosticStageRetries); attempt++) {
             try {
               const stage = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
                 body: { command: staged.command, timeout: 30 } });
@@ -683,7 +787,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               }
               break;
             } catch (error) {
-              if (attempt < diagnosticStageRetries && error?.ambiguous && !signal?.aborted &&
+              if (!certified && attempt < diagnosticStageRetries && error?.ambiguous && !signal?.aborted &&
                   (deadlineAtMs === undefined || Date.now() < deadlineAtMs)) continue;
               throw new MaritimeAdapterError('MARITIME_PUBLIC_REQUEST_STAGE_FAILED');
             }
@@ -709,7 +813,11 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             invalid.diagnostic_code = fixedCliDiagnostic(responseText) ?? 'MARITIME_REPLY_PROTOCOL_INVALID';
             throw invalid;
           }
-          if (awakeLimit !== undefined) {
+          if (certified) {
+            await certified.verify();
+            await certified.sleep();
+            if (!rotationBlocked) { releaseLease(); leaseAcquired = false; }
+          } else if (awakeLimit !== undefined) {
             const sleeping = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` });
             if (String(sleeping?.status ?? '').toLowerCase() !== 'sleeping') {
               throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
@@ -721,7 +829,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           if (maxAwake !== undefined && leaseAcquired && !boundary.remotePostStarted) {
             releaseLease(); leaseAcquired = false;
           }
-          if (awakeLimit !== undefined && error?.ambiguous) rotationBlocked = true;
+          if (awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
+          if (certified && boundary.remotePostStarted && !error?.ambiguous) {
+            throw new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true });
+          }
           throw error;
         } finally { busy.delete(assigned.seat_id); }
       };

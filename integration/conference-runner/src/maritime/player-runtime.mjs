@@ -9,6 +9,7 @@ import { runtimeIdentityForSettings } from './runtime-identity.mjs';
 import { safePlayerErrorCode, classifyPlayerBridgeError } from './diagnostics.mjs';
 import { writeDiagnosticReceipt } from './diagnostic-receipt.mjs';
 import { inspectModelRoute } from './install-runtime.mjs';
+import { readRuntimeInstanceFingerprint, verifyExecutionPermit } from './execution-permit.mjs';
 
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 
@@ -17,6 +18,9 @@ export function validatePlayerSettings(settings) {
       settings.game_address?.toLowerCase() !== FROZEN_NETWORK.game.toLowerCase() ||
       !isAbsolute(settings.game_repo ?? '') || !isAbsolute(settings.state_directory ?? '') ||
       !/^https:\/\//.test(settings.rpc_url ?? '') || !settings.operations_manifest) throw new TypeError('PLAYER_SETTINGS_INVALID');
+  if (settings.execution_permit_required !== undefined && typeof settings.execution_permit_required !== 'boolean') {
+    throw new TypeError('PLAYER_SETTINGS_INVALID');
+  }
   validateMaritimeRoster(settings.roster);
   const operations = settings.operations_manifest;
   const keysEqual = (value, keys) => value && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
@@ -288,12 +292,15 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
   lockSeatImpl = lockSeat, diagnosticChainVerifier = createJsonRpcChainVerifier({ timeoutMs: 5_000 }),
   diagnosticContractVerifier = createPlayerContractVerifier(),
   diagnosticReaderFactory = defaultDiagnosticReaderFactory,
-  diagnosticReceiptWriter = writeDiagnosticReceipt, diagnosticModelRouteVerifier = inspectModelRoute } = {}) {
+  diagnosticReceiptWriter = writeDiagnosticReceipt, diagnosticModelRouteVerifier = inspectModelRoute,
+  diagnosticRuntimeFingerprintReader = readRuntimeInstanceFingerprint,
+  executionPermitVerifier = verifyExecutionPermit } = {}) {
   validatePlayerSettings(settings);
   if (typeof checkoutVerifier !== 'function' || typeof accessImpl !== 'function' ||
       typeof privateDirectoryImpl !== 'function' || typeof lockSeatImpl !== 'function' ||
       typeof diagnosticChainVerifier !== 'function' || typeof diagnosticContractVerifier !== 'function' ||
-      typeof diagnosticReaderFactory !== 'function') {
+      typeof diagnosticReaderFactory !== 'function' || typeof diagnosticRuntimeFingerprintReader !== 'function' ||
+      typeof executionPermitVerifier !== 'function') {
     throw new TypeError('PLAYER_DIAGNOSTIC_DEPENDENCY_INVALID');
   }
   settings = structuredClone(settings);
@@ -334,6 +341,17 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
       await privateDirectory(settings.state_directory);
       const release = await lockSeat(settings.state_directory);
       try {
+        const guard = async () => {
+          if (!settings.execution_permit_required) return;
+          const verified = await executionPermitVerifier({ settings, request, env });
+          if (verified?.schema_version !== 1 || verified.verified !== true || verified.request_id !== request.request_id ||
+              !/^[0-9a-f]{64}$/.test(verified.permit_sha256 ?? '') || Object.keys(verified).length !== 4) {
+            throw new Error('PLAYER_EXECUTION_PERMIT_INVALID');
+          }
+        };
+        // A cold or missing-permit execution stops inside the lock before even
+        // creating gameplay journal/bundle directories or constructing bridges.
+        await guard();
         const bundleDirectory = join(settings.state_directory, 'bundles');
         const journals = join(settings.state_directory, 'requests');
         await privateDirectory(bundleDirectory); await privateDirectory(journals);
@@ -352,6 +370,7 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
         let operation = request.requested_action;
         const options = optionsFor(settings, request);
         if (operation === 'claim') {
+          await guard();
           const state = await bridges.reader.run('state', { ...options, registry: FROZEN_NETWORK.authRegistry, chat: FROZEN_NETWORK.chat,
             ...(request.chain_state.block_number ? { fromBlock: String(request.chain_state.block_number) } : {}) });
           if (state.error || state.exit_code !== 0 || String(state.parsed?.gameId) !== request.game_id ||
@@ -369,6 +388,7 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
             if (!input.choice) throw new TypeError('PLAYER_CHOICE_REQUIRED');
             journal = { schema_version: 1, stage: 'preparing', request_id: request.request_id };
             await atomicJson(journalPath, journal);
+            await guard();
             const prepared = await bridges.player.run('prepare_commit', { ...options, choice: input.choice, out: bundlePath });
             if (prepared.error || prepared.exit_code !== 0) return persistError(
               classifyPlayerBridgeError(prepared, 'PLAYER_PREPARE_FAILED'), 'prepare_commit', 'preparing');
@@ -389,6 +409,7 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
           options.input = bundlePath;
         } else if (operation === 'join') options.causeId = String(seat.cause_id);
         await atomicJson(journalPath, { schema_version: 1, stage: 'submitting', request_id: request.request_id, operation });
+        await guard();
         let result;
         try { result = await bridges.player.run(operation, options); }
         catch { return persistError('PLAYER_SUBMISSION_OUTCOME_UNKNOWN', operation); }
@@ -417,6 +438,16 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
       await privateDirectoryImpl(settings.state_directory);
       const release = await lockSeatImpl(settings.state_directory);
       try {
+        if (settings.execution_permit_required) {
+          // This runs as the native harness UID before a diagnostic receipt can
+          // certify its path. The public fingerprint is deliberately discarded.
+          try {
+            const fingerprint = await diagnosticRuntimeFingerprintReader();
+            if (typeof fingerprint !== 'string' || !/^[0-9a-f]{64}$/.test(fingerprint)) {
+              throw new Error('PLAYER_EXECUTION_PERMIT_INVALID');
+            }
+          } catch { throw new Error('PLAYER_EXECUTION_PERMIT_INVALID'); }
+        }
         const reader = diagnosticReaderFactory({ settings, env });
         if (!reader || typeof reader.run !== 'function') throw new Error('PLAYER_DIAGNOSTIC_WRAPPER_CHECK_FAILED');
         const auth = await reader.run('wallet_auth_status', { network: 'base-sepolia', chainId: settings.chain_id,

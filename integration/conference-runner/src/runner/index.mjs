@@ -129,7 +129,8 @@ function sortEvents(events) {
   return events.sort((a, b) => BigInt(a.block_number) < BigInt(b.block_number) ? -1 : BigInt(a.block_number) > BigInt(b.block_number) ? 1 : a.log_index - b.log_index);
 }
 
-export function createConferenceRunner({ config, runtimeDir, chain, agents, launcher, phaseExecutor, spectator, now = Date.now }) {
+export function createConferenceRunner({ config, runtimeDir, chain, agents, launcher, phaseExecutor, spectator,
+  launcherTimeoutMs, now = Date.now }) {
   if (!path.isAbsolute(runtimeDir ?? '') || config?.chain_id !== 84532 || !Array.isArray(config.roster) || config.roster.length < 2) {
     throw new TypeError('Invalid conference runner configuration.');
   }
@@ -143,9 +144,11 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
   const limits = {
     agent: config.agent_timeout_ms ?? 45_000,
     adapter: config.adapter_timeout_ms ?? 15_000,
+    launcher: launcherTimeoutMs ?? config.adapter_timeout_ms ?? 15_000,
     spectator: config.spectator_timeout_ms ?? 5_000
   };
   for (const value of Object.values(limits)) if (!Number.isSafeInteger(value) || value < 1) throw new TypeError('Timeouts must be positive integers.');
+  if (limits.launcher > 2 ** 31 - 1) throw new TypeError('Launcher timeout exceeds timer range.');
   const store = createDurableStore({ directory: path.join(runtimeDir, 'coordinator') });
   const logs = new Map();
   let state = { snapshot: null, events: [], game_ids: [], completed_game_ids: [], cancelled_game_ids: [],
@@ -478,7 +481,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     const record = { ...intent, previous_game_id: current.game_id, state: 'reserved', requested_at: stamp() };
     await store.set(key, record);
     try {
-      const outcome = await bounded(() => launcher.create(intent), limits.adapter, 'LAUNCH_TIMEOUT');
+      const outcome = await bounded(() => launcher.create(intent), limits.launcher, 'LAUNCH_TIMEOUT');
       if (!['accepted', 'confirmed-revert', 'race-or-revert', 'rejected-before-submit'].includes(outcome?.status) ||
         (outcome.reference && (outcome.reference.kind !== 'transaction-hash' || !txHash.test(outcome.reference.value)))) throw new Error('INVALID_LAUNCH_OUTCOME');
       await store.set(key, { ...record, state: outcome.status,

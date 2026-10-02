@@ -10,7 +10,7 @@ import { HERMES_RUNTIME_IDENTITY } from './runtime-identity.mjs';
 
 const SOURCE_FILES = [
   'game-bridge/src/index.js', 'shared/runtime-source.json', 'maritime-transport/src/validation.mjs',
-  ...['protocol.mjs', 'roster.mjs', 'runtime-identity.mjs', 'diagnostics.mjs', 'diagnostic-receipt.mjs', 'player-runtime.mjs', 'player-cli.mjs', 'install-runtime.mjs']
+  ...['protocol.mjs', 'roster.mjs', 'runtime-identity.mjs', 'diagnostics.mjs', 'diagnostic-receipt.mjs', 'execution-permit.mjs', 'player-runtime.mjs', 'player-cli.mjs', 'install-runtime.mjs']
     .map(file => `conference-runner/src/maritime/${file}`)
 ];
 const MAX_ARTIFACT_HASH_OUTPUT_BYTES = 131_072;
@@ -134,6 +134,7 @@ export async function buildInstallArtifact({ config, seatId, persistentRoot, ope
   const settings = {
     schema_version: 1, seat_id: seatId, harness: seat.harness, chain_id: config.chain_id, rpc_url: config.rpc_url,
     game_address: config.game_address, game_repo: posix.join(base, 'game'), persistent_root: persistentRoot,
+    execution_permit_required: config.mode === 'live',
     ...(seat.harness === 'openclaw' ? { openclaw_config_path: posix.join(persistentPath(persistentRoot), '.openclaw', 'openclaw.json') } : {}),
     ...(seat.harness === 'hermes' ? { hermes_config_path: posix.join(persistentRoot, 'config.yaml'),
       runtime_identity: { ...HERMES_RUNTIME_IDENTITY } } : {}),

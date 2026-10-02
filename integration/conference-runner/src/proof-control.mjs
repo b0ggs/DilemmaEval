@@ -10,6 +10,10 @@ export const PROOF_CONTROL_VERSION = 1;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const UINT = /^(0|[1-9][0-9]*)$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const verificationRecords = new WeakMap();
+const exact = (value, fields) => value && typeof value === 'object' && !Array.isArray(value) &&
+  Object.keys(value).sort().join('\0') === [...fields].sort().join('\0');
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const fail = code => { throw new Error(code); };
 const contained = (parent, child) => {
@@ -24,6 +28,7 @@ function clock(options) {
 }
 
 function deadlines(options) {
+  if (options.signal?.aborted) fail('PROOF_ABORTED');
   const nowMs = clock(options);
   if (!Number.isSafeInteger(options.stopNewGamesAtMs) || !Number.isSafeInteger(options.hardStopAtMs) ||
       options.stopNewGamesAtMs > options.hardStopAtMs) fail('PROOF_DEADLINE_INVALID');
@@ -33,15 +38,20 @@ function deadlines(options) {
 
 async function bounded(options, callback, code = 'PROOF_READ_FAILED') {
   const nowMs = deadlines(options);
-  let timer;
+  let timer, onAbort;
   try {
     return await Promise.race([
       Promise.resolve().then(callback).catch(error => fail(code === 'PROOF_CURRENT_READINESS_UNVERIFIED' &&
         error?.message === 'READINESS_REMOTE_GENERATION_UNATTESTED' ? 'READINESS_REMOTE_GENERATION_UNATTESTED' : code)),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('PROOF_DEADLINE_EXCEEDED')),
-        Math.min(options.stopNewGamesAtMs - nowMs, 2 ** 31 - 1)); })
+        Math.min(options.stopNewGamesAtMs - nowMs, 2 ** 31 - 1)); }),
+      ...(options.signal ? [new Promise((_, reject) => {
+        onAbort = () => reject(new Error('PROOF_ABORTED'));
+        if (options.signal.aborted) onAbort();
+        else options.signal.addEventListener('abort', onAbort, { once: true });
+      })] : [])
     ]);
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); if (onAbort) options.signal.removeEventListener('abort', onAbort); }
 }
 
 async function existing(filename) {
@@ -77,6 +87,8 @@ async function paths(options, { fresh }) {
     runner_directories: await Promise.all(options.runnerDirectories.map(value => canonicalPath(value, { directory: true, outside: true }))),
     directory: await canonicalPath(options.directory, { directory: true, fresh, outside: true })
   };
+  if (options.verificationRoot !== undefined) selected.verification_root = await canonicalPath(options.verificationRoot,
+    { directory: true, outside: true });
   if (new Set(selected.runner_directories).size !== selected.runner_directories.length) fail('PROOF_DUPLICATE_RUNNER_DIRECTORY');
   for (const other of [selected.config_path, selected.evidence_path, selected.readiness_directory,
     selected.operator_directory, ...selected.runner_directories]) {
@@ -148,8 +160,10 @@ async function inspectJournal(options, selected, config, preflight) {
     const intentFields = operation === 'advance'
       ? ['schema_version', 'type', 'action_id', 'attempt_id', 'game_id', 'round', 'phase', 'source_block_number', 'source_block_hash', 'source_predicate_token', 'reason']
       : ['action_id', 'source_block_number'];
+    if (record.intent?.not_after_ms !== undefined) intentFields.push('not_after_ms');
     if (!['create', 'advance', 'configure-defaults'].includes(operation) || !record.intent ||
         Object.keys(record.intent).sort().join() !== intentFields.sort().join() ||
+        (record.intent.not_after_ms !== undefined && (!Number.isSafeInteger(record.intent.not_after_ms) || record.intent.not_after_ms < 1)) ||
         !/^[a-zA-Z0-9:._-]{1,200}$/.test(record.intent.action_id ?? '') ||
         !UINT.test(record.intent.source_block_number ?? '') || configFingerprint(record.intent.action_id) !== key) fail('PROOF_JOURNAL_INVALID');
     if (operation === 'advance' && (record.intent.schema_version !== 1 || record.intent.type !== 'advance-request' ||
@@ -184,6 +198,70 @@ async function inputState(options, selected) {
   return { source, evidenceFile, config, evidence };
 }
 
+async function checkVerification(options, selected, config, evidence, current, pinned, notBeforeMs) {
+  try {
+    const filename = await canonicalPath(current.verification_path, { outside: true });
+    if (!selected.verification_root || filename !== current.verification_path ||
+        !contained(selected.verification_root, filename) || path.basename(filename) !== 'continuity-verification.json' ||
+        !DIGEST.test(current.verification_sha256 ?? '')) fail('invalid');
+    const identity = stat => [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, stat.nlink];
+    const before = identity(await lstat(filename));
+    const file = await readJson(filename), record = file.value;
+    const after = identity(await lstat(filename));
+    if (before[5] !== 1 || configFingerprint(before) !== configFingerprint(after) ||
+        pinned && (pinned.path !== filename || pinned.file_sha256 !== file.sha256 ||
+          configFingerprint(pinned.identity) !== configFingerprint(after))) fail('invalid');
+    const nowMs = clock(options);
+    if (!exact(record, ['schema_version', 'verification_id', 'continuity_policy', 'evidence_sha256',
+      'lifecycle_state_digest', 'status', 'started_at_ms', 'deadline_at_ms', 'cleanup_deadline_at_ms',
+      'all_seats_sleeping', 'operations', 'completed_at_ms']) || record.schema_version !== 1 ||
+        !UUID.test(record.verification_id ?? '') || configFingerprint(record) !== current.verification_sha256 ||
+        record.status !== 'complete' || record.all_seats_sleeping !== true ||
+        record.evidence_sha256 !== runtimeEvidenceFingerprint(evidence) ||
+        record.lifecycle_state_digest !== evidence.lifecycle_state_digest || record.continuity_policy !== evidence.continuity_policy ||
+        !['started_at_ms', 'completed_at_ms', 'deadline_at_ms', 'cleanup_deadline_at_ms'].every(key => Number.isSafeInteger(record[key])) ||
+        record.started_at_ms < Math.max(Date.parse(evidence.verified_at), pinned?.not_before_ms ?? notBeforeMs) ||
+        record.completed_at_ms < record.started_at_ms ||
+        record.completed_at_ms > nowMs || record.completed_at_ms >= record.deadline_at_ms ||
+        record.deadline_at_ms !== options.stopNewGamesAtMs ||
+        record.cleanup_deadline_at_ms !== Math.min(options.hardStopAtMs, options.stopNewGamesAtMs + 60_000) ||
+        record.cleanup_deadline_at_ms <= record.deadline_at_ms || !Array.isArray(record.operations) || config.roster.length !== 10) fail('invalid');
+    // This is the serial journal emitted by verifyReadinessCurrent: inventory,
+    // resume, confirmed lifecycle, the nested continuity checks, confirmed sleep.
+    // The nine runtime reads include both original diagnostic receipts.
+    const expected = config.roster.flatMap(seat => [
+      ['inventory', null], ...['activation', 'lifecycle-read', 'continuity-check', 'lifecycle-read',
+        ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read'].map(kind => [kind, seat.seat_id])
+    ]).concat([['inventory', null], ['chain-revalidation', null]]);
+    if (record.operations.length !== expected.length) fail('invalid');
+    let previousStarted = record.started_at_ms;
+    for (const [index, operation] of record.operations.entries()) {
+      if (!exact(operation, ['sequence', 'kind', 'seat_id', 'status', 'started_at_ms', 'completed_at_ms']) ||
+          operation.sequence !== index + 1 || operation.kind !== expected[index][0] || operation.seat_id !== expected[index][1] ||
+          operation.status !== 'complete' || !Number.isSafeInteger(operation.started_at_ms) || !Number.isSafeInteger(operation.completed_at_ms) ||
+          operation.started_at_ms < previousStarted || operation.completed_at_ms < operation.started_at_ms ||
+          operation.completed_at_ms > record.completed_at_ms) fail('invalid');
+      previousStarted = operation.started_at_ms;
+      // Only continuity-check encloses later journal operations. All other
+      // operations complete before the next begins.
+      const next = record.operations[index + 1];
+      if (operation.kind !== 'continuity-check' && next && operation.completed_at_ms > next.started_at_ms) fail('invalid');
+      if (operation.kind === 'continuity-check') {
+        const lastNested = record.operations[index + 11], sleep = record.operations[index + 12];
+        if (operation.completed_at_ms < lastNested.completed_at_ms || operation.completed_at_ms > sleep.started_at_ms) fail('invalid');
+      }
+    }
+    return { path: filename, file_sha256: file.sha256, identity: after, not_before_ms: pinned?.not_before_ms ?? notBeforeMs };
+  } catch { fail('PROOF_CURRENT_READINESS_UNVERIFIED'); }
+}
+
+async function assertVerificationUnchanged(options, current) {
+  const pinned = verificationRecords.get(current.preflight);
+  if (!pinned) return;
+  const inputs = await inputState(options, current.bindings);
+  await checkVerification(options, current.bindings, inputs.config, inputs.evidence, current.preflight, pinned);
+}
+
 async function refresh(options, selected, inputs) {
   if (typeof options.chain?.preflight !== 'function' || typeof options.chain?.readBlockHash !== 'function' ||
       typeof options.provider?.getTransactionCount !== 'function') fail('PROOF_READ_ADAPTER_REQUIRED');
@@ -208,16 +286,29 @@ async function refresh(options, selected, inputs) {
     ]), 'PROOF_NONCE_UNAVAILABLE');
     if (!Number.isSafeInteger(latest) || latest < 0 || !Number.isSafeInteger(pending) || pending !== latest) fail('PROOF_PENDING_NONCE');
   }
+  const verificationStartedAtMs = clock(options);
   const current = await bounded(options, () => options.validateReadinessCurrent({ config, evidence,
     chain: options.chain, provider: options.provider, readinessDirectory: selected.readiness_directory,
-    nowMs: clock(options), deadlineAtMs: options.stopNewGamesAtMs }), 'PROOF_CURRENT_READINESS_UNVERIFIED');
-  if (current?.ready !== true || current.evidence_sha256 !== runtimeEvidenceFingerprint(evidence) ||
+    nowMs: clock(options), deadlineAtMs: options.stopNewGamesAtMs,
+    cleanupDeadlineAtMs: Math.min(options.hardStopAtMs, options.stopNewGamesAtMs + 60_000),
+    readOnly: options.readOnly === true, signal: options.signal }), 'PROOF_CURRENT_READINESS_UNVERIFIED');
+  const verified = current?.ready === true;
+  if ((!verified && !(options.readOnly === true && current?.verification_required === true)) ||
+      current.evidence_sha256 !== runtimeEvidenceFingerprint(evidence) ||
       current.lifecycle_state_digest !== evidence.lifecycle_state_digest) fail('PROOF_CURRENT_READINESS_UNVERIFIED');
+  let verification;
+  if (verified && evidence.producer_version === 2) {
+    verification = await checkVerification(options, selected, config, evidence, current, undefined, verificationStartedAtMs);
+  }
   deadlines(options);
   validateControlledRuntimeEvidence(config, evidence, { now: clock(options), allowDiagnosticsOnly: true });
-  return { chain_id: 84532, game_address: config.game_address, block_number: preflight.block_number,
+  const result = { chain_id: 84532, game_address: config.game_address, block_number: preflight.block_number,
     block_hash: preflight.block_hash, active_game_id: '0', code_hash: evidence.game_code_hash,
-    chain_defaults_fingerprint: evidence.chain_defaults_fingerprint };
+    chain_defaults_fingerprint: evidence.chain_defaults_fingerprint, runtime_verified: verified,
+    ...(current.verification_sha256 ? { verification_sha256: current.verification_sha256,
+      verification_path: verification?.path } : {}) };
+  if (verification) verificationRecords.set(result, verification);
+  return result;
 }
 
 function bindingsFor(options, selected, inputs, preparedConfig) {
@@ -233,7 +324,7 @@ async function assertInputsUnchanged(selected, inputs) {
       (await readJson(selected.evidence_path)).sha256 !== inputs.evidenceFile.sha256) fail('PROOF_INPUT_CHANGED_DURING_VALIDATION');
 }
 
-/** Read-only preparation checks. Never loads a signer, creates state, or changes a lock. */
+/** Set readOnly:true for metadata-only planning; full verification wakes and inspects runtimes. */
 export async function planControlledProof(options) {
   deadlines(options);
   if (options.ownedProcesses !== undefined && (!Array.isArray(options.ownedProcesses) || options.ownedProcesses.length)) fail('PROOF_PREPARATION_REQUIRES_STOPPED_PROCESSES');
@@ -245,7 +336,8 @@ export async function planControlledProof(options) {
     intermission_ms: 0 });
   await assertInputsUnchanged(selected, inputs);
   deadlines(options);
-  return { schema_version: 1, status: 'ready', bindings: bindingsFor(options, selected, inputs, preparedConfig), preflight, preparedConfig };
+  return { schema_version: 1, status: options.readOnly ? 'verification-required' : 'ready',
+    bindings: bindingsFor(options, selected, inputs, preparedConfig), preflight, preparedConfig };
 }
 
 async function writeExclusive(filename, value) {
@@ -265,6 +357,7 @@ async function syncDirectory(directory) {
 
 /** A new directory is the prepare transaction. Partial failures remain for inspection. */
 export async function prepareControlledProof(options) {
+  if (options.readOnly) fail('PROOF_MUTATING_VERIFICATION_REQUIRED');
   const plan = await planControlledProof(options);
   deadlines(options);
   try { await mkdir(plan.bindings.directory, { mode: 0o700 }); }
@@ -277,7 +370,7 @@ export async function prepareControlledProof(options) {
   return { ...plan, status: 'prepared' };
 }
 
-/** Read-only status gate: recompute exact input bindings and independently refresh current state. */
+/** Recompute bindings; readOnly:true selects metadata checks instead of runtime revalidation. */
 export async function validatePreparedProof(options) {
   deadlines(options);
   const selected = await paths(options, { fresh: false });
@@ -297,16 +390,17 @@ export async function validatePreparedProof(options) {
   if ((await readJson(path.join(selected.directory, 'config.json'))).sha256 !== preparedFile.sha256 ||
       (await readJson(path.join(selected.directory, 'proof-bindings.json'))).sha256 !== bindingsFile.sha256) fail('PROOF_INPUT_CHANGED_DURING_VALIDATION');
   deadlines(options);
-  return { schema_version: 1, status: 'ready', bindings, preflight, preparedConfig };
+  return { schema_version: 1, status: options.readOnly ? 'verification-required' : 'ready', bindings, preflight, preparedConfig };
 }
 
 /** Only a verified current lifecycle may cross this boundary. The one-game fuse survives every outcome. */
 export async function createGuardedLauncher(options) {
+  if (options.readOnly) fail('PROOF_MUTATING_VERIFICATION_REQUIRED');
   if (typeof options.launcher?.create !== 'function') fail('PROOF_LAUNCHER_REQUIRED');
   // Ownership capabilities remain in memory and are pinned before validation;
   // no token can enter evidence, bindings, the fuse, or a returned status.
   options = { ...options, ownedProcesses: structuredClone(options.ownedProcesses ?? []) };
-  const prepared = await validatePreparedProof(options);
+  const prepared = await validatePreparedProof({ ...options, readOnly: true });
   const pinnedBindings = configFingerprint(prepared.bindings);
   return Object.freeze({ create: async intent => {
     if (!intent || Object.keys(intent).sort().join() !== 'action_id,source_block_number' ||
@@ -315,9 +409,12 @@ export async function createGuardedLauncher(options) {
     if (configFingerprint(current.bindings) !== pinnedBindings) fail('PROOF_BINDINGS_CHANGED');
     if (BigInt(intent.source_block_number) > BigInt(current.preflight.block_number)) fail('PROOF_CREATE_SOURCE_BLOCK_INVALID');
     deadlines(options);
+    await assertVerificationUnchanged(options, current);
     await writeExclusive(path.join(current.bindings.directory, 'launch-once.json'), {
       schema_version: 1, maximum_fresh_games: 1, bindings_sha256: pinnedBindings,
       runtime_evidence_sha256: current.bindings.runtime_evidence_sha256,
+      ...(current.preflight.verification_sha256 ? { verification_sha256: current.preflight.verification_sha256,
+        verification_path: current.preflight.verification_path } : {}),
       action_id: intent.action_id, source_block_number: intent.source_block_number,
       attempted_at: new Date(clock(options)).toISOString()
     });
@@ -332,7 +429,9 @@ export async function createGuardedLauncher(options) {
         configFingerprint(latestBindings.value) !== pinnedBindings) fail('PROOF_BINDINGS_CHANGED');
     await inspectProcesses(current.bindings, options.ownedProcesses);
     validateControlledRuntimeEvidence(source.value, evidence.value, { now: clock(options), allowDiagnosticsOnly: true });
-    const result = await bounded(options, () => options.launcher.create(structuredClone(intent)), 'PROOF_CREATION_UNCERTAIN');
+    await assertVerificationUnchanged(options, current);
+    const result = await bounded(options, () => options.launcher.create({ ...structuredClone(intent),
+      not_after_ms: Math.min(options.stopNewGamesAtMs, clock(options) + 20_000) }, { signal: options.signal }), 'PROOF_CREATION_UNCERTAIN');
     if (!['accepted', 'race-or-revert', 'rejected-before-submit'].includes(result?.status) ||
         (result.reference !== undefined && (result.reference?.kind !== 'transaction-hash' || !HASH.test(result.reference.value ?? '')))) fail('PROOF_CREATION_UNCERTAIN');
     return { status: result.status, ...(result.reference ? { reference: { kind: 'transaction-hash', value: result.reference.value } } : {}) };

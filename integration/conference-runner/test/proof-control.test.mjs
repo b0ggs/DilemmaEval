@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, appendFile, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fixtureConfig, createFixtureAdapters } from '../src/fixture.mjs';
@@ -73,6 +74,136 @@ async function setup(t) {
   return { root, config, evidence, preflight, options, setNow: value => { nowMs = value; },
     setCurrentReady: value => { lifecycleCurrent = value; } };
 }
+
+async function setupContinuity(t) {
+  const f = await setup(t);
+  f.evidence.producer_version = 2;
+  f.evidence.ready_for_controlled_gameplay = true;
+  f.evidence.continuity_policy = 'observed-runtime-continuity-v1';
+  await json(f.options.evidencePath, f.evidence);
+  f.options.verificationRoot = path.join(await realpath(f.root), 'verifications');
+  await mkdir(f.options.verificationRoot);
+  let sequence = 0;
+  f.options.validateReadinessCurrent = async ({ evidence, readOnly }) => {
+    const identity = { evidence_sha256: runtimeEvidenceFingerprint(evidence), lifecycle_state_digest: evidence.lifecycle_state_digest };
+    if (readOnly) return { ...identity, ready: false, verification_required: true };
+    const directory = path.join(f.options.verificationRoot, `verification-${++sequence}`);
+    await mkdir(directory);
+    const at = f.options.now();
+    const operations = [];
+    const record = kind => operations.push({ sequence: operations.length + 1, kind, seat_id: null,
+      status: 'complete', started_at_ms: at, completed_at_ms: at });
+    for (const seat of f.config.roster) {
+      record('inventory');
+      for (const kind of ['activation', 'lifecycle-read', 'continuity-check', 'lifecycle-read',
+        ...Array(9).fill('runtime-read'), 'lifecycle-read', 'sleep', 'lifecycle-read']) {
+        record(kind); operations.at(-1).seat_id = seat.seat_id;
+      }
+    }
+    record('inventory'); record('chain-revalidation');
+    const verification = { schema_version: 1, verification_id: `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`,
+      continuity_policy: evidence.continuity_policy, ...identity, status: 'complete', started_at_ms: at,
+      deadline_at_ms: f.options.stopNewGamesAtMs,
+      cleanup_deadline_at_ms: Math.min(f.options.hardStopAtMs, f.options.stopNewGamesAtMs + 60000),
+      all_seats_sleeping: true, operations, completed_at_ms: at };
+    f.mutateVerification?.(verification);
+    f.verificationPath = path.join(directory, 'continuity-verification.json');
+    await json(f.verificationPath, verification);
+    const result = { ...identity, ready: true, verification_sha256: configFingerprint(verification), verification_path: f.verificationPath };
+    f.afterVerification?.();
+    return result;
+  };
+  return f;
+}
+
+test('v2 creation rereads complete ten-seat verification and forwards the cancellation signal', async t => {
+  const f = await setupContinuity(t), controller = new AbortController();
+  const prepared = await prepareControlledProof(f.options);
+  const preparationPath = f.verificationPath;
+  let calls = 0;
+  const guarded = await createGuardedLauncher({ ...f.options, signal: controller.signal,
+    launcher: { create: async (request, context) => {
+      calls++;
+      assert.equal(context.signal, controller.signal);
+      assert.equal(request.not_after_ms, f.options.now() + 20000);
+      const fuse = JSON.parse(await readFile(path.join(f.options.directory, 'launch-once.json')));
+      assert.notEqual(fuse.verification_path, preparationPath);
+      assert.equal(fuse.verification_sha256, configFingerprint(JSON.parse(await readFile(f.verificationPath))));
+      assert.equal(fuse.runtime_evidence_sha256, prepared.bindings.runtime_evidence_sha256);
+      return { status: 'accepted' };
+    } } });
+  assert.deepEqual(await guarded.create(intent), { status: 'accepted' });
+  assert.equal(calls, 1);
+});
+
+test('v2 verification rejects incomplete seats, ambiguous operations and invalid or future timestamps', async t => {
+  for (const [label, mutate] of [
+    ['empty operations', value => { value.operations = []; }],
+    ['missing seat', value => { value.operations = value.operations.filter(row => row.seat_id !== 'hs-5'); }],
+    ['mixed seat', value => { value.operations.find(row => row.seat_id === 'hs-5').seat_id = 'oc-1'; }],
+    ['missing receipt read', value => { value.operations.find(row => row.kind === 'runtime-read').kind = 'lifecycle-read'; }],
+    ['unknown operation', value => { value.operations[4].status = 'unknown'; }],
+    ['missing completion', value => { delete value.completed_at_ms; }],
+    ['future completion', value => { value.completed_at_ms += 1; }],
+    ['future start', value => { value.started_at_ms += 1; }],
+    ['stale verification', value => {
+      value.started_at_ms -= 1; value.completed_at_ms -= 1;
+      for (const row of value.operations) { row.started_at_ms -= 1; row.completed_at_ms -= 1; }
+    }],
+    ['fractional time', value => { value.operations[0].completed_at_ms += 0.5; }],
+    ['backwards operation', value => { value.operations[0].completed_at_ms -= 1; }],
+    ['bad cleanup deadline', value => { value.cleanup_deadline_at_ms = value.deadline_at_ms; }],
+    ['private field', value => { value.raw_reply = 'synthetic private data'; }]
+  ]) {
+    await t.test(label, async t => {
+      const f = await setupContinuity(t);
+      f.mutateVerification = mutate;
+      await assert.rejects(prepareControlledProof(f.options), /PROOF_CURRENT_READINESS_UNVERIFIED/);
+      await assert.rejects(access(f.options.directory), { code: 'ENOENT' });
+    });
+  }
+});
+
+test('verification deletion or replacement after callback prevents the fuse and remote creation', async t => {
+  for (const operation of ['delete', 'change']) await t.test(operation, async t => {
+    const f = await setupContinuity(t);
+    await prepareControlledProof(f.options);
+    let calls = 0;
+    const guarded = await createGuardedLauncher({ ...f.options,
+      launcher: { create: async () => { calls++; return { status: 'accepted' }; } } });
+    f.afterVerification = () => queueMicrotask(() => {
+      if (operation === 'delete') rmSync(f.verificationPath);
+      else writeFileSync(f.verificationPath, JSON.stringify({ status: 'failed' }));
+    });
+    await assert.rejects(guarded.create(intent), /PROOF_CURRENT_READINESS_UNVERIFIED/);
+    assert.equal(calls, 0);
+    await assert.rejects(access(path.join(f.options.directory, 'launch-once.json')), { code: 'ENOENT' });
+  });
+});
+
+test('verification deletion, byte-identical replacement and failed status after fuse never reach raw creation', async t => {
+  for (const operation of ['delete', 'replace', 'change']) await t.test(operation, async t => {
+    const f = await setupContinuity(t);
+    await prepareControlledProof(f.options);
+    let calls = 0, changed = false;
+    const now = f.options.now;
+    const guarded = await createGuardedLauncher({ ...f.options, now: () => {
+      if (!changed && existsSync(path.join(f.options.directory, 'launch-once.json'))) {
+        changed = true;
+        if (operation === 'delete') rmSync(f.verificationPath);
+        else if (operation === 'replace') {
+          const replacement = `${f.verificationPath}.replacement`;
+          writeFileSync(replacement, readFileSync(f.verificationPath));
+          renameSync(replacement, f.verificationPath);
+        } else writeFileSync(f.verificationPath, JSON.stringify({ status: 'failed' }));
+      }
+      return now();
+    }, launcher: { create: async () => { calls++; return { status: 'accepted' }; } } });
+    await assert.rejects(guarded.create(intent), /PROOF_CURRENT_READINESS_UNVERIFIED/);
+    assert.equal(changed, true); assert.equal(calls, 0);
+    await access(path.join(f.options.directory, 'launch-once.json'));
+  });
+});
 
 test('ten-seat proof plan is read-only and preparation exclusively writes three bound files', async t => {
   const f = await setup(t);

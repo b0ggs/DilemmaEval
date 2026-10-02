@@ -47,7 +47,7 @@ This checklist replaces launch-first debugging. Do not create another game until
 - [x] Determine whether the third Hermes configuration write is required for a new activation generation or is an unintended replay. It is required after the confirmed sleep/reload generation boundary can rematerialize configuration.
 - [x] Correct the implementation or the invariant—not merely the assertion—and add a test proving ambiguous repair is inspected before any repeat mutation. The test also proves a stable rerun performs no fourth write.
 - [x] Make the conference-runner default test command deterministic. The package default now uses `--test-concurrency=1`.
-- [x] Run the conference-runner suite to zero failures and zero cancellations. Inherited 255/255 reproduced; October 2 integrated default suite: **378/378**.
+- [x] Run the conference-runner suite to zero failures and zero cancellations. Inherited 255/255 reproduced; October 2 final continuity/default suite: **518/518** (earlier diagnostic tranche 378/378).
 - [x] Run the site suite and the changed shared package suites: game bridge, harness adapters, Maritime transport, orchestrator core, and team logs. October 2 default suites: **199/199**, zero failures or cancellations.
 - [x] Run `git diff --check`.
 
@@ -78,11 +78,11 @@ This checklist replaces launch-first debugging. Do not create another game until
 
 - [x] Implement the durable all-ten readiness-v2 producer with run/config/roster/source/artifact/chain/model/lifecycle bindings, independent sanitized CLI receipts, exclusive external state, and atomic evidence publication. Repeated fixture runs pass; no live readiness record has been collected.
 - [x] Enforce a short maximum evidence age, initially ten minutes, at game preparation and again immediately before creation.
-- [x] Reject changed roster/config/artifacts/runtime/transport/model/chain/defaults and observed mixed generations in local tests. `activation_generation` now identifies a durable diagnostic-run activation intent. Unobservable remote generation remains fail-closed with `READINESS_REMOTE_GENERATION_UNATTESTED`; it is not inferred from provider timestamps.
+- [x] Reject changed roster/config/artifacts/runtime/transport/model/chain/defaults and observed mixed generations in local tests. `activation_generation` identifies a durable diagnostic-run activation intent. Producer v2 uses observed-runtime-continuity-v1: fresh VM-incarnation/source/model/wallet checks and both original diagnostic receipts after every resume. Provider generation attestation remains false; timestamps are never substituted for generation.
 - [x] Require all ten seats and both diagnostic modes in one bounded run; missing seats, stale results, private fields, model-only replies, timeouts and incomplete publication fail local fixtures.
 - [x] Require final sleeping inventory plus per-seat sleep response/readback. Unresolved lifecycle operations or abort-ignoring late work prevent readiness; interrupted runs are inspectable without replay. These are local fixture results; fresh live sleep evidence remains required.
 
-**Live exit condition remains unmet:** no live diagnostic run has occurred. Produced fixture evidence is explicitly `diagnostics_complete:true`, `remote_generation_attested:false`, and `ready_for_controlled_gameplay:false`. Remote generation attestation must be resolved before any creation.
+**Live exit condition remains unmet:** no live diagnostic run has occurred. Producer v2 fixture evidence is explicitly `diagnostics_complete:true`, `remote_generation_attested:false`, and ready only under the observed-runtime continuity policy. Preparation and final creation perform separate durable all-ten wake/inspect/sleep checks against the unchanged original digest. Read-only status cannot establish runtime continuity. An invisible restore to identical state is not distinguishable and is not claimed as provider attestation.
 
 **Exit condition:** all ten agents pass the exact chat-to-tool-to-stdin path without a transaction, and the creation path refuses missing, stale, mixed-generation, or mismatched evidence.
 
@@ -99,6 +99,11 @@ This checklist replaces launch-first debugging. Do not create another game until
 - [x] Require a fresh exclusive external directory and refuse to overwrite existing fuses, journals, evidence or runtime state; partial writes remain for inspection.
 - [x] Add local read-only `plan`/`status` with no credentials/network/writes, plus read-only proof checks. Only allowlisted error codes cross the CLI; signing keys are never loaded.
 - [x] Keep `candidate_proof_complete` non-authoritative. Only the independent chain/Telegram audit may mark a proof complete.
+- [x] Add version 2 `proof-run` wiring for existing operator ownership, readonly spectator preflight, certified Maritime resumes, a single creation fuse, absolute cutoffs, signal propagation, and durable candidate-only reports. Local execution fixtures pass; live operation remains Phase 7.
+- [x] Recheck immutable request permits inside the player lock before preparation/signing; cold boots, artifact/model/receipt drift, mixed generation and expired permits fail closed.
+- [x] Preserve the earliest operator deadline across queued requests/replays; disconnect, abort or expiry prevents subsequent signing/broadcast. Loopback HTTP regressions exercise the actual client/server/signer boundary.
+- [x] Add separate atomic `proof-audit` output requiring both independent canonical chain and scoreboard/pin audits, unchanged preparation/verification/report inputs, and exact ten-seat identity.
+
 
 **Exit condition:** a failed or interrupted proof leaves enough durable, sanitized evidence to reconcile every seat and transaction without guessing or blindly retrying.
 
@@ -126,11 +131,11 @@ This phase is read-only except for waking/configuring agents as required by the 
 - [ ] Confirm 10/10 defaults and the reviewed entry fee/timing values. Do not reconfigure them merely because old documentation differs.
 - [ ] Confirm latest and pending nonces match for the owner and all ten players.
 - [ ] Confirm the ten expected Maritime agents exist with no unknown replacement or unrelated awake capacity consumer.
-- [ ] Run the complete Phase 3 readiness gate for all ten seats.
+- [ ] Review/update the exact deployed artifacts without replacing agents or private state, then run the complete Phase 3 readiness gate for all ten seats in an authorized diagnostic window.
 - [ ] Verify both Telegram destinations, existing pinned message IDs, spectator permissions, fresh outbox identity, and scoreboard series identity.
 - [ ] Have an independent reviewer inspect the gate results, creation fuse inputs, deadlines, cleanup path, and absence of unresolved ambiguity.
 - [ ] Start the single owner/operator only after every preceding item passes.
-- [ ] Recheck chain idle state, pending owner nonce, readiness evidence age, and execution cutoff immediately before allowing `createGame()`.
+- [ ] Recheck chain idle state, all owner/player pending nonces, unchanged readiness digest/age, durable all-ten continuity verification, process ownership, and cutoff immediately before allowing `createGame()`.
 
 **Exit condition:** one reviewed command can create at most one game, and that command remains unable to run if any prerequisite changes.
 
@@ -185,7 +190,7 @@ This phase is read-only except for waking/configuring agents as required by the 
 All of the following must be true at once:
 
 - [x] Conference source and existing evidence are recoverably committed and secret-scanned: implementation checkpoint `7d8e025`. No fresh live diagnostic evidence has been produced.
-- [x] Every affected local suite is green under the documented default command: October 2, 577/577 tests total.
+- [x] Every affected local suite is green under the documented default command: October 2 final continuity tranche, **717/717 tests total**, zero failures, cancellations or skips.
 - [x] The deterministic Hermes lifecycle ambiguity is resolved. This local regression fix does not establish remote lifecycle attestation.
 - [ ] All ten seats pass fresh exact-path, no-transaction diagnostics.
 - [ ] Readiness evidence matches the exact config, roster, artifacts, activation generations, transport, and current chain.

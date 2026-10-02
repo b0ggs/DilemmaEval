@@ -14,6 +14,8 @@ const RUNTIME_FINGERPRINT_SOURCES = [
   './maritime/player-runtime.mjs',
   './maritime/diagnostics.mjs',
   './maritime/diagnostic-receipt.mjs',
+  './maritime/execution-permit.mjs',
+  './maritime/continuity.mjs',
   './maritime/roster.mjs',
   './maritime/runtime-identity.mjs',
   './maritime/install-runtime.mjs',
@@ -184,7 +186,7 @@ export function buildControlledRuntimeEvidence(config,{
     confirmed_block_number: String(confirmedBlockNumber ?? ''),
     confirmed_block_hash: confirmedBlockHash,
     sdk: { package: 'maritime-sdk', version: '0.6.0', maxRetries: 0 },
-    ready_for_controlled_gameplay: producer === undefined,
+    ready_for_controlled_gameplay: producer === undefined || producer.producer_version === 2,
     seats: structuredClone(seats),
     ...(producer === undefined ? {} : structuredClone(producer))
   };
@@ -204,15 +206,18 @@ function validateProducerEvidence(config, evidence) {
     'transport_fingerprint','verified_at','expires_at','confirmed_block_number','confirmed_block_hash',
     'sdk','ready_for_controlled_gameplay','seats','producer_version','diagnostic_run_id','chain_id',
     'game_address','game_code_hash','chain_defaults_fingerprint','generation_scope','lifecycle_state_digest',
-    'remote_generation_attested','diagnostics_complete']);
-  if (evidence.producer_version !== 1 ||
+    'remote_generation_attested','diagnostics_complete',
+    ...(evidence.producer_version === 2 ? ['continuity_policy'] : [])]);
+  if (![1,2].includes(evidence.producer_version) ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(evidence.diagnostic_run_id ?? '') ||
       evidence.chain_id !== 84532 || evidence.game_address !== config.game_address.toLowerCase() ||
       !/^0x[0-9a-f]{64}$/.test(evidence.game_code_hash ?? '') ||
       !/^[0-9a-f]{64}$/.test(evidence.chain_defaults_fingerprint ?? '') ||
       !/^[0-9a-f]{64}$/.test(evidence.lifecycle_state_digest ?? '') ||
       evidence.generation_scope !== 'diagnostic-run-intent-v1' || evidence.remote_generation_attested !== false ||
-      evidence.diagnostics_complete !== true || evidence.ready_for_controlled_gameplay !== false) {
+      evidence.diagnostics_complete !== true ||
+      (evidence.producer_version === 1 ? evidence.ready_for_controlled_gameplay !== false :
+        evidence.ready_for_controlled_gameplay !== true || evidence.continuity_policy !== 'observed-runtime-continuity-v1')) {
     throw new Error('RUNTIME_PRODUCER_BINDING_INVALID');
   }
   exactEvidenceKeys(evidence.sdk, ['package','version','maxRetries']);

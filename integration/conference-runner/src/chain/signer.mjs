@@ -16,9 +16,11 @@ function exact(value, fields) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).sort().join(',') !== [...fields].sort().join(',')) throw new Error('INVALID_SIGNER_REQUEST');
 }
 function validateIntent(operation, intent) {
-  if (operation !== 'advance') exact(intent, ['action_id', 'source_block_number']);
+  const deadlineField = Object.hasOwn(intent ?? {}, 'not_after_ms') ? ['not_after_ms'] : [];
+  if (deadlineField.length && (!Number.isSafeInteger(intent.not_after_ms) || intent.not_after_ms < 1)) throw new Error('INVALID_SIGNER_DEADLINE');
+  if (operation !== 'advance') exact(intent, ['action_id', 'source_block_number', ...deadlineField]);
   else {
-    exact(intent, ['schema_version', 'type', 'action_id', 'attempt_id', 'game_id', 'round', 'phase', 'source_block_number', 'source_block_hash', 'source_predicate_token', 'reason']);
+    exact(intent, ['schema_version', 'type', 'action_id', 'attempt_id', 'game_id', 'round', 'phase', 'source_block_number', 'source_block_hash', 'source_predicate_token', 'reason', ...deadlineField]);
     if (intent.schema_version !== 1 || intent.type !== 'advance-request' || !['join', 'commit', 'reveal'].includes(intent.phase) || !decimal.test(intent.game_id) || !Number.isInteger(intent.round) || intent.round < 0 || !hash.test(intent.source_block_hash) || !/^[a-f0-9]{64}$/.test(intent.source_predicate_token)) throw new Error('INVALID_ADVANCE_REQUEST');
     const action = `advance:${fingerprint({ game_id: intent.game_id, round: intent.round, phase: intent.phase })}`;
     const attempt = `${action}:${fingerprint({ block_number: intent.source_block_number, block_hash: intent.source_block_hash })}`;
@@ -37,8 +39,9 @@ async function writeAtomic(filename, value) {
 }
 
 /** The operator serializes owner creation and phase advancement in one journal. */
-export async function createIsolatedSigner({ role, config, provider, signer, directory, deployment = PINNED_DEPLOYMENT }) {
+export async function createIsolatedSigner({ role, config, provider, signer, directory, deployment = PINNED_DEPLOYMENT, now = Date.now }) {
   if (!['operator', 'launcher', 'phase-executor'].includes(role)) throw new Error('INVALID_SIGNER_ROLE');
+  if (typeof now !== 'function') throw new Error('INVALID_SIGNER_CLOCK');
   assertChainConfig(config);
   assertSignerDeployment(config, deployment);
   const signerAddress = getAddress(await signer.getAddress());
@@ -101,30 +104,62 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
     await persist();
     return result(record);
   }
-  async function submit(operation, intent, configure) {
+  async function submit(operation, intent, configure, signal) {
     if (closed) throw new Error('SIGNER_CLOSED');
     validateIntent(operation, intent);
     const key = fingerprint(intent.action_id);
     const existing = journal.records[key];
     if (existing) {
-      // Preserve the existing legacy single-role journal format while binding
-      // all new records to their operation. An action ID cannot change methods.
       const existingOperation = existing.operation ?? (role === 'phase-executor' ? 'advance' : existing.intent.action_id.startsWith('configure:') ? 'configure-defaults' : 'create');
       if (existingOperation !== operation) return { status: 'rejected-before-submit' };
+    }
+    // A semantic action keeps its earliest accepted expiry across retries,
+    // including a replay which omits the optional deadline entirely.
+    const originalDeadline = existing?.intent?.not_after_ms;
+    if (originalDeadline !== undefined && (!Number.isSafeInteger(originalDeadline) || originalDeadline < 1)) throw new Error('INVALID_SIGNER_DEADLINE');
+    const expiry = Math.min(originalDeadline ?? Infinity, intent.not_after_ms ?? Infinity);
+    intent = Object.freeze({ ...intent, ...(expiry === Infinity ? {} : { not_after_ms: expiry }) });
+    if (existing && expiry !== Infinity && existing.intent.not_after_ms !== expiry) {
+      existing.intent = { ...existing.intent, not_after_ms: expiry };
+      await persist();
+    }
+    // Persist a new bounded action's expiry before any awaited reconciliation.
+    // A provider failure or queue obstruction cannot erase the original bound.
+    if (!existing && expiry !== Infinity) {
+      journal.records[key] = { operation, intent, stage: 'reserved', status: 'rejected-before-submit' };
+      await persist();
+    }
+    const rejectCurrent = async () => {
+      if (existing) return result(existing);
+      journal.records[key] = { operation, intent, stage: 'rejected', status: 'rejected-before-submit' };
+      await persist();
+      return result(journal.records[key]);
+    };
+    const permitted = () => {
+      const current = now();
+      return Number.isSafeInteger(current) && current >= 0 && !signal?.aborted && current < expiry;
+    };
+    const assertPermitted = () => { if (!permitted()) throw new Error('SIGNER_EXECUTION_EXPIRED'); };
+    if (!permitted()) return rejectCurrent();
+    if (existing) {
       await reconcile(existing);
+      if (!permitted()) return result(existing);
       if (!['confirmed-revert', 'rejected-before-submit'].includes(existing.status) || BigInt(intent.source_block_number) <= BigInt(existing.intent.source_block_number)) return result(existing);
     }
     // A pending/unknown nonce for any action prevents all additional submissions.
     for (const [otherKey, other] of Object.entries(journal.records)) {
       if (otherKey === key || other.stage === 'confirmed' || other.stage === 'rejected') continue;
       await reconcile(other);
-      if (other.stage !== 'confirmed' && other.stage !== 'rejected') return { status: 'rejected-before-submit' };
+      if (!permitted()) return rejectCurrent();
+      if (other.stage !== 'confirmed' && other.stage !== 'rejected') return rejectCurrent();
     }
     const record = { operation, intent, stage: 'reserved', status: 'rejected-before-submit' };
     journal.records[key] = record;
     await persist(); // Intent precedes RPC estimation, signing, and broadcast.
     try {
+      assertPermitted();
       const preflight = await reader.preflight();
+      assertPermitted();
       if (BigInt(intent.source_block_number) > BigInt(preflight.block_number)) throw new Error('FUTURE_SOURCE_BLOCK');
       let tx;
       if (operation !== 'advance') {
@@ -138,16 +173,22 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
       } else {
         if (preflight.active_game_id !== intent.game_id) throw new Error('ACTIVE_GAME_CHANGED');
         const sourceBlock = await provider.getBlock(Number(intent.source_block_number));
+        assertPermitted();
         if (sourceBlock?.hash?.toLowerCase() !== intent.source_block_hash.toLowerCase()) throw new Error('SOURCE_BLOCK_REORGED');
         const snapshot = await reader.readSnapshot({ gameId: intent.game_id });
+        assertPermitted();
         if (snapshot.phase !== intent.phase || snapshot.round !== intent.round || !await contract.canAdvancePhase(intent.game_id, { blockTag: Number(snapshot.block_number) })) throw new Error('PHASE_NOT_ELIGIBLE');
         tx = await contract.advancePhase.populateTransaction(intent.game_id);
       }
+      assertPermitted();
       const [latestNonce, pendingNonce] = await Promise.all([provider.getTransactionCount(signerAddress, 'latest'), provider.getTransactionCount(signerAddress, 'pending')]);
+      assertPermitted();
       if (latestNonce !== pendingNonce) throw new Error('UNTRACKED_PENDING_SIGNER_NONCE');
       const populated = await signer.populateTransaction({ ...tx, chainId: 84532, value: 0n });
+      assertPermitted();
       if (Number(populated.chainId) !== 84532 || getAddress(populated.to) !== getAddress(config.game_address) || BigInt(populated.value ?? 0) !== 0n || Number(populated.nonce) !== pendingNonce) throw new Error('UNSAFE_POPULATED_TRANSACTION');
       await verifyBaseSepoliaRpc(provider);
+      assertPermitted();
       const raw = await signer.signTransaction(populated);
       record.nonce = Number(populated.nonce);
       record.hash = keccak256(raw);
@@ -155,7 +196,9 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
       // The raw transaction and key never enter coordinator state or this journal.
       await persist();
       try {
+        assertPermitted();
         await verifyBaseSepoliaRpc(provider);
+        assertPermitted();
         const broadcast = await provider.broadcastTransaction(raw);
         if (broadcast.hash.toLowerCase() !== record.hash.toLowerCase()) throw new Error('BROADCAST_HASH_MISMATCH');
         record.stage = 'broadcast'; record.status = 'accepted';
@@ -172,13 +215,15 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
   }
   const serialized = (fn) => { const pending = tail.then(fn); tail = pending.catch(() => {}); return pending; };
   return Object.freeze({
-    create: (intent) => {
+    create: (intent, { signal } = {}) => {
       if (!['operator', 'launcher'].includes(role)) throw new Error('ROLE_OPERATION_FORBIDDEN');
-      return serialized(() => submit('create', intent));
+      const captured = Object.freeze(structuredClone(intent));
+      return serialized(() => submit('create', captured, undefined, signal));
     },
-    advance: (intent) => {
+    advance: (intent, { signal } = {}) => {
       if (!['operator', 'phase-executor'].includes(role)) throw new Error('ROLE_OPERATION_FORBIDDEN');
-      return serialized(() => submit('advance', intent));
+      const captured = Object.freeze(structuredClone(intent));
+      return serialized(() => submit('advance', captured, undefined, signal));
     },
     configureDefaults: ({ action_id, source_block_number, defaults }) => {
       if (!['operator', 'launcher'].includes(role)) throw new Error('ROLE_OPERATION_FORBIDDEN');

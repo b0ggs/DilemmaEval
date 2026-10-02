@@ -80,7 +80,8 @@ test('actual producer plan and absent status leave the filesystem untouched', as
   assert.equal(plan.read_only, true);
   assert.equal(plan.seats.length, 10);
   assert.equal(plan.max_account_awake, 5);
-  assert.equal(plan.creation_blocker, 'READINESS_REMOTE_GENERATION_UNATTESTED');
+  assert.equal(plan.continuity_policy, 'observed-runtime-continuity-v1');
+  assert.equal(plan.verification_required, true);
   const status = await runConferenceControl(['status', ...args]);
   assert.equal(status.status, 'absent');
   assert.deepEqual(await readdir(directory), before);
@@ -103,7 +104,7 @@ test('diagnostic CLI passes absolute deadlines to producer, never creates gamepl
     } },
   });
   assert.equal(destroyed, true);
-  assert.deepEqual(result, { schema_version: 1, cli_version: 1, diagnostics_complete: true,
+  assert.deepEqual(result, { schema_version: 1, cli_version: 2, diagnostics_complete: true,
     ready_for_controlled_gameplay: false, evidence_sha256: 'ab'.repeat(32) });
 });
 
@@ -128,4 +129,87 @@ test('historical live run/rehearse entrypoints reject before reading config or c
       return true;
     });
   }
+});
+
+function proofArgs(fixture) {
+  const directory = fixture.directory;
+  return ['--config', path.join(directory, 'config.json'), '--evidence', path.join(directory, 'evidence.json'),
+    '--readiness-dir', path.join(directory, 'readiness'), '--proof-dir', path.join(directory, 'proof'),
+    '--operator-dir', path.join(directory, 'operator'), '--runner-dirs', JSON.stringify([path.join(directory, 'old-runner')]),
+    '--stop-new-games-at', new Date(Date.now() + 300_000).toISOString(),
+    '--hard-stop-at', new Date(Date.now() + 600_000).toISOString(), '--secrets-env', path.join(directory, 'secrets.env'),
+    '--artifact-plan', path.join(directory, 'artifacts.json'), '--operations-manifest', path.join(directory, 'operations.json'),
+    '--verification-root', directory];
+}
+function readers() {
+  return { env: {}, loadSecrets: async () => ({ MARITIME_API_KEY: 'fixture-maritime', TELEGRAM_BOT_TOKEN: 'fixture-telegram',
+    DILEMMA_LAUNCHER_TOKEN: 'fixture-operator' }),
+    chainModule: { makeProvider: () => ({ destroy() {} }), createChainReader: () => ({ fixture: true }) } };
+}
+test('proof read-only commands never allocate a verification directory; preparation requests a fresh one', async t => {
+  const fixture = await setup(t), before = await readdir(fixture.directory);
+  for (const command of ['proof-plan', 'proof-status', 'proof-prepare']) {
+    let checked = false;
+    const readOnly = command !== 'proof-prepare';
+    const inspect = async options => {
+      assert.equal(options.readOnly, readOnly);
+      await options.validateReadinessCurrent({ config: fixture.config, evidence: {}, readOnly });
+      return { status: readOnly ? 'verification-required' : 'prepared' };
+    };
+    const result = await runConferenceControl([command, ...proofArgs(fixture)], { ...readers(),
+      proof: { planControlledProof: inspect, validatePreparedProof: inspect, prepareControlledProof: inspect },
+      readiness: { verifyReadinessCurrent: async input => {
+        checked = true; assert.equal(input.readOnly, readOnly); assert.equal(input.artifacts.length, 10);
+        assert.ok(input.artifacts.every(row => JSON.parse(row.files.find(file => file.path === row.gameplay_command[2]).content).execution_permit_required === true));
+        if (readOnly) assert.equal(input.verificationDir, undefined);
+        else {
+          assert.equal(path.dirname(input.verificationDir), fixture.directory);
+          assert.match(path.basename(input.verificationDir), /^verification-[a-f0-9-]{36}$/);
+        }
+        return { ready: !readOnly };
+      } }, maritime: { createMaritimeAdapter: () => assert.fail('gameplay during planning or preparation') },
+    });
+    assert.equal(checked, true); assert.equal(result.ready_for_creation, false);
+    assert.equal(result.verification_required, readOnly);
+  }
+  assert.deepEqual(await readdir(fixture.directory), before);
+});
+test('proof-run connects certified adapters after operator and spectator preflight and emits no private adapter result', async t => {
+  const fixture = await setup(t), order = [];
+  const scoreboardPath = path.join(fixture.directory, 'scoreboards.json');
+  await writeFile(scoreboardPath, JSON.stringify({ fixture: true }));
+  await writeFile(path.join(fixture.directory, 'evidence.json'), '{}');
+  const continuity = { verify() {}, prepareAction() {} };
+  const result = await runConferenceControl(['proof-run', ...proofArgs(fixture), '--operator-pid', String(process.pid),
+    '--operator-url', 'http://127.0.0.1:4312', '--scoreboard-bindings', scoreboardPath], {
+    ...readers(), proof: { validatePreparedProof: async options => {
+      order.push('metadata'); assert.equal(options.readOnly, true); assert.equal(options.ownedProcesses.length, 1);
+      return { preparedConfig: fixture.config };
+    } }, livePreflight: {
+      inspectProofOperator: async input => { order.push('operator'); assert.equal(input.expectedPid, process.pid);
+        return { role: 'operator', directory: input.operatorDirectory, pid: process.pid, token: 'fixture-lock-token' }; },
+      verifyProofSpectators: async input => { order.push('spectators'); assert.deepEqual(input.scoreboard, { fixture: true }); },
+    }, continuity: { createRuntimeContinuity: input => { order.push('continuity'); assert.equal(input.artifacts.length, 10); return continuity; } },
+    maritime: { createMaritimeAdapter: input => { order.push('agents'); assert.equal(input.maxAwake, 5);
+      assert.equal(input.maxAgents, 10); assert.equal(input.runtimeContinuity, continuity); return {}; } },
+    operator: { createOperatorAdapters: input => { assert.equal(input.token, 'fixture-operator'); return { launcher: {}, phaseExecutor: {} }; } },
+    telegram: { createTelegramMirror: input => { assert.equal(input.runtimeDir, path.join(fixture.directory, 'proof', 'runtime')); return {}; } },
+    execution: { runControlledProof: async input => { order.push('execute'); assert.equal(input.proofOptions.ownedProcesses[0].token, 'fixture-lock-token');
+      return { status: 'candidate-complete', game_id: '18', launch_attempts: 1, candidate_proof_complete: true,
+        awaiting_independent_audit: true, proof_complete: true, raw: 'private-fixture' }; } },
+  });
+  assert.deepEqual(order, ['operator', 'metadata', 'spectators', 'continuity', 'agents', 'execute']);
+  assert.equal(result.proof_complete, false); assert.equal(result.awaiting_independent_audit, true);
+  assert.equal(JSON.stringify(result).includes('private'), false);
+  assert.equal(JSON.stringify(result).includes('fixture-lock-token'), false);
+});
+test('versioned audit requires explicit output and proof-run requires a loopback operator', async t => {
+  const fixture = await setup(t);
+  const audit = parseControlArguments(['proof-audit', '--proof-dir', path.join(fixture.directory, 'proof'), '--game-id', '18',
+    '--scoreboard-bindings', path.join(fixture.directory, 'scoreboards.json'), '--secrets-env', path.join(fixture.directory, 'secrets.env'),
+    '--output', path.join(fixture.directory, 'audit.json')]);
+  assert.equal(audit.command, 'proof-audit');
+  assert.throws(() => parseControlArguments(['proof-run', ...proofArgs(fixture), '--operator-pid', '42',
+    '--operator-url', 'https://example.invalid', '--scoreboard-bindings', path.join(fixture.directory, 'scoreboards.json')]), /CONTROL_OPERATOR_URL_INVALID/);
+  assert.equal((await runConferenceControl(['--version'])).cli_version, 2);
 });

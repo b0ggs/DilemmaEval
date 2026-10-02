@@ -12,9 +12,20 @@ function createClient({ url, token, fetchImpl = fetch }, operation) {
   if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash || !['http:', 'https:'].includes(endpoint.protocol)) throw new Error('INVALID_SIGNER_URL');
   if (endpoint.protocol !== 'https:' && !['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname)) throw new Error('SIGNER_HTTPS_REQUIRED');
   if (typeof token !== 'string' || token.length < 24) throw new Error('SIGNER_TOKEN_REQUIRED');
-  return Object.freeze({ [operation]: async (intent) => {
+  return Object.freeze({ [operation]: async (intent, { signal } = {}) => {
     try {
-      const response = await fetchImpl(new URL(`/${operation}`, endpoint), { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(intent), signal: AbortSignal.timeout(20_000), redirect: 'error' });
+      if (signal?.aborted) return { status: 'rejected-before-submit' };
+      const wire = structuredClone(intent);
+      let timeoutMs = 20_000;
+      if (Object.hasOwn(wire ?? {}, 'not_after_ms')) {
+        const current = Date.now();
+        if (!Number.isSafeInteger(wire.not_after_ms) || wire.not_after_ms < 1 || wire.not_after_ms <= current) return { status: 'rejected-before-submit' };
+        wire.not_after_ms = Math.min(wire.not_after_ms, current + 20_000);
+        timeoutMs = wire.not_after_ms - current;
+      }
+      const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
+      if (requestSignal.aborted) return { status: 'rejected-before-submit' };
+      const response = await fetchImpl(new URL(`/${operation}`, endpoint), { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(wire), signal: requestSignal, redirect: 'error' });
       if (!response.ok) return { status: 'race-or-revert' };
       return validateOutcome(await response.json());
     } catch { return { status: 'race-or-revert' }; }
@@ -33,15 +44,25 @@ export function createSignerServer({ role, service, token }) {
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { response.writeHead(401).end(); return; }
     const operation = operations.get(request.url);
     if (request.method !== 'POST' || !operation) { response.writeHead(404).end(); return; }
+    const controller = new AbortController();
+    const abortRequest = () => controller.abort();
+    const responseClosed = () => { if (!response.writableFinished) controller.abort(); };
+    request.once('aborted', abortRequest);
+    response.once?.('close', responseClosed);
     try {
       let body = '';
       for await (const chunk of request) { body += chunk; if (Buffer.byteLength(body) > 8192) throw new Error('BODY_TOO_LARGE'); }
-      const value = validateOutcome(await service[operation](JSON.parse(body)));
+      if (request.aborted || response.destroyed) controller.abort();
+      const value = validateOutcome(await service[operation](JSON.parse(body), { signal: controller.signal }));
+      if (response.destroyed) return;
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(value));
     } catch {
       // A service exception may follow a broadcast or disk failure. Never imply
       // that retrying is safe merely because the HTTP request failed.
-      response.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'race-or-revert' }));
+      if (!response.destroyed) response.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'race-or-revert' }));
+    } finally {
+      request.removeListener('aborted', abortRequest);
+      response.removeListener?.('close', responseClosed);
     }
   });
   server.requestTimeout = 25_000;

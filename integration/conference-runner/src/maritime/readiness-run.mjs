@@ -11,7 +11,7 @@ import { verifyPublicArtifactIntegrity } from './install.mjs';
 import { reconcileRoster, validateMaritimeRoster } from './roster.mjs';
 import { buildDiagnosticReceiptReadCommand, validateDiagnosticReceipt } from './diagnostic-receipt.mjs';
 
-export const READINESS_PRODUCER_VERSION = 1;
+export const READINESS_PRODUCER_VERSION = 2;
 export const READINESS_FILES = Object.freeze({ evidence: 'readiness-v2.json', state: 'readiness-state.json', journal: 'readiness-journal.json' });
 const HASH = /^[0-9a-f]{64}$/;
 const BLOCK_HASH = /^0x[0-9a-f]{64}$/;
@@ -23,7 +23,8 @@ const exact = (value, keys) => value && typeof value === 'object' && !Array.isAr
 
 // Observational continuity, NOT a provider-issued activation generation. A VM
 // snapshot can preserve these values. Current-generation revalidation therefore
-// stays closed until Maritime exposes a documented attestation mechanism.
+// is combined with exact content/receipt checks after every resume and an
+// execution permit checked inside the player lock; it is not lifecycle history.
 export const RUNTIME_INSTANCE_COMMAND = Object.freeze(['node', '--input-type=module', '-e', `
 import { readFile, readlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -31,7 +32,7 @@ try {
   const boot = (await readFile('/proc/sys/kernel/random/boot_id','utf8')).trim();
   const stat = await readFile('/proc/1/stat','utf8');
   const start = stat.slice(stat.lastIndexOf(')')+2).split(' ')[19];
-  const ns = await readlink('/proc/1/ns/pid');
+  const ns = await readlink('/proc/self/ns/pid');
   if (!/^[0-9a-f-]{36}$/.test(boot) || !/^[0-9]+$/.test(start) || !/^pid:\\[[0-9]+\\]$/.test(ns)) throw new Error();
   process.stdout.write(JSON.stringify({schema_version:1,runtime_instance_fingerprint:createHash('sha256').update(JSON.stringify([boot,start,ns])).digest('hex')}));
 } catch { process.exitCode=1; }
@@ -100,7 +101,8 @@ function checkedArtifacts(config, artifacts) {
     let settings;
     try { settings = JSON.parse(artifact.files.find(row => row.path === artifact.gameplay_command[2])?.content); }
     catch { fail('READINESS_ARTIFACTS_INVALID'); }
-    if (settings?.chain_id !== config.chain_id || settings.game_address?.toLowerCase() !== config.game_address.toLowerCase() ||
+    if (settings?.chain_id !== config.chain_id || (config.mode === 'live' && settings.execution_permit_required !== true) ||
+        settings.game_address?.toLowerCase() !== config.game_address.toLowerCase() ||
         settings.rpc_url !== config.rpc_url || settings.seat_id !== seat.seat_id || settings.harness !== seat.harness ||
         runtimeEvidenceFingerprint(settings.roster) !== runtimeEvidenceFingerprint(config.roster)) fail('READINESS_ARTIFACTS_INVALID');
     return structuredClone(artifact);
@@ -131,6 +133,26 @@ function execJson(value) {
   if (value?.exitCode !== 0 || typeof value.stdout !== 'string' || Buffer.byteLength(value.stdout) > 16_384 ||
       (value.stderr !== undefined && value.stderr !== '')) fail('READINESS_INSPECTION_FAILED');
   try { return JSON.parse(value.stdout); } catch { fail('READINESS_INSPECTION_FAILED'); }
+}
+
+function validateVolumeList(value, expectedRoot) {
+  // GET files/list without a path lists the volume root. The documented REST
+  // shape is {path,root,entries}; metadata is checked then discarded, never
+  // copied into diagnostic journals or readiness evidence.
+  if (!exact(value,['path','root','entries']) || value.root !== expectedRoot || value.path !== expectedRoot ||
+      !isAbsolute(expectedRoot) || resolve(expectedRoot) !== expectedRoot || expectedRoot === '/' ||
+      /[\0\r\n]/.test(expectedRoot) || !Array.isArray(value.entries)) fail('READINESS_VOLUME_INVALID');
+  const names = new Set();
+  for (const entry of value.entries) {
+    if (!exact(entry,['name','isDir','size','mtime']) || typeof entry.name !== 'string' || !entry.name ||
+        Buffer.byteLength(entry.name) > 255 || /[\x00-\x1f\x7f/\\]/.test(entry.name) ||
+        ['.','..'].includes(entry.name) || names.has(entry.name) || typeof entry.isDir !== 'boolean' ||
+        !Number.isSafeInteger(entry.size) || entry.size < 0 || typeof entry.mtime !== 'number' ||
+        !Number.isFinite(entry.mtime) || entry.mtime < 0 || entry.mtime > Number.MAX_SAFE_INTEGER) {
+      fail('READINESS_VOLUME_INVALID');
+    }
+    names.add(entry.name);
+  }
 }
 
 function verifyModel(value, seat) {
@@ -177,12 +199,13 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
   artifacts = checkedArtifacts(config, artifacts);
   const rows = config.roster;
   let started = false;
-  const plan = () => ({ schema_version: 1, producer_version: 1, read_only: true,
+  const plan = () => ({ schema_version: 1, producer_version: READINESS_PRODUCER_VERSION, read_only: true,
     run_id: config.run_id, roster_fingerprint: rosterFingerprint(config), config_fingerprint: configFingerprint(config),
     transport_fingerprint: TRANSPORT_FINGERPRINT, requested_seats: 10, max_account_awake: 5,
     schedule: 'serial-account-capacity-checked', modes: ['gameplay-input','commit-input'],
     generation_scope: 'diagnostic-run-intent-v1', remote_generation_attested: false,
-    creation_blocker: 'READINESS_REMOTE_GENERATION_UNATTESTED',
+    continuity_policy: 'observed-runtime-continuity-v1',
+    verification_required: true,
     seats: artifacts.map(row => ({ seat_id: row.seat_id, agent_id: row.agent_id, artifact_sha256: row.artifact_sha256 })) });
   return Object.freeze({
     plan,
@@ -209,7 +232,7 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
           pending_operations: journal.operations.filter(row => row.status === 'intent').length,
           all_seats_sleeping: journal.all_seats_sleeping === true, replay_allowed: false,
           ready_for_controlled_gameplay: false,
-          creation_blocker: 'READINESS_REMOTE_GENERATION_UNATTESTED',
+          continuity_policy: 'observed-runtime-continuity-v1', verification_required: true,
           ...(journal.status === 'complete' && !complete ? {status:'incomplete-no-replay'} : {}) };
       } catch { fail('READINESS_STATE_INVALID'); }
     },
@@ -227,7 +250,7 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
       try { await parent.sync(); } finally { await parent.close(); }
       started = true;
       const runId = randomUUID();
-      const journal = { schema_version: 1, producer_version: 1, diagnostic_run_id: runId,
+      const journal = { schema_version: 1, producer_version: READINESS_PRODUCER_VERSION, diagnostic_run_id: runId,
         config_fingerprint: configFingerprint(config), roster_fingerprint: rosterFingerprint(config),
         transport_fingerprint: TRANSPORT_FINGERPRINT, status: 'running', started_at_ms: startedAt,
         deadline_at_ms: deadlineAtMs, cleanup_deadline_at_ms: cleanupDeadlineAtMs,
@@ -270,8 +293,7 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
       const inspect = async (seat, artifact, previous) => {
         await getStatus(seat, 'active');
         const volume = await request('volume-read', seat, `${prefix(seat)}/files/list`);
-        if (!exact(volume, ['root','files']) && (typeof volume?.root !== 'string' || !Array.isArray(volume?.files))) fail('READINESS_VOLUME_INVALID');
-        if (volume.root !== artifact.persistent_root) fail('READINESS_VOLUME_INVALID');
+        validateVolumeList(volume, artifact.persistent_root);
         await verifyPublicArtifactIntegrity(artifact, command => execute(seat, command));
         const direct = execJson(await execute(seat, artifact.inspect_command));
         if (!exact(direct, ['schema_version','seat_id','wallet_address','chain_id','persistent_storage_writable','gameplay_execution_proven']) ||
@@ -380,14 +402,16 @@ export function createReadinessRun({ config, runtimeDir, artifacts, deadlineAtMs
             runtime_instance_fingerprint: row.runtime_instance_fingerprint, final_agent_status: 'sleeping' })) };
         const evidence = buildControlledRuntimeEvidence(config, { confirmedBlockNumber: initial.block_number,
           confirmedBlockHash: initial.block_hash, seats: completed, now: startedAt,
-          producer: { producer_version: 1, diagnostic_run_id: runId, chain_id: 84532,
+          producer: { producer_version: READINESS_PRODUCER_VERSION, diagnostic_run_id: runId, chain_id: 84532,
             game_address: config.game_address.toLowerCase(), game_code_hash: initial.game_code_hash,
             chain_defaults_fingerprint: initial.chain_defaults_fingerprint, generation_scope: 'diagnostic-run-intent-v1',
-            remote_generation_attested: false, diagnostics_complete: true, lifecycle_state_digest: runtimeEvidenceFingerprint(state) } });
+            remote_generation_attested: false, diagnostics_complete: true,
+            continuity_policy: 'observed-runtime-continuity-v1', lifecycle_state_digest: runtimeEvidenceFingerprint(state) } });
         await atomicWrite(join(runtimeDir, READINESS_FILES.state), state);
         const evidencePath = join(runtimeDir, READINESS_FILES.evidence);
         if (now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
         await atomicWrite(evidencePath, evidence);
+        if (now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
         return { evidence, evidencePath, evidenceDigest: runtimeEvidenceFingerprint(evidence) };
       } catch {
         abandoned = true;
@@ -434,17 +458,123 @@ export async function validateReadinessRunState({ config, evidence, runtimeDir, 
   } catch { fail('READINESS_STATE_INVALID'); }
 }
 
-/** Current provider schema cannot attest no intervening restore/reload. */
+/** Read-only inspection never wakes agents. Verification is a separate, durable,
+ * explicit serial wake/inspect/sleep operation; it never changes the certificate. */
 export async function verifyReadinessCurrent({ config, evidence, runtimeDir, apiKey, fetchImpl = globalThis.fetch,
-  chain, deadlineAtMs, now = Date.now } = {}) {
-  await validateReadinessRunState({ config, evidence, runtimeDir, now });
-  const result = inventory(await bounded(() => maritimeRequest({ apiKey, fetchImpl, path: '/api/agents',
-    timeoutMs: Math.max(1, deadlineAtMs - now()) }), deadlineAtMs, now), config);
-  if (result.seats.some(row => row.status !== 'sleeping')) fail('READINESS_SLEEP_UNCONFIRMED');
-  const current = chainFacts(await bounded(() => chain.preflight(), deadlineAtMs, now), config);
-  if (current.chain_defaults_fingerprint !== evidence.chain_defaults_fingerprint || current.game_code_hash !== evidence.game_code_hash ||
-      await bounded(() => chain.readBlockHash({ blockNumber: evidence.confirmed_block_number }), deadlineAtMs, now) !== evidence.confirmed_block_hash) {
-    fail('READINESS_CHAIN_CHANGED');
+  chain, deadlineAtMs, cleanupDeadlineAtMs, verificationDir, artifacts, readOnly = false, signal, now = Date.now } = {}) {
+  if (signal?.aborted) fail('READINESS_VERIFICATION_ABORTED');
+  const identity = await validateReadinessRunState({ config, evidence, runtimeDir, now });
+  if (evidence.producer_version !== READINESS_PRODUCER_VERSION ||
+      evidence.continuity_policy !== 'observed-runtime-continuity-v1') fail('READINESS_CONTINUITY_POLICY_REQUIRED');
+  const readRequest = path => bounded(() => maritimeRequest({ apiKey, fetchImpl, path,
+    timeoutMs: Math.max(1, Math.min(120_000, deadlineAtMs - now())), signal }), deadlineAtMs, now);
+  const assertChain = async () => {
+    const current = chainFacts(await bounded(() => chain.preflight(), deadlineAtMs, now), config);
+    if (current.chain_defaults_fingerprint !== evidence.chain_defaults_fingerprint || current.game_code_hash !== evidence.game_code_hash ||
+        await bounded(() => chain.readBlockHash({ blockNumber: evidence.confirmed_block_number }), deadlineAtMs, now) !== evidence.confirmed_block_hash) {
+      fail('READINESS_CHAIN_CHANGED');
+    }
+  };
+  const initial = inventory(await readRequest('/api/agents'), config);
+  if (initial.seats.some(row => row.status !== 'sleeping')) fail('READINESS_SLEEP_UNCONFIRMED');
+  await assertChain();
+  if (readOnly) return { ...identity, ready: false, read_only: true, verification_required: true,
+    continuity_policy: evidence.continuity_policy };
+  if (!Number.isSafeInteger(cleanupDeadlineAtMs) || cleanupDeadlineAtMs <= deadlineAtMs ||
+      cleanupDeadlineAtMs - deadlineAtMs > 300_000) fail('READINESS_DEADLINE_INVALID');
+  const pinnedArtifacts = checkedArtifacts(config, artifacts);
+  const { createRuntimeContinuity } = await import('./continuity.mjs');
+  const continuity = createRuntimeContinuity({ config, evidence, artifacts: pinnedArtifacts, now });
+  await checkedDirectory(verificationDir);
+  await mkdir(verificationDir, { mode: 0o700 });
+  const parent = await open(dirname(verificationDir), 'r');
+  try { await parent.sync(); } finally { await parent.close(); }
+  const journal = { schema_version: 1, verification_id: randomUUID(),
+    continuity_policy: evidence.continuity_policy, evidence_sha256: identity.evidence_sha256,
+    lifecycle_state_digest: identity.lifecycle_state_digest, status: 'running', started_at_ms: now(),
+    deadline_at_ms: deadlineAtMs, cleanup_deadline_at_ms: cleanupDeadlineAtMs,
+    all_seats_sleeping: false, operations: [] };
+  const journalPath = join(verificationDir, 'continuity-verification.json');
+  let writes = Promise.resolve(), sequence = 0, abandoned = false, cleaning = false, ambiguous = false;
+  const activated = new Set(), slept = new Set();
+  const persist = () => {
+    const snapshot = structuredClone(journal);
+    writes = writes.then(() => atomicWrite(journalPath, snapshot));
+    return writes;
+  };
+  await persist();
+  const operation = async (kind, seat, task) => {
+    const cleanupOperation = cleaning;
+    const end = cleaning ? cleanupDeadlineAtMs : deadlineAtMs;
+    if (signal?.aborted && !cleaning) fail('READINESS_VERIFICATION_ABORTED');
+    if (abandoned && !cleaning) fail('READINESS_RUN_ABANDONED');
+    if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
+    const entry = { sequence: ++sequence, kind, seat_id: seat?.seat_id ?? null, status: 'intent', started_at_ms: now() };
+    journal.operations.push(entry); await persist();
+    try {
+      const value = await bounded(task, end, now);
+      if (signal?.aborted && !cleanupOperation) fail('READINESS_VERIFICATION_ABORTED');
+      if (abandoned && !cleanupOperation) fail('READINESS_RUN_ABANDONED');
+      if (now() >= end) fail('READINESS_DEADLINE_EXPIRED');
+      entry.status = 'complete'; entry.completed_at_ms = now(); await persist(); return value;
+    } catch {
+      entry.status = 'unknown'; entry.completed_at_ms = now();
+      if (['activation','sleep','runtime-read','continuity-check'].includes(kind)) ambiguous = true;
+      if (!(abandoned && !cleanupOperation)) await persist();
+      fail('READINESS_OPERATION_FAILED');
+    }
+  };
+  const prefix = seat => `/api/agents/${encodeURIComponent(seat.agent_id)}`;
+  const request = (kind, seat, path, method = 'GET', body) => operation(kind, seat, () => maritimeRequest({
+    apiKey, fetchImpl, path, method, body, signal: cleaning ? undefined : signal,
+    timeoutMs: Math.max(1, Math.min(120_000, (cleaning ? cleanupDeadlineAtMs : deadlineAtMs) - now())) }));
+  const sleepingInventory = async () => {
+    const value = inventory(await request('inventory', null, '/api/agents'), config);
+    if (value.seats.some(row => row.status !== 'sleeping')) fail('READINESS_SLEEP_UNCONFIRMED');
+    return value;
+  };
+  const sleep = async seat => {
+    if (slept.has(seat.seat_id)) fail('READINESS_SLEEP_REPLAY_FORBIDDEN');
+    slept.add(seat.seat_id);
+    try {
+      agentStatus(await request('sleep', seat, `${prefix(seat)}/sleep`, 'POST'), seat, 'sleeping');
+      agentStatus(await request('lifecycle-read', seat, prefix(seat)), seat, 'sleeping');
+    } catch { ambiguous = true; fail('READINESS_SLEEP_UNCONFIRMED'); }
+  };
+  try {
+    for (const seat of config.roster) {
+      const capacity = await sleepingInventory();
+      if (capacity.awake >= 5) fail('READINESS_CAPACITY_UNAVAILABLE');
+      activated.add(seat.seat_id);
+      try {
+        agentStatus(await request('activation', seat, `${prefix(seat)}/start`, 'POST'), seat, 'active');
+        agentStatus(await request('lifecycle-read', seat, prefix(seat)), seat, 'active');
+      } catch { ambiguous = true; fail('READINESS_LIFECYCLE_UNCONFIRMED'); }
+      await operation('continuity-check', seat, () => continuity.verify({ seat,
+        execute: command => request('runtime-read', seat, `${prefix(seat)}/exec`, 'POST', { command, timeout: 30 }),
+        getAgent: async () => {
+          const value = await request('lifecycle-read', seat, prefix(seat));
+          agentStatus(value, seat, 'active');
+          return { id: value.id, framework: seat.harness, status: value.status };
+        } }));
+      await sleep(seat);
+    }
+    await sleepingInventory();
+    await operation('chain-revalidation', null, assertChain);
+    await validateReadinessRunState({ config, evidence, runtimeDir, now });
+    if (now() >= deadlineAtMs) fail('READINESS_DEADLINE_EXPIRED');
+    journal.status = 'complete'; journal.all_seats_sleeping = true; journal.completed_at_ms = now();
+    await persist();
+    if (now() >= deadlineAtMs || signal?.aborted) fail('READINESS_DEADLINE_EXPIRED');
+    return { ...identity, ready: true, read_only: false, continuity_policy: evidence.continuity_policy,
+      verification_sha256: runtimeEvidenceFingerprint(journal), verification_path: journalPath };
+  } catch {
+    abandoned = true; cleaning = true;
+    for (const seat of config.roster.filter(row => activated.has(row.seat_id) && !slept.has(row.seat_id))) {
+      try { await sleep(seat); } catch { /* preserve uncertainty; no blind replay */ }
+    }
+    try { await sleepingInventory(); journal.all_seats_sleeping = !ambiguous; } catch { journal.all_seats_sleeping = false; }
+    journal.status = 'failed'; journal.completed_at_ms = now(); await persist();
+    fail(journal.all_seats_sleeping ? 'READINESS_VERIFICATION_FAILED' : 'READINESS_VERIFICATION_FAILED_SLEEP_UNCONFIRMED');
   }
-  fail('READINESS_REMOTE_GENERATION_UNATTESTED');
 }

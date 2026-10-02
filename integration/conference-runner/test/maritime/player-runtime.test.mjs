@@ -136,7 +136,7 @@ test('diagnostic runtime verifies both stdin shapes without signer, journal, or 
   const f = await fixture(t);
   const privateKey = `0x${'1'.repeat(64)}`;
   const wallet = deriveEthereumAddress(privateKey);
-  const settings = { ...f.settings, bin_directory: join(f.directory, 'bin'),
+  const settings = { ...f.settings, bin_directory: join(f.directory, 'bin'), execution_permit_required:true,
     roster: f.settings.roster.map((row, index) => index === 0 ? { ...row, wallet_address: wallet } : row) };
   const calls = [];
   const make = () => createPlayerRuntime({ settings, env: { GAMEPLAY_WALLET_PRIVATE_KEY: privateKey },
@@ -148,6 +148,7 @@ test('diagnostic runtime verifies both stdin shapes without signer, journal, or 
     checkoutVerifier: async (...args) => { calls.push(['checkout', ...args.slice(0, 1)]); return { ok: true }; },
     accessImpl: async (path, mode) => { calls.push(['access', path, mode]); },
     diagnosticChainVerifier: async request => { calls.push(['chain', request]); return { chainId: 84532 }; },
+    diagnosticRuntimeFingerprintReader: async () => { calls.push(['instance']); return 'be'.repeat(32); },
     diagnosticModelRouteVerifier: async () => ({schema_version:1,seat_id:'oc-1',model_route_verified:true}),
     diagnosticContractVerifier: async request => { calls.push(['contract', request]); return { contract_read: true }; }
   });
@@ -161,15 +162,47 @@ test('diagnostic runtime verifies both stdin shapes without signer, journal, or 
     assert.deepEqual(input, original);
     assert.equal(result.status, 'ready');
     assert.equal(JSON.stringify(result).includes('catch'), false);
+    assert.equal(JSON.stringify(result).includes('be'.repeat(32)), false);
     assert.deepEqual(Object.values(result.checks), Array(9).fill(true));
   }
   assert.equal(calls.filter(row => row[0] === 'checkout').length, 2);
   assert.equal(calls.filter(row => row[0] === 'reader').length, 2);
   assert.equal(calls.filter(row => row[0] === 'chain').length, 2);
   assert.equal(calls.filter(row => row[0] === 'contract').length, 2);
+  assert.equal(calls.filter(row => row[0] === 'instance').length, 2);
   assert.deepEqual(await readdir(settings.state_directory), [], 'transient seat lock must be released');
   assert.equal((await readdir(settings.state_directory)).some(name => ['requests', 'bundles'].includes(name)), false);
   assert.equal(f.calls.length, 0);
+});
+
+test('live Hermes diagnostic namespace permission or malformed fingerprint prevents receipts and gameplay',async t=>{
+  for(const kind of ['permission','malformed']) {
+    const f=await fixture(t),privateKey=`0x${'1'.repeat(64)}`,wallet=deriveEthereumAddress(privateKey);
+    const assigned=roster.find(row=>row.harness==='hermes');
+    const settings={...f.settings,seat_id:assigned.seat_id,harness:'hermes',execution_permit_required:true,
+      runtime_identity:{...HERMES_RUNTIME_IDENTITY},
+      bin_directory:join(f.directory,'bin'),roster:roster.map(row=>row.seat_id===assigned.seat_id?{...row,wallet_address:wallet}:row)};
+    let fingerprints=0,receipts=0;
+    const runtime=createPlayerRuntime({settings,env:{GAMEPLAY_WALLET_PRIVATE_KEY:privateKey},
+      bridgeFactory:()=>assert.fail('failed native diagnostic cannot construct a gameplay bridge'),
+      checkoutVerifier:async()=>({ok:true}),accessImpl:async()=>{},
+      diagnosticRuntimeFingerprintReader:async()=>{
+        fingerprints++;
+        if(kind==='permission')throw Object.assign(new Error('unpublished namespace EACCES details'),{code:'EACCES'});
+        return {toString:()=> 'be'.repeat(32)};
+      },
+      diagnosticReaderFactory:()=>assert.fail('namespace failure precedes diagnostic RPC or wrapper work'),
+      diagnosticReceiptWriter:async()=>{receipts++;}
+    });
+    await assert.rejects(runtime.diagnose({request:{schema_version:1,type:'runtime-diagnostic',
+      request_id:`namespace:${kind}`,seat_id:assigned.seat_id,team:'hermes',mode:'gameplay-input',
+      chain_state:{chain_id:84532,game_address:config.game_address,confirmed_block_number:'123',
+        confirmed_block_hash:`0x${'a'.repeat(64)}`}}}),error=>
+      error.message==='PLAYER_EXECUTION_PERMIT_INVALID'&&!error.cause);
+    assert.equal(fingerprints,1);assert.equal(receipts,0);assert.equal(f.calls.length,0);
+    assert.deepEqual(await readdir(settings.state_directory),[],'seat lock releases without a gameplay journal or bundle');
+    assert.equal((await readdir(f.directory)).includes('diagnostic-receipts'),false);
+  }
 });
 
 test('diagnostic runtime rejects malformed commit input before filesystem, chain, or bridge work', async t => {
