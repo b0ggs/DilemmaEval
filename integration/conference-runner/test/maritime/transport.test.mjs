@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { buildAgentPrompt, createMaritimeAdapter as rawMaritimeAdapter, reconcileRoster } from '../../src/maritime/index.mjs';
 import { buildPublicRequestArtifact, buildGameplayShellCommand, stagePublicRequest,
   buildRuntimeDiagnosticArtifact, buildRuntimeDiagnosticShellCommand, createMaritimeAwakeLeasePool,
-  safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../../src/maritime/transport.mjs';
+  maritimeRequest, safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../../src/maritime/transport.mjs';
+import { createProofDispatchJournal } from '../../../../conference/operations/saved-helpers/proof-dispatch-journal.mjs';
 import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -950,7 +951,9 @@ test('an already-aborted unsent dispatch is safely retryable with the same reque
 
 
 test('fixed Maritime metadata allowlists reject arbitrary codes without inspecting provider text', () => {
-  for (const code of ['MARITIME_HTTP_502', 'MARITIME_TIMEOUT', 'MARITIME_PUBLIC_REQUEST_STAGE_FAILED']) {
+  const addedStatuses = [402,406,407,411,412,416,417,418,421,423,424,426,428,506];
+  for (const code of ['MARITIME_HTTP_502', 'MARITIME_TIMEOUT', 'MARITIME_PUBLIC_REQUEST_STAGE_FAILED',
+    ...addedStatuses.map(status => `MARITIME_HTTP_${status}`)]) {
     assert.equal(safeMaritimeErrorCode(code), code);
     assert.equal(safeMaritimeDiagnosticCode(code), code);
   }
@@ -958,7 +961,8 @@ test('fixed Maritime metadata allowlists reject arbitrary codes without inspecti
     assert.equal(safeMaritimeErrorCode(code), null);
     assert.equal(safeMaritimeDiagnosticCode(code), code);
   }
-  for (const code of ['MARITIME_HTTP_599', 'MARITIME_HTTP_502_private-fixture', 'READINESS_PRIVATE_FIXTURE',
+  for (const code of ['MARITIME_HTTP_419', 'MARITIME_HTTP_499', 'MARITIME_HTTP_509', 'MARITIME_HTTP_599',
+    'MARITIME_HTTP_423_private-fixture', 'MARITIME_HTTP_502_private-fixture', 'READINESS_PRIVATE_FIXTURE',
     'PLAYER_TOOL_FAILED\nprivate-fixture', null, 502, {code:'MARITIME_HTTP_502'}]) {
     assert.equal(safeMaritimeErrorCode(code), null);
     assert.equal(safeMaritimeDiagnosticCode(code), null);
@@ -967,8 +971,33 @@ test('fixed Maritime metadata allowlists reject arbitrary codes without inspecti
   }
 });
 
+test('standard HTTP 423 remains sanitized in proof dispatch evidence without replaying an unknown mutation', async () => {
+  const secret = 'unpublished-provider-private-fixture';
+  const report = { dispatches: [] }, stopController = new AbortController();
+  let calls = 0;
+  const journal = createProofDispatchJournal({ report, stopController, persist: async () => {},
+    adapter: { dispatch: () => maritimeRequest({ apiKey: 'fixture-credential', path: '/synthetic/start', method: 'POST',
+      fetchImpl: async () => { calls++; return new Response(secret, { status: 423 }); } }) } });
+  const request = poke('reveal');
+  await assert.rejects(journal.dispatch({ seat: roster[0], request }), error => {
+    assert.equal(error.code, 'MARITIME_HTTP_423');
+    assert.equal(error.ambiguous, true); assert.equal(error.retryable, false);
+    assert.equal(error.cause, undefined); assert.doesNotMatch(String(error), /unpublished-provider/); return true;
+  });
+  assert.equal(calls, 1); assert.equal(stopController.signal.aborted, true);
+  assert.equal(report.dispatches.length, 1);
+  assert.equal(report.dispatches[0].status, 'ambiguous');
+  assert.equal(report.dispatches[0].error_code, 'MARITIME_OPERATION_FAILED');
+  assert.equal(report.dispatches[0].transport_code, 'MARITIME_HTTP_423');
+  assert.equal(report.dispatches[0].diagnostic_code, null);
+  assert.equal(report.dispatches[0].transaction_hash, null);
+  assert.doesNotMatch(JSON.stringify(report), /unpublished-provider|fixture-credential|\/synthetic\/start/);
+  await assert.rejects(journal.dispatch({ seat: roster[0], request }), /CONTROLLED_PROOF_STOPPED/);
+  assert.equal(calls, 1); assert.equal(report.dispatches.length, 1);
+});
+
 test('staging wrappers retain fixed HTTP metadata and preserve existing retry and ambiguity semantics', async () => {
-  for (const action of ['dispatch', 'diagnose']) for (const status of [401, 502]) {
+  for (const action of ['dispatch', 'diagnose']) for (const status of [401, 423, 502]) {
     let calls = 0;
     const adapter = rawMaritimeAdapter({config,apiKey:'fixture-credential',runtimeEvidence:runtimeEvidenceV2(),
       diagnosticStageRetries:0,fetchImpl:async url => {
@@ -987,7 +1016,7 @@ test('staging wrappers retain fixed HTTP metadata and preserve existing retry an
       assert.equal(error.cause, undefined); return true;
     };
     await assert.rejects(invoke(), check);
-    const count = action === 'dispatch' && status === 502 ? 2 : 1;
+    const count = action === 'dispatch' && status !== 401 ? 2 : 1;
     assert.equal(calls, count);
     await assert.rejects(invoke(), check);
     assert.equal(calls, count, 'cached failed requests do not repeat their remote work');

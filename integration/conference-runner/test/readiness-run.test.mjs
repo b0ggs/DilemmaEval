@@ -741,6 +741,8 @@ test('failed operation metadata retains only exact adapter codes and never provi
   const cases=[
     {name:'http',expected:'MARITIME_HTTP_503',ambiguous:true,
       fail:()=>new Response(secret,{status:503})},
+    ...[412,423,506].map(status=>({name:`standard-http-${status}`,expected:`MARITIME_HTTP_${status}`,ambiguous:true,
+      fail:()=>new Response(secret,{status})})),
     {name:'rejected',expected:'MARITIME_HTTP_401',ambiguous:false,
       fail:()=>new Response(secret,{status:401})},
     {name:'timeout',expected:'MARITIME_TIMEOUT',ambiguous:true,fail:()=>{
