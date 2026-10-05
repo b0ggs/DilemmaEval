@@ -8,7 +8,7 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Step 0: full working diff and all untracked files scanned with `gitleaks`; no leaks.
   OAuth targeted tests passed 46/46. Saved every existing modified/untracked file in commit `3fc2d2e`.
 - Step 1: AGENTS.md now points here and records persistent D1 authorization.
-- Complete: steps 0, 1, 3, 4 and 5 (5/7). Remaining: 2d and 6.
+- Complete: steps 0–5 (6/7). Remaining: step 6; debug retry targets zero defaults.
 - Steps 2–4: named receipt causes, `diagnose --seat`, coordinator debug admission,
   observer disable/restore and persistent seat quarantine implemented locally.
   Integration checkpoint passed 625/625; supplemental chain 25/25, transport
@@ -22,10 +22,12 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   failed jobs were stopped and later stopped reads resolved quarantine. No replay.
 - Step 5: Game 21 completed; all ten acted, four defaults, Telegram correct.
 - Cleanup 18:59 UTC: active game 0, awake 0, quarantine empty, operator stopped.
-- Next: another debug attempt to test the transport fix and aim for zero defaults.
-- Next-attempt fix: isolate native conversations per request; name JSON parse
-  and discussion schema failures. Transport 48/48; no agent-source changes.
-  OC1's named per-call diagnosis is still pending (step 2d).
+- Current: Game 22 running with the transport fix; pre-proof full suite running.
+- Next-attempt fix: 140-character discussion draft with terminal length check;
+  retain strict 200-character validation and name overflow. Transport 48/48.
+- Step 2d: OC1 production diagnosis names `OPENCLAW_RECEIPT_FILES` during
+  activation; per-call provenance unresolved. Observer disabled again; OAuth-only
+  route and awake 0 confirmed. Use D3 for final proof if still unresolved.
 - Preflight October 5 18:13 UTC: active game 0, awake 0, quarantine empty;
   owner nonce 476 clear, all players admitted/funded, owner balance 0.14625 ETH.
 - Game 20: ten awards unpaid. Claims authorized while no game is running.
@@ -40,9 +42,9 @@ Standing D1 authorization persists across sessions/compaction until revoked:
 gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram rooms.
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
-October 5 counters under this authorization: creations 1/10 (total 1/30),
-additional wakes 24/60, owner/operator gas 0.00000775/0.07 ETH.
-Game 21 terminal and cleaned up; second debug attempt preparing.
+October 5 counters under this authorization: creations 2/10 (total 2/30),
+additional wakes 26/60, owner/operator gas 0.00000775/0.07 ETH.
+Game 21 terminal and cleaned up; second debug attempt executing.
 
 ## Run map
 
@@ -67,10 +69,11 @@ Game 21 terminal and cleaned up; second debug attempt preparing.
   `src/maritime/prepare-debug.mjs`; reuse existing installer, fresh private output.
 - Operator entry: `node --env-file=PRIVATE_OWNER_ENV src/chain/cli.mjs operator`.
   Existing journal: `/Users/wade/.local/state/dilemmaeval-conference/`
-  `converge-rehearsal-2026-09-24-r8/operator` (67-record baseline; stopped).
+  `converge-rehearsal-2026-09-24-r8/operator` (67-record baseline; running).
 - Original implementation reference: [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md).
 - Historical evidence archive: [RUN-STATUS.md](RUN-STATUS.md).
 
 ## Attempt log
 
 A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid; 56/56 DEBUG messages sent; terminal/awake 0/active 0 confirmed.
+A2 / Game 22: all ten joined; oc-4 R1 team-message invalid, quarantined; first post-fix failure; game/cleanup pending.

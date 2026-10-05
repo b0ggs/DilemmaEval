@@ -303,7 +303,8 @@ test('discussion schema failures preserve the owned failed check through the out
     [{ ...valid, unexpected: 'untrusted reply detail' }, 'MARITIME_REPLY_INVALID_ENVELOPE'],
     [{ ...valid, type: 'gameplay-response' }, 'MARITIME_REPLY_DISCUSSION_INVALID'],
     [{ ...valid, status: 'skipped' }, 'MARITIME_REPLY_DISCUSSION_INVALID'],
-    [{ ...valid, team_message: 'x'.repeat(201) }, 'MARITIME_REPLY_TEAM_MESSAGE_INVALID'],
+    [{ ...valid, team_message: 'x'.repeat(201) }, 'MARITIME_REPLY_TEAM_MESSAGE_TOO_LONG'],
+    [{ ...valid, team_message: '🙂'.repeat(201) }, 'MARITIME_REPLY_TEAM_MESSAGE_TOO_LONG'],
     [{ ...valid, request_id: 'stale-request' }, 'MARITIME_REPLY_IDENTITY_MISMATCH']
   ]) {
     const report = { dispatches: [] };
@@ -353,6 +354,7 @@ test('every gameplay and discussion prompt carries the team goal and exact same-
       assert.deepEqual(request, original);
       if (request.type === 'discussion') {
         assert.match(instructions, /substantive team_message \(at most 200 characters\).*concrete strategic consideration/);
+        assert.match(instructions, /Draft no more than 140 ASCII characters.*Verify the character count with your terminal/);
         assert.match(instructions, /phase deadline; do not disclose a private commit choice or secret/);
         assert.match(instructions, /Do not run a gameplay transaction/);
         assert.match(instructions, /Return exact JSON.*type:"discussion-response".*status:"observed",team_message/);
