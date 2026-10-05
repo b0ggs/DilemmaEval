@@ -8,19 +8,19 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Step 0: full working diff and all untracked files scanned with `gitleaks`; no leaks.
   OAuth targeted tests passed 46/46. Saved every existing modified/untracked file in commit `3fc2d2e`.
 - Step 1: AGENTS.md now points here and records persistent D1 authorization.
-- Complete: steps 0, 1 and 4 (3/7). Current: step 3; remaining: 2d, 3, 5, 6.
+- Complete: steps 0, 1, 3 and 4 (4/7). Current: step 5; remaining: 2d, 5, 6.
 - Steps 2–4: named receipt causes, `diagnose --seat`, coordinator debug admission,
   observer disable/restore and persistent seat quarantine implemented locally.
   Integration checkpoint passed 625/625; supplemental chain 25/25, transport
   46/46 and installer 8/8. Debug fixtures complete past an uncertain seat,
   with chain defaults, no claims or pin edits. Proof rejects debug evidence.
 - All-ten public sources deployed; OAuth-only credentials, model and no-fallback
-  route checks passed. Hermes observer disable did not survive refresh: fixing
-  config-directory flush and checking the selection after refresh (step 3).
-- Hermes Sol diagnostic failed `MARITIME_REPLY_PROTOCOL_INVALID`; hs-1's job
-  was stopped and a later stopped read resolved its quarantine. No chat replay.
-  Observer transition/inspection and quarantine fixes passed targeted tests 4/4.
-- Next: finish transition fix and two live Sol diagnostics, then a debug 5v5.
+  route checks passed. Hermes observer disable now survives refresh: directory
+  flush plus unique temporary files fix the confirmed `FileExistsError` (3/3 tests).
+- Live debug diagnostics passed on oc-1 and hs-1, with observers disabled and
+  account awake 0. hs-1 needed a fresh conversation after protocol-invalid replies;
+  failed jobs were stopped and later stopped reads resolved quarantine. No replay.
+- Next: prepare and run a debug 5v5 with fresh inputs, fuse and attempt directory.
   OC1's named per-call diagnosis is still pending (step 2d).
 - Live read October 5 16:38 UTC: active game 0, account awake 0, all eleven
   nonces clear, all players funded/admitted. Refresh before mutation.
@@ -37,8 +37,8 @@ gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram ro
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
 October 5 counters under this authorization: creations 0/10 (total 0/30),
-additional wakes 15/60, owner/operator gas 0/0.07 ETH.
-Live step 3 source deployment/observer transition in progress; no game created.
+additional wakes 24/60, owner/operator gas 0/0.07 ETH.
+Step 3 live acceptance complete; no game created.
 
 ## Run map
 
@@ -57,6 +57,7 @@ Live step 3 source deployment/observer transition in progress; no game created.
   inspect their inputs, preserve every old request/fuse, never replay expired runs.
 - Current input config/artifact plan/manifest:
   `/private/tmp/conference-game20-claims-oauth-20261004-v7/`.
+- Current v2 private reports/counters: `/private/tmp/dilemma-fast-iteration-20261005/`.
 - One-time source deploy/observer transition: `prepareDebugAgents` in
   `src/maritime/prepare-debug.mjs`; reuse existing installer, fresh private output.
 - Operator entry: `node --env-file=PRIVATE_OWNER_ENV src/chain/cli.mjs operator`.

@@ -16,6 +16,7 @@ test('disable and restore change only the OpenClaw observer entry and preserve r
       load: { paths: ['/data/.conference-production-oauth/oc-1/old-scope'] } } };
   await writeFile(settingsPath, JSON.stringify({ seat_id: 'oc-1', openclaw_config_path: configPath }));
   await writeFile(configPath, JSON.stringify(config));
+  await writeFile(configPath + '.observer-transition.tmp', 'preserved interrupted transition');
   await mkdir(path.join(root, 'receipt')); await writeFile(path.join(root, 'receipt', 'old.json'), 'unchanged');
   const artifact = { harness: 'openclaw', gameplay_command: ['node', '/unused/cli', settingsPath] };
   for (const enabled of [false, true]) {
@@ -28,6 +29,7 @@ test('disable and restore change only the OpenClaw observer entry and preserve r
     config.plugins.entries['conference-oauth-observer'].enabled = enabled;
     assert.deepEqual(updated, config);
     assert.equal(await readFile(path.join(root, 'receipt', 'old.json'), 'utf8'), 'unchanged');
+    assert.equal(await readFile(configPath + '.observer-transition.tmp', 'utf8'), 'preserved interrupted transition');
   }
 });
 
@@ -37,6 +39,7 @@ test('Hermes disable and restore preserve YAML selection and flush the config di
   const settingsPath = path.join(root, 'seat.json'), configPath = path.join(root, 'config.yaml');
   await writeFile(settingsPath, JSON.stringify({ seat_id: 'hs-1', hermes_config_path: configPath }));
   await writeFile(configPath, 'model:\n  default: gpt-6.1-sol\nplugins:\n  enabled: [dilemma-conference-oauth, unrelated]\n');
+  await writeFile(configPath + '.observer-transition.tmp', 'preserved interrupted transition');
   const artifact = { harness: 'hermes', gameplay_command: ['node', '/unused/cli', settingsPath] };
   for (const enabled of [false, true]) {
     const command = buildObserverTransitionCommand({ artifact, enabled });
@@ -61,5 +64,6 @@ assert ('dilemma-conference-oauth' not in c['plugins']['disabled'])==${enabled ?
 `;
     const result = await promisify(execFile)('python3', ['-c', source, command[3], configPath, settingsPath, String(enabled)]);
     assert.equal(JSON.parse(result.stdout).observer_enabled, enabled);
+    assert.equal(await readFile(configPath + '.observer-transition.tmp', 'utf8'), 'preserved interrupted transition');
   }
 });
