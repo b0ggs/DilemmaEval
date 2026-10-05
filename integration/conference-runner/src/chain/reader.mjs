@@ -159,13 +159,16 @@ export function createChainReader({ config, provider = makeProvider(config.rpc_u
         const [adapterCode, registryCode] = await Promise.all([provider.getCode(auth, block.number), provider.getCode(registry, block.number)]);
         if (adapterCode === '0x' || registryCode === '0x') throw new Error('AUTH_CONTRACT_NOT_DEPLOYED');
       }
-      const players = await Promise.all((config.roster ?? []).map(async (seat) => {
+      // The public Base RPC throttles a forty-read ten-seat burst. Keep each
+      // seat's four independent reads together, all at the same pinned block.
+      const players = [];
+      for (const seat of config.roster ?? []) {
         const [admitted, agentKey, balance, cause] = await Promise.all([
           contract.isAdmissionReady(seat.wallet_address, opts), contract.admissionAgentKey(seat.wallet_address, opts),
           provider.getBalance(seat.wallet_address, block.number), contract.isCauseWhitelisted(seat.cause_id, opts),
         ]);
-        return { seat_id: seat.seat_id, wallet_address: getAddress(seat.wallet_address), admitted, agent_key: agentKey, balance_wei: dec(balance), cause_whitelisted: cause };
-      }));
+        players.push({ seat_id: seat.seat_id, wallet_address: getAddress(seat.wallet_address), admitted, agent_key: agentKey, balance_wei: dec(balance), cause_whitelisted: cause });
+      }
       return { chain_id: 84532, game_address: address, block_number: dec(block.number), block_hash: block.hash, block_timestamp: dec(block.timestamp), owner, auth_adapter_address: auth, identity_registry_address: registry, active_game_id: dec(active), code_hash: keccak256(code), config: publicConfig(defaults),
         player_funding: playerFundingBudget(defaults.entryFeeWei, block.baseFeePerGas), players };
     });

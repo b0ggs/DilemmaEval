@@ -46,6 +46,8 @@ const NATIVE_RECEIPT_CODES = new Set([
     .map(code => `OPENCLAW_RECEIPT_REFUSED_${code.toUpperCase().replaceAll('-', '_')}`)
 ]);
 const CONTINUITY_FAILURE_CODES = new Set([
+  'PERSISTENT_ROOT_CHANGED', 'INSTALL_DIRECTORY_FAILED', 'INSTALL_RUNTIME_FAILED',
+  'INSTALL_EVIDENCE_INVALID', 'INSTALL_PUBLIC_ARTIFACT_FLUSH_FAILED',
   'OBSERVER_TRANSITION_FAILED', 'HERMES_OAUTH_POOL_UNVERIFIED', 'DEBUG_AGENT_PREPARATION_FAILED',
   'READINESS_ARTIFACTS_INVALID', 'READINESS_CONTINUITY_INPUT_INVALID', 'READINESS_EVIDENCE_INVALID',
   'READINESS_DEADLINE_EXPIRED', 'READINESS_LIFECYCLE_UNCONFIRMED', 'READINESS_MIXED_GENERATION',
@@ -785,9 +787,6 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               result = await recoverInvalid(invalid);
             }
           }
-          if (debug) {
-            await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
-          }
           if (certified) {
             await certified.verify();
             await certified.sleep();
@@ -949,9 +948,6 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             const invalid = new MaritimeAdapterError('MARITIME_DIAGNOSTIC_RESPONSE_INVALID', { ambiguous: true });
             invalid.diagnostic_code = fixedCliDiagnostic(responseText) ?? 'MARITIME_REPLY_PROTOCOL_INVALID';
             throw invalid;
-          }
-          if (debug) {
-            await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
           }
           if (certified) {
             await certified.verify();

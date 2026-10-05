@@ -114,6 +114,27 @@ test('preflight rejects missing base fee and a reorg instead of publishing an un
   await assert.rejects(createChainReader({ config, provider: reorg.provider }).preflight(), /CHAIN_REORG_DURING_READ/);
 });
 
+test('ten-seat preflight stays within the public RPC read capacity at one canonical block', async () => {
+  const { provider, calls } = fixture();
+  let concurrent = 0, peak = 0;
+  for (const name of ['call', 'getBalance']) {
+    const original = provider[name].bind(provider);
+    provider[name] = async (...args) => {
+      concurrent++; peak = Math.max(peak, concurrent);
+      try {
+        assert.ok(concurrent <= 4, 'public RPC read capacity exceeded');
+        await new Promise(resolve => setTimeout(resolve, 1));
+        return await original(...args);
+      } finally { concurrent--; }
+    };
+  }
+  const roster = Array.from({ length: 10 }, (_, i) => ({ ...config.roster[0], seat_id: `seat-${i}` }));
+  const result = await createChainReader({ config: { ...config, roster }, provider }).preflight();
+  assert.equal(result.players.length, 10);
+  assert.equal(peak, 4);
+  assert.ok(calls.every(call => call.blockTag === 100));
+});
+
 test('events include actual defaults/eliminations, net awards and separate net claims; unconfirmed events excluded', async () => {
   const { provider, calls } = fixture({ phase: 4, outcome: 1, active: 0n });
   provider.logs = [

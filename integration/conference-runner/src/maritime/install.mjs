@@ -245,6 +245,27 @@ export function createMaritimeInstaller({ apiKey, fetchImpl = globalThis.fetch, 
   };
   const inspectHarnessConfiguration = artifact => runHarnessConfigurationCommand(artifact,
     artifact?.hermes_config_check_command, { code: 'HERMES_CONFIG_INSPECTION_INVALID' });
+  const uploadPublicArtifact = async artifact => {
+    const files = validatedPublicArtifactFiles(artifact);
+    const prefix = `/api/agents/${encodeURIComponent(artifact.agent_id)}`;
+    const liveVolume = await request({ path: `${prefix}/files/list` });
+    if (persistentPath(liveVolume?.root) !== artifact.persistent_root) throw new TypeError('PERSISTENT_ROOT_CHANGED');
+    const directories = [...new Set(files.map(file => posix.dirname(file.path)))];
+    const made = await request({ path: `${prefix}/exec`, method: 'POST', body: { command: ['mkdir', '-p', '--', ...directories], timeout: 30 } });
+    if (made.exitCode !== 0) throw new MaritimeAdapterError('INSTALL_DIRECTORY_FAILED', { ambiguous: true });
+    const upload = async () => {
+      for (const file of files) await request({ path: `${prefix}/files/write`, method: 'PUT', body: { path: file.path, content: file.content } });
+      await flushPublicArtifacts(artifact, command => request({ path: `${prefix}/exec`, method: 'POST', body: { command, timeout: 30 } }));
+    };
+    await upload();
+    try { await verifyRemoteArtifact(artifact, prefix); }
+    catch (error) {
+      if (error?.code !== INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH) throw error;
+      await upload();
+      await verifyRemoteArtifact(artifact, prefix);
+    }
+    return prefix;
+  };
   return Object.freeze({
     async inspectVolumeRoot(agentId) {
       if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(agentId)) throw new TypeError('INSTALL_AGENT_ID_INVALID');
@@ -252,31 +273,9 @@ export function createMaritimeInstaller({ apiKey, fetchImpl = globalThis.fetch, 
       return persistentPath(data?.root);
     },
     async install(artifact) {
-      const files = validatedPublicArtifactFiles(artifact);
-      const prefix = `/api/agents/${encodeURIComponent(artifact.agent_id)}`;
-      const liveVolume = await request({ path: `${prefix}/files/list` });
-      if (persistentPath(liveVolume?.root) !== artifact.persistent_root) throw new TypeError('PERSISTENT_ROOT_CHANGED');
-      // Parent creation uses argv, never untrusted shell interpolation.
-      const directories = [...new Set(files.map(file => posix.dirname(file.path)))];
-      const made = await request({ path: `${prefix}/exec`, method: 'POST', body: { command: ['mkdir', '-p', '--', ...directories], timeout: 30 } });
-      if (made.exitCode !== 0) throw new MaritimeAdapterError('INSTALL_DIRECTORY_FAILED', { ambiguous: true });
-      const upload = async () => {
-        for (const file of files) await request({ path: `${prefix}/files/write`, method: 'PUT', body: { path: file.path, content: file.content } });
-        await flushPublicArtifacts(artifact, command =>
-          request({ path: `${prefix}/exec`, method: 'POST', body: { command, timeout: 30 } }));
-      };
-      const verify = () => verifyPublicArtifactIntegrity(artifact, command =>
-        request({ path: `${prefix}/exec`, method: 'POST', body: { command, timeout: 30 } }));
-      await upload();
-      try { await verify(); }
-      catch (error) {
-        if (error?.code !== INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH) throw error;
-        // One bounded, exact rewrite is safe before the installer has executed.
-        await upload();
-        await verify();
-      }
+      const prefix = await uploadPublicArtifact(artifact);
       const result = await request({ path: `${prefix}/exec`, method: 'POST', body: { command: artifact.install_command, timeout: 120 } });
-      await verify();
+      await verifyRemoteArtifact(artifact, prefix);
       if (result.exitCode !== 0) throw new MaritimeAdapterError('INSTALL_RUNTIME_FAILED', { ambiguous: true });
       let evidence;
       try { evidence = JSON.parse(result.stdout); } catch { throw new MaritimeAdapterError('INSTALL_EVIDENCE_INVALID'); }
@@ -287,6 +286,12 @@ export function createMaritimeInstaller({ apiKey, fetchImpl = globalThis.fetch, 
       }
       return { schema_version: 1, seat_id: artifact.seat_id, agent_id: artifact.agent_id,
         artifact_sha256: artifact.artifact_sha256, ...artifact.live_evidence, installed: true };
+    },
+    /** Reinstall public source changes onto an existing runtime. The checkout,
+     * dependencies and wrapper must pass the existing direct inspection. */
+    async refreshPublicArtifact(artifact) {
+      await uploadPublicArtifact(artifact);
+      return inspectRuntimeArtifact(artifact, false);
     },
     async configureHarnessConfiguration(artifact) {
       return runHarnessConfigurationCommand(artifact, artifact?.hermes_configure_command,

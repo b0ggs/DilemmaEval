@@ -44,7 +44,9 @@ async function fixture({ corruption = 'none' } = {}) {
           hermes_terminal_env_passthrough_configured: false, hermes_private_state_owner_configured: false }) });
       }
       if (JSON.stringify(command) === JSON.stringify(artifact.inspect_command)) {
-        return jsonResponse({ exitCode: 0, stdout: '{}' });
+        return jsonResponse({ exitCode: 0, stdout: JSON.stringify({ schema_version: 1,
+          seat_id: artifact.seat_id, chain_id: 84532, wallet_address: config.roster[0].wallet_address,
+          persistent_storage_writable: true, gameplay_execution_proven: false }) });
       }
     }
     throw new Error(`unexpected fixture request ${init.method} ${path}`);
@@ -77,6 +79,16 @@ test('installer repairs one transient zero-byte upload exactly once before execu
   assert.equal(f.calls.filter(call => call.body?.command?.[1] === '--input-type=module').length, 2);
   assert.equal(f.calls.filter(call => call.body?.command?.[0] === 'sha256sum').length, 3);
   assert.equal(f.calls.filter(call => JSON.stringify(call.body?.command) === JSON.stringify(f.artifact.install_command)).length, 1);
+});
+
+test('public source refresh verifies existing runtime without reinstalling checkout or dependencies', async () => {
+  const f = await fixture();
+  const result = await f.installer.refreshPublicArtifact(f.artifact);
+  assert.equal(result.direct_runtime_inspection_verified, true);
+  assert.equal(f.calls.filter(call => call.method === 'PUT').length, f.artifact.files.length);
+  assert.equal(f.calls.filter(call => call.body?.command?.[0] === 'sha256sum').length, 2);
+  assert.equal(f.calls.filter(call => JSON.stringify(call.body?.command) === JSON.stringify(f.artifact.install_command)).length, 0);
+  assert.equal(f.calls.filter(call => JSON.stringify(call.body?.command) === JSON.stringify(f.artifact.inspect_command)).length, 1);
 });
 
 test('persistent zero-byte upload fails with fixed integrity code before installer execution', async () => {

@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { posix, join } from 'node:path';
 import { createMaritimeInstaller } from './install.mjs';
-import { maritimeRequest, safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './transport.mjs';
+import { maritimeRequest, safeMaritimeDiagnosticCode } from './transport.mjs';
 import { buildObserverTransitionCommand } from './observer-transition.mjs';
 import { buildOpenClawOAuthInspectionCommand } from './openclaw-oauth.mjs';
 import { nativeCommandResult } from './seat-diagnostic.mjs';
@@ -11,16 +11,19 @@ import { writeProofReport } from '../../../../conference/operations/saved-helper
  * Reuses installation and model/route checks, with one account-checked wake per
  * seat. It never creates a game or signs, claims, or sends Telegram messages. */
 export async function prepareDebugAgents({ config, artifacts, apiKey, runtimeDir,
+  seatIds = config.roster.map(seat => seat.seat_id),
   fetchImpl = globalThis.fetch, installer = createMaritimeInstaller({ apiKey, fetchImpl }),
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), onWake = async () => {} }) {
   if (config.chain_id !== 84532 || config.roster.length !== 10 || artifacts.length !== 10) throw new Error('DEBUG_TEN_SEATS_REQUIRED');
+  if (!Array.isArray(seatIds) || !seatIds.length || new Set(seatIds).size !== seatIds.length ||
+      seatIds.some(id => !config.roster.some(seat => seat.seat_id === id))) throw new Error('DEBUG_TEN_SEATS_REQUIRED');
   await mkdir(runtimeDir, { mode: 0o700 });
   const report = { schema_version: 1, purpose: 'debug', status: 'started', seats: [], account_awake: null };
   const persist = () => writeProofReport(join(runtimeDir, 'debug-agents.json'), report);
   const fail = code => { throw Object.assign(new Error(code), { code }); };
   const request = (url, method = 'GET', body) => maritimeRequest({ apiKey, fetchImpl, path: url, method, body });
   await persist();
-  for (const seat of config.roster) {
+  for (const seat of config.roster.filter(seat => seatIds.includes(seat.seat_id))) {
     const artifact = artifacts.find(row => row.seat_id === seat.seat_id);
     const row = { seat_id: seat.seat_id, wake_started: false, installed: false, observer_disabled: false,
       route_verified: false, native_credentials_oauth_only: false, sleep_confirmed: false, failure: null };
@@ -33,7 +36,7 @@ export async function prepareDebugAgents({ config, artifacts, apiKey, runtimeDir
           !inventory.some(agent => agent.id === seat.agent_id && agent.framework === seat.harness && agent.status === 'sleeping')) fail('MARITIME_INVENTORY_INVALID');
       await onWake(seat); row.wake_started = true; await persist();
       await request(`${prefix}/start`, 'POST'); await pause(10000);
-      await installer.install(artifact); row.installed = true;
+      await (installer.refreshPublicArtifact ?? installer.install)(artifact); row.installed = true;
       const transition = nativeCommandResult(await execute(buildObserverTransitionCommand({ artifact })));
       if (transition.observer_enabled !== false || transition.seat_id !== seat.seat_id) fail('OBSERVER_TRANSITION_FAILED');
       row.observer_disabled = true;
@@ -66,7 +69,7 @@ except Exception:
       if (!row.native_credentials_oauth_only) fail('READINESS_MODEL_ROUTE_UNVERIFIED');
     } catch (error) {
       row.failure = { code: safeMaritimeDiagnosticCode(error.diagnostic_code,
-        safeMaritimeDiagnosticCode(error.code, safeMaritimeErrorCode(error.code, 'DEBUG_AGENT_PREPARATION_FAILED'))) };
+        safeMaritimeDiagnosticCode(error.code, safeMaritimeDiagnosticCode(error.message, 'DEBUG_AGENT_PREPARATION_FAILED'))) };
     } finally {
       if (row.wake_started) {
         try {
@@ -81,7 +84,7 @@ except Exception:
   }
   const inventory = await request('/api/agents');
   report.account_awake = inventory.filter(agent => !['sleeping', 'stopped'].includes(agent.status)).length;
-  report.status = report.seats.length === 10 && report.seats.every(row => !row.failure && row.sleep_confirmed && row.native_credentials_oauth_only) ? 'complete' : 'failed';
+  report.status = report.seats.length === seatIds.length && report.seats.every(row => !row.failure && row.sleep_confirmed && row.native_credentials_oauth_only) ? 'complete' : 'failed';
   await persist();
   return report;
 }
