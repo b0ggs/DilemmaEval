@@ -34,7 +34,8 @@ const MARITIME_FAILURE_CODES = new Set([
   'MARITIME_DEADLINE_INVALID', 'MARITIME_SIGNAL_INVALID',
   'MARITIME_RUNTIME_COMMAND_INVALID', 'MARITIME_RUNTIME_COMMAND_REQUIRED',
   'HERMES_CONFIG_UPDATE_OUTCOME_UNKNOWN', 'MODEL_CONFIG_UPDATE_OUTCOME_UNKNOWN',
-  'INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH', 'MARITIME_SEAT_QUARANTINED', 'MARITIME_QUARANTINE_INVALID'
+  'INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH', 'MARITIME_SEAT_QUARANTINED', 'MARITIME_QUARANTINE_INVALID',
+  'MARITIME_REPLY_DISCUSSION_INVALID', 'MARITIME_REPLY_TEAM_MESSAGE_INVALID'
 ]);
 const NATIVE_RECEIPT_CODES = new Set([
   ...['FILES','OPERATION','FORMAT','EXPIRED','IDENTITY','BLOCKED','ENVIRONMENT','PROCESS','SOURCE',
@@ -70,6 +71,15 @@ export function withFailureMetadata(failure, error) {
   if (transport !== null) failure.transport_code ??= transport;
   if (diagnostic !== null) failure.diagnostic_code ??= diagnostic;
   return failure;
+}
+
+function replyValidationDiagnostic(error) {
+  if (/RESPONSE_IDENTITY_MISMATCH/.test(error?.message ?? '') || error?.message === 'DISCUSSION_TEAM_MISMATCH') return 'MARITIME_REPLY_IDENTITY_MISMATCH';
+  if (error instanceof SyntaxError || /INVALID_JSON/.test(error?.message ?? '')) return 'MARITIME_REPLY_INVALID_JSON';
+  if (error?.message === 'CONFERENCE_ENVELOPE_INVALID') return 'MARITIME_REPLY_INVALID_ENVELOPE';
+  if (['DISCUSSION_RESPONSE_INVALID', 'DISCUSSION_MESSAGE_REQUIRES_OBSERVED'].includes(error?.message)) return 'MARITIME_REPLY_DISCUSSION_INVALID';
+  if (error?.message === 'TEAM_MESSAGE_INVALID') return 'MARITIME_REPLY_TEAM_MESSAGE_INVALID';
+  return 'MARITIME_REPLY_PROTOCOL_INVALID';
 }
 
 // Abort bounds our wait, but does NOT claim to cancel remote agent execution.
@@ -781,9 +791,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             } catch (validationError) {
               const invalid = new MaritimeAdapterError('MARITIME_AGENT_RESPONSE_INVALID', { ambiguous: true });
               const diagnosticCode = fixedCliDiagnostic(responseText);
-              invalid.diagnostic_code = diagnosticCode ??
-                (/RESPONSE_IDENTITY_MISMATCH/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_IDENTITY_MISMATCH' :
-                  validationError instanceof SyntaxError || /INVALID_JSON/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_INVALID_JSON' : 'MARITIME_REPLY_PROTOCOL_INVALID');
+              invalid.diagnostic_code = diagnosticCode ?? replyValidationDiagnostic(validationError);
               result = await recoverInvalid(invalid);
             }
           }
@@ -946,9 +954,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           try { result = validateRuntimeDiagnosticResponse(JSON.parse(responseText), snapshot); }
           catch (validationError) {
             const invalid = new MaritimeAdapterError('MARITIME_DIAGNOSTIC_RESPONSE_INVALID', { ambiguous: true });
-            invalid.diagnostic_code = fixedCliDiagnostic(responseText) ??
-              (validationError instanceof SyntaxError ? 'MARITIME_REPLY_INVALID_JSON' :
-                /RESPONSE_IDENTITY_MISMATCH/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_IDENTITY_MISMATCH' : 'MARITIME_REPLY_PROTOCOL_INVALID');
+            invalid.diagnostic_code = fixedCliDiagnostic(responseText) ?? replyValidationDiagnostic(validationError);
             throw invalid;
           }
           if (certified) {

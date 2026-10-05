@@ -8,7 +8,7 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Step 0: full working diff and all untracked files scanned with `gitleaks`; no leaks.
   OAuth targeted tests passed 46/46. Saved every existing modified/untracked file in commit `3fc2d2e`.
 - Step 1: AGENTS.md now points here and records persistent D1 authorization.
-- Complete: steps 0, 1, 3 and 4 (4/7). Current: step 5; remaining: 2d, 5, 6.
+- Complete: steps 0, 1, 3, 4 and 5 (5/7). Remaining: 2d and 6.
 - Steps 2–4: named receipt causes, `diagnose --seat`, coordinator debug admission,
   observer disable/restore and persistent seat quarantine implemented locally.
   Integration checkpoint passed 625/625; supplemental chain 25/25, transport
@@ -20,10 +20,11 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Live debug diagnostics passed on oc-1 and hs-1, with observers disabled and
   account awake 0. hs-1 needed a fresh conversation after protocol-invalid replies;
   failed jobs were stopped and later stopped reads resolved quarantine. No replay.
-- Step 5: first debug 5v5 prepared; single operator and runner now executing.
-- Next: observe all-ten gameplay and confirm terminal/account cleanup.
+- Step 5: Game 21 completed; all ten acted, four defaults, Telegram correct.
+- Cleanup 18:59 UTC: active game 0, awake 0, quarantine empty, operator stopped.
+- Next: another debug attempt to test the transport fix and aim for zero defaults.
 - Next-attempt fix: isolate native conversations per request; name JSON parse
-  failures. Transport tests 47/47; coordinator only, no agent-source changes.
+  and discussion schema failures. Transport 48/48; no agent-source changes.
   OC1's named per-call diagnosis is still pending (step 2d).
 - Preflight October 5 18:13 UTC: active game 0, awake 0, quarantine empty;
   owner nonce 476 clear, all players admitted/funded, owner balance 0.14625 ETH.
@@ -40,8 +41,8 @@ gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram ro
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
 October 5 counters under this authorization: creations 1/10 (total 1/30),
-additional wakes 24/60, owner/operator gas 0.00000095/0.07 ETH.
-Game 21 executing; no additional creation until cleanup.
+additional wakes 24/60, owner/operator gas 0.00000775/0.07 ETH.
+Game 21 terminal and cleaned up; second debug attempt preparing.
 
 ## Run map
 
@@ -55,21 +56,21 @@ Game 21 executing; no additional creation until cleanup.
 - Private coordinator secrets: `conference-secrets-local/coordinator.env`;
   owner secrets: `conference-secrets-local/launcher.env` (operator only).
   Never print or commit their values.
-- Pinned local game checkout: `/private/tmp/dilemma-conference-game`.
+- Pinned game checkout is installed on each agent; use its manifest binding.
 - Historical live artifacts: `/private/tmp/conference-oauth-resume-20261004-b/`;
   inspect their inputs, preserve every old request/fuse, never replay expired runs.
 - Current input config/artifact plan/manifest:
   `/private/tmp/conference-game20-claims-oauth-20261004-v7/`.
 - Current v2 private reports/counters: `/private/tmp/dilemma-fast-iteration-20261005/`.
-  First debug: `debug-game-1/`; inputs and deadlines: `debug-game-1-inputs/`.
+  Attempts: `debug-game-N/`; inputs and deadlines: `debug-game-N-inputs/`.
 - One-time source deploy/observer transition: `prepareDebugAgents` in
   `src/maritime/prepare-debug.mjs`; reuse existing installer, fresh private output.
 - Operator entry: `node --env-file=PRIVATE_OWNER_ENV src/chain/cli.mjs operator`.
   Existing journal: `/Users/wade/.local/state/dilemmaeval-conference/`
-  `converge-rehearsal-2026-09-24-r8/operator` (67 confirmed records, stopped).
+  `converge-rehearsal-2026-09-24-r8/operator` (67-record baseline; stopped).
 - Original implementation reference: [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md).
 - Historical evidence archive: [RUN-STATUS.md](RUN-STATUS.md).
 
 ## Attempt log
 
-A1 / Game 21: all ten acted; R1–2 zero defaults; hs-1 R3 discussion protocol-invalid, quarantined; game/cleanup pending.
+A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid; 56/56 DEBUG messages sent; terminal/awake 0/active 0 confirmed.

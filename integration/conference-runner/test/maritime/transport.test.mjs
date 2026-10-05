@@ -296,6 +296,31 @@ test('discussion and diagnostic JSON syntax failures retain the named parse boun
   }
 });
 
+test('discussion schema failures preserve the owned failed check through the outcome journal', async () => {
+  const request = discussion();
+  const valid = discussionReply(request, { team_message: 'Consider the team payout before acting.' });
+  for (const [response, expected] of [
+    [{ ...valid, unexpected: 'untrusted reply detail' }, 'MARITIME_REPLY_INVALID_ENVELOPE'],
+    [{ ...valid, type: 'gameplay-response' }, 'MARITIME_REPLY_DISCUSSION_INVALID'],
+    [{ ...valid, status: 'skipped' }, 'MARITIME_REPLY_DISCUSSION_INVALID'],
+    [{ ...valid, team_message: 'x'.repeat(201) }, 'MARITIME_REPLY_TEAM_MESSAGE_INVALID'],
+    [{ ...valid, request_id: 'stale-request' }, 'MARITIME_REPLY_IDENTITY_MISMATCH']
+  ]) {
+    const report = { dispatches: [] };
+    const adapter = createMaritimeAdapter({ config, apiKey: 'fixture-credential',
+      fetchImpl: async () => jsonResponse({ response: JSON.stringify(response) }) });
+    const journal = createProofDispatchJournal({ adapter, report, persist: async () => {},
+      stopController: new AbortController(), debug: true });
+    await assert.rejects(journal.dispatch({ seat: roster[0], request }), error =>
+      error.ambiguous === true && error.diagnostic_code === expected &&
+      !error.message.includes('untrusted reply detail'));
+    const outcome = report.dispatches[0];
+    assert.equal(outcome.diagnostic_code, expected);
+    assert.equal(outcome.status, 'ambiguous');
+    assert.equal(JSON.stringify(outcome).includes('untrusted reply detail'), false);
+  }
+});
+
 function seatFromUrl(configuration, url) {
   const agentId = new URL(url).pathname.split('/')[3];
   return configuration.roster.find(row => row.agent_id === agentId);
