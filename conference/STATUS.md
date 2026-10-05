@@ -6,9 +6,9 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 ## State and next action
 
 - Step 0: full working diff and all untracked files scanned with `gitleaks`; no leaks.
-  OAuth targeted tests passed 46/46. Saving every existing modified/untracked file.
-- Next: step 1 instruction rewrite, then named failures and coordinator debug mode
-  (steps 2–4). No debug game has been created.
+  OAuth targeted tests passed 46/46. Saved every existing modified/untracked file in commit `3fc2d2e`.
+- Step 1: AGENTS.md now points here and records persistent D1 authorization.
+- Next: named failures and coordinator debug mode (steps 2–4). No debug game created.
 - Historical last live observation: active game 0, account awake 0. Refresh before use.
 - Game 20: ten awards unpaid. Claims authorized while no game is running.
 - Hermes actual OAuth/Sol diagnostics passed historically; OpenClaw production

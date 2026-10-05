@@ -1,46 +1,71 @@
-# Conference implementation instructions
+# Conference implementation
 
-## Active scope
+Work on `codex/converge-demo-2026-09-25`. Read [STATUS.md](conference/STATUS.md)
+first, then the relevant code. The user approved
+[FAST-ITERATION-IMPLEMENTATION-v2.md](conference/FAST-ITERATION-IMPLEMENTATION-v2.md);
+it governs conflicts. [IMPLEMENTATION-GUIDE.md](conference/IMPLEMENTATION-GUIDE.md)
+is a technical reference, not additional scope.
 
-- For the conference implementation, work on `codex/converge-demo-2026-09-25`. Start with [current status](conference/CURRENT-STATUS.md), the three remaining milestones in [the canonical checklist](conference/TAKEOVER-IMPLEMENTATION-CHECKLIST.md), and [the current session handoff](conference/NEXT-SESSION.md). Then consult the implementation guide, run-status archive and package interfaces for relevant details.
-- These canonical documents govern this build. The original wiki, `PARALLEL-IMPLEMENTATION-PLAN.md`, and older handoffs are historical references, not additional active plans. A new session or compaction does not expand scope or renew authorization.
-- Finish one independently audited 5v5 game with the five existing OpenClaw and five existing Hermes agents on Base Sepolia, including correct Telegram results and cleanup. Games 12–14 prove only the three-agent baseline. Continuous operation, hosting, UI expansion and broader hardening are deferred until that proof; they are not additional milestones for this tranche.
-- Preserve existing edits and untracked files, including `HANDOFF.md`. Inspect the working tree before changing branches or integrating work; do not reset or clean away another session's work.
+## Goal and workflow
 
-## Concurrent development
+Finish one 5v5 with the five existing OpenClaw and five existing Hermes agents,
+correct Telegram results and cleanup. Implement steps 0–6 of v2. Use the existing
+runner with debug/proof purposes; no second engine. The user reviews the existing
+`proof-audit` report. Aim for zero defaults; a fallback with defaults is a labeled
+“degraded demo,” never a passed proof.
 
-The user explicitly requests concurrent sub-agents for independent implementation work. Use them when implementing the conference demo; short documentation-only tasks do not require delegation.
+One session owns implementation and live operations. Sub-agents are optional.
+Preserve all existing work, private journals, uncertain operations and consumed
+fuses. Do not reset or clean. No new plans, handoffs, audit docs or temporary
+wrappers. Put progress, blockers, run commands and one line per attempt in
+`conference/STATUS.md`; give audit output in chat.
 
-The lead first defines the small shared interfaces and gives each worker an exact, non-overlapping file allowlist, its inputs/outputs, and an acceptance check. Then start ready workers concurrently while the lead handles live preflight and integration. Reuse existing code instead of duplicating it in each lane.
+Run targeted tests per fix and commit after secret scanning. Run the full suite
+at the steps 3–4 integration checkpoint and before final proof; documentation
+commits need no tests. Batch agent-side edits: any `install.mjs` `SOURCE_FILES`
+change requires reinstalling all ten before the next game. Do not edit
+`execution-permit.mjs` for debug admission.
 
-Suggested ownership, subject to the actual files present when work starts:
+## Standing live authorization (D1–D4)
 
-| Owner | Exclusive implementation area | Responsibility |
-|---|---|---|
-| Runner worker | `integration/conference-runner/src/runner/`, `test/runner/` within that package | Continuous scheduling, durable state, recovery |
-| Chain worker | `integration/conference-runner/src/chain/`, `test/chain/` within that package | Chain reads, event accounting, isolated launcher/phase-executor adapters |
-| Maritime worker | `integration/conference-runner/src/maritime/`, `test/maritime/` within that package | Roster-driven agent integration, gameplay/discussion protocol, installation tooling |
-| Telegram worker | `integration/conference-runner/src/telegram/`, `test/telegram/` within that package | Message mirror, Dealer formatting, delivery recovery |
-| Site worker | `conference/site/` | Phone-friendly spectator UI consuming the agreed public state |
-| Lead | Shared interfaces/configuration, runner entry point and HTTP API, runner package/lockfiles, existing shared modules, root docs, integration tests | Integration, live operations, verification, run-status updates |
+The user approved this scope; it persists across sessions and compaction until
+revoked. No per-session window or per-attempt reconfirmation:
 
-These are proposed paths, not a claim that code or commands already exist. Each worker owns tests inside its assigned area. The site worker may manage its own separate package files. All other paths remain with the lead unless explicitly reassigned.
+- At most 10 game creations per America/New_York calendar day and 30 total.
+- At most 60 additional wakes per day for diagnostics, observer transitions
+  and claims; record counters in STATUS.md.
+- Owner/operator gas at most 0.07 ETH per day, excluding player entry fees.
+- Existing balances, ten existing agents and existing Telegram rooms only.
+- Claims, including Game 20, are authorized when no game is running.
+- Ask when a wallet cannot cover another game plus cleanup or a cap is reached.
+- If two consecutive debug attempts fail for the same cause after a fix, stop
+  and ask about the v2 section 7 fallbacks.
 
-- Establish the chain snapshot, agent request/response, public spectator state, and adapter signatures before consumers depend on them. Keep this interface pass small; do not turn it into another planning project.
-- Workers may read shared files but must request changes through the lead. Do not edit another worker's files, shared schemas, manifests, or lockfiles concurrently.
-- In a shared checkout, workers do not switch branches, commit, stash, reset, or clean. The lead coordinates any Git operations. Isolated worktrees are optional, not required for disjoint work.
-- Workers report changed files, exports/interfaces, tests run, and unresolved blockers. The lead reviews changes and runs meaningful integration checks before declaring the combined feature complete.
-- One lead or explicitly designated operator owns external mutations. Workers develop and test adapters locally; do not let competing workers provision the same agent, fund the same wallet, configure a contract, launch games, or publish messages independently.
-- If a dependency blocks a lane, continue independent work and report the concrete missing input. Ask the user only for information or authorization not already available; do not require reconfirmation for routine implementation choices.
+If OC1 per-call provenance is unresolved at final proof, use config-level
+OAuth/Sol verification for OpenClaw and disclose: “OpenClaw model verified by
+configuration, not per-call receipt.” Do not delay the demo for that choice.
+Continuous operation, hosting, UI expansion and broader hardening are deferred.
 
-## Implementation boundaries
+## Hard limits
 
-- Base Sepolia (`84532`) only. Reuse the pinned game rules and tooling described in the guide. Refresh live state before configuration; the recorded snapshot is historical evidence.
-- Keep secrets out of Git, prompts, public state, and logs. Preserve separate player signing and private commit/reveal material; the coordinator does not invent player choices or dialogue.
-- Respect the five-awake account-wide limit, including unrelated awake agents, using the ten existing agents. Do not add agents or paid capacity. The older three-free-slot limit describes a superseded baseline.
-- Preserve and reuse applicable authorization from the session. This file does not independently authorize spending, public publishing, deployments, or messages; complete reviewable local work while any required access or permission is outstanding.
-- Run targeted tests for each changed component and integration checks at assembly points. Use fixtures for development, clearly labeled; only confirmed live evidence completes the demo checklist.
-- Tie every implementation change to one of the three remaining milestones and a demonstrated blocker or an existing acceptance requirement. Use targeted tests during a fix and the documented full suites before its implementation checkpoint; do not rerun unchanged suites for documentation-only handoffs or simply because a new session started. Do not reopen completed fixture work without new evidence of a defect.
-- The lead maintains `conference/RUN-STATUS.md` with actual progress, evidence, blockers, and next actions. Continue toward the three canonical milestones; the older guide's broader definition of done must not expand this tranche.
-
-Instruction-file format reference: [official AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+- Base Sepolia (84532) only; refresh live state before configuration.
+- Account-wide maximum five awake, counting unrelated agents, quarantined seats
+  and uncertain lifecycle operations. Check before every wake. No paid capacity,
+  new agents or funding.
+- Each agent signs its own moves and keeps its own commit/reveal secrets. Never
+  invent player choices, dialogue or defaults; defaults come from chain events.
+- One signer process per wallet. Never blindly resend uncertain creation,
+  signing, lifecycle or Telegram operations; read chain and nonce first.
+- Persist quarantine in private state across attempts/restarts. Resolve it only
+  after completion, or after the job ends and a subsequent read confirms sleep;
+  matching nonces or a sleep snapshot before delayed wake completion do not suffice.
+- Verify OAuth/`gpt-6.1-sol`, no reachable metered API key and no fallback on every
+  seat before the first debug game; retain gameplay model/route checks.
+- Debug Telegram messages all start `[DEBUG]`; no scoreboard bindings, pin edits,
+  accepted-proof count changes or automatic award claims.
+- No secrets in Git, prompts, logs, Telegram or public state. Run `gitleaks`
+  over the complete staged diff before each commit.
+- After each attempt advance any active game to terminal using the operator as
+  contract deadlines expire. Then confirm account awake 0 and active game 0 with
+  fresh reads; log both. If terminal cannot be reached, stop and report it.
+  Debug cleanup needs no claims, Telegram reconciliation or process audit.
