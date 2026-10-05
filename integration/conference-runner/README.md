@@ -1,12 +1,12 @@
 # Conference runner
 
-The September 25 demo combines the existing game bridge, team logs, and orchestrator core with real chain/Maritime/Telegram adapters and a static phone website. The roster is configurable; the example is OpenClaw 2 vs Hermes 1. **Implemented and locally tested does not mean live-proven.** See [run status](../../conference/RUN-STATUS.md) for current evidence and blockers.
+The September 25 demo combines the existing game bridge, team logs, and orchestrator core with real chain/Maritime/Telegram adapters and a static phone website. The roster is configurable; the example is OpenClaw 2 vs Hermes 1. **Implemented and locally tested does not mean live-proven.** See [current status](../../conference/STATUS.md) for evidence and blockers.
 
 Requires Node 22+, `npm ci`, and the pinned runtime described in [Maritime installation](src/maritime/README.md). All chain writes use Base Sepolia. The coordinator holds API credentials but no player or owner signing keys. Each player executes its own tool in its own Maritime runtime and keeps its private reveal bundles on persistent storage.
 
 ## Current controlled operator (version 2)
 
-The active target is the existing five OpenClaw and five Hermes agents. Follow [the canonical checklist](../../conference/TAKEOVER-IMPLEMENTATION-CHECKLIST.md). `src/conference-control.mjs` replaces workstation-specific preparation and execution. Historical `run`, `rehearse`, and saved controlled-proof entrypoints refuse execution with `PROOF_VERSIONED_CLI_REQUIRED`. None of these commands grants authorization for a live operation.
+The active target is the existing five OpenClaw and five Hermes agents. Follow [the approved V2 implementation](../../conference/FAST-ITERATION-IMPLEMENTATION-v2.md) and [current status](../../conference/STATUS.md). `src/conference-control.mjs` replaces workstation-specific preparation and execution. Historical `run`, `rehearse`, and saved controlled-proof entrypoints refuse execution with `PROOF_VERSIONED_CLI_REQUIRED`. Live work uses the standing authorization recorded in [AGENTS.md](../../AGENTS.md).
 
 `plan` and `status` are local and read-only: no credentials, providers, or directory creation. Supply the exact public config, operations manifest, and an artifact plan containing `{ "schema_version": 1, "seats": [{ "seat_id": "oc-1", "persistent_root": "/actual/installed/volume" }] }` with one row per seat. Use existing installed roots. Artifact reconstruction uses repository sources; deployed differences require a reviewed source refresh before diagnostics. New live artifacts require player-side execution permits.
 

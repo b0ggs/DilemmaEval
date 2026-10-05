@@ -1,6 +1,6 @@
 # DilemmaEval
 
-For the September 25 conference demo on branch `codex/converge-demo-2026-09-25`, start with the **[conference implementation guide](conference/IMPLEMENTATION-GUIDE.md)** and **[conference run status](conference/RUN-STATUS.md)**. This is a separate, three-agent starting scope with continuous Base Sepolia games, two Telegram spectator rooms, and a small live website. The guide below describes the original tournament work; its build sequence is not the conference checklist.
+For the conference implementation on branch `codex/converge-demo-2026-09-25`, start with **[current status](conference/STATUS.md)** and the **[approved V2 implementation](conference/FAST-ITERATION-IMPLEMENTATION-v2.md)**. The target is one Base Sepolia 5v5 with the five existing OpenClaw and five existing Hermes agents, correct Telegram results and cleanup. The guide below describes the original tournament work as technical reference.
 
 The [conference runner](integration/conference-runner/README.md) now provides implementation, local fixture preview, preflight, and operating commands. Live completion remains tracked separately in the run status.
 

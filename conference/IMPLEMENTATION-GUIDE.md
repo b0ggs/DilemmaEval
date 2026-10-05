@@ -1,13 +1,13 @@
 # Conference demo implementation guide
 
-> **Current operators:** Read [CURRENT-STATUS.md](CURRENT-STATUS.md) first and execute [TAKEOVER-IMPLEMENTATION-CHECKLIST.md](TAKEOVER-IMPLEMENTATION-CHECKLIST.md). This guide preserves the original three-agent design and build sequence. Its three-agent targets, old readiness claims, and unchecked milestones are chronological/historical wherever they conflict with the canonical current status.
+> **Current operators:** Read [STATUS.md](STATUS.md) first and follow the approved [V2 implementation](FAST-ITERATION-IMPLEMENTATION-v2.md). This guide preserves the original three-agent design and build sequence as a technical reference; V2 governs the active work.
 
 **Event:** September 25, 2026, America/New_York.
 **Branch:** `codex/converge-demo-2026-09-25`, created from `bcc7490`.
 **Historical starting scope:** three Maritime agents, two spectator rooms, continuous games on Base Sepolia.
-**Status when this guide was written:** local implementation and fixture integration tested; credential smoke check passed; live setup and rehearsal remained outstanding. See [CURRENT-STATUS.md](CURRENT-STATUS.md) for the active target and verified present state.
+**Status when this guide was written:** local implementation and fixture integration tested; credential smoke check passed; live setup and rehearsal remained outstanding. See [STATUS.md](STATUS.md) for the active target and verified present state.
 
-**Development workflow:** follow the root [AGENTS.md](../AGENTS.md) for concurrent sub-agent assignments, exclusive file ownership, and lead-owned integration.
+**Development workflow:** follow the root [AGENTS.md](../AGENTS.md) for the V2 scope, standing authorization and implementation workflow.
 
 ## 1. Use this guide for the conference build
 
@@ -228,4 +228,4 @@ Before leaving for the venue: verify all three agents, owner launcher, phase exe
 - A saved recording provides an explicitly labeled fallback.
 - All ten-agent claims are absent until ten agents are actually running; three-agent operation is a complete conference deliverable.
 
-Track these outcomes in [RUN-STATUS.md](RUN-STATUS.md). The original [wiki master guide](../wiki/MASTER-IMPLEMENTATION-GUIDE.md) remains reference material for reusable components, not a second active checklist.
+Current progress is tracked in [STATUS.md](STATUS.md); historical outcomes are preserved in [RUN-STATUS.md](archive/RUN-STATUS.md). The original [wiki master guide](../wiki/MASTER-IMPLEMENTATION-GUIDE.md) remains reference material for reusable components, not a second active checklist.

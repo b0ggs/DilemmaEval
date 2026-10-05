@@ -7,12 +7,12 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 
 - Step 0: full working diff and all untracked files scanned with `gitleaks`; no leaks.
   OAuth targeted tests passed 46/46. Saved every existing modified/untracked file in commit `3fc2d2e`.
-- Step 1: AGENTS.md now points here and records persistent D1 authorization.
+- Step 1: AGENTS.md points here with persistent D1 authorization; D5 docs archived.
 - Complete: steps 0–5 (6/7). Remaining: step 6; debug retry targets zero defaults.
 - Steps 2–4: named receipt causes, `diagnose --seat`, coordinator debug admission,
   observer disable/restore and persistent seat quarantine implemented locally.
-  Integration checkpoint passed 625/625; supplemental chain 25/25, transport
-  46/46 and installer 8/8. Debug fixtures complete past an uncertain seat,
+  Integration checkpoint 625/625; pre-proof full suite 631/631 (October 5).
+  Supplemental chain 25/25, transport 48/48, installer 8/8. Debug fixtures complete past an uncertain seat,
   with chain defaults, no claims or pin edits. Proof rejects debug evidence.
 - All-ten public sources deployed; OAuth-only credentials, model and no-fallback
   route checks passed. Hermes observer disable now survives refresh: directory
@@ -22,7 +22,7 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   failed jobs were stopped and later stopped reads resolved quarantine. No replay.
 - Step 5: Game 21 completed; all ten acted, four defaults, Telegram correct.
 - Cleanup 18:59 UTC: active game 0, awake 0, quarantine empty, operator stopped.
-- Current: Game 22 running with the transport fix; pre-proof full suite running.
+- Current: Game 22 running; pre-proof full suite passed 631/631.
 - Next-attempt fix: 140-character discussion draft with terminal length check;
   retain strict 200-character validation and name overflow. Transport 48/48.
 - Step 2d: OC1 production diagnosis names `OPENCLAW_RECEIPT_FILES` during
@@ -71,9 +71,9 @@ Game 21 terminal and cleaned up; second debug attempt executing.
   Existing journal: `/Users/wade/.local/state/dilemmaeval-conference/`
   `converge-rehearsal-2026-09-24-r8/operator` (67-record baseline; running).
 - Original implementation reference: [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md).
-- Historical evidence archive: [RUN-STATUS.md](RUN-STATUS.md).
+- Historical evidence archive: [RUN-STATUS.md](archive/RUN-STATUS.md).
 
 ## Attempt log
 
 A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid; 56/56 DEBUG messages sent; terminal/awake 0/active 0 confirmed.
-A2 / Game 22: all ten joined; oc-4 R1 team-message invalid, quarantined; first post-fix failure; game/cleanup pending.
+A2 / Game 22: all ten joined; oc-4 R1 / oc-5 R2 team-message invalid, quarantined; first post-fix failure; game/cleanup pending.

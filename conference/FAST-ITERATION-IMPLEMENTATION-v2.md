@@ -1,7 +1,7 @@
 # Implementation v2: remove ceremony from the conference debugging loop
 
 **Date:** October 5, 2026. **Branch:** `codex/converge-demo-2026-09-25`.
-**Builds on:** [FAST-ITERATION-IMPLEMENTATION.md](FAST-ITERATION-IMPLEMENTATION.md) (v1). v1 is unchanged. This revision keeps v1's diagnosis and debug/proof split. It incorporates two audits of v2's first draft and a separate four-auditor investigation (October 5).
+**Builds on:** [FAST-ITERATION-IMPLEMENTATION.md](archive/FAST-ITERATION-IMPLEMENTATION.md) (v1). v1 is unchanged. This revision keeps v1's diagnosis and debug/proof split. It incorporates two audits of v2's first draft and a separate four-auditor investigation (October 5).
 
 **Status:** this is a plan, nothing more. It authorizes no live action and no code or document changes. Nothing below is implemented. The decisions in section 9 are made. Work starts when the user approves the plan.
 
