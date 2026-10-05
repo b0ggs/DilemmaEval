@@ -1022,3 +1022,42 @@ test('staging wrappers retain fixed HTTP metadata and preserve existing retry an
     assert.equal(calls, count, 'cached failed requests do not repeat their remote work');
   }
 });
+
+
+test('debug quarantines only the uncertain seat and healthy later seats can rotate through all remaining slots', async () => {
+  const seats = [...roster, ...Array.from({ length: 3 }, (_, index) => ({ ...roster[0], seat_id: `oc-${index + 3}`,
+    agent_id: `agent-extra-${index}`, maritime_agent: `extra-${index}`, wallet_address: `0x${String(index + 4).repeat(40)}` }))];
+  const debugConfig = { ...config, purpose: 'debug', roster: seats };
+  const bindings = seats.map(seat => ({ seat_id: seat.seat_id, agent_id: seat.agent_id, artifact_sha256: 'ab'.repeat(32),
+    gameplay_command: ['node', `/volume/${seat.seat_id}/player-cli.mjs`, `/volume/${seat.seat_id}/seat.json`],
+    model_configure_command: ['model'], ...(seat.harness === 'hermes' ? { hermes_configure_command: ['hermes'] } : {}) }));
+  const held = new Map(), chats = [], liveStatuses = new Map(seats.map(seat => [seat.agent_id, 'sleeping']));
+  const quarantine = {
+    assertAvailable: async seat => { if (held.has(seat.agent_id)) throw Object.assign(new Error('MARITIME_SEAT_QUARANTINED'), { code: 'MARITIME_SEAT_QUARANTINED', ambiguous: false }); },
+    begin: async (seat, id) => { held.set(seat.agent_id, id); },
+    complete: async seat => { held.delete(seat.agent_id); },
+    reservedAgentIds: async () => [...held.keys()]
+  };
+  const adapter = createMaritimeAdapter({ config: debugConfig, apiKey: 'fixture-credential', debug: true, quarantine,
+    runtimeEvidence: { schema_version: 2, run_id: config.run_id, seats: bindings }, maxAwake: 5, maxAgents: 10, wakeDelayMs: 0,
+    runtimeContinuity: { verify: async () => ({ schema_version: 1, verified: true }), prepareAction: async () => ({ schema_version: 1, verified: true }) },
+    fetchImpl: async (url, options) => {
+      const route = new URL(url).pathname;
+      if (route === '/api/agents') return jsonResponse(seats.map(seat => ({ id: seat.agent_id, framework: seat.harness, status: 'sleeping' })));
+      const seat = seats.find(seat => route.includes(seat.agent_id));
+      if (route.endsWith('/start')) { liveStatuses.set(seat.agent_id, 'active'); return jsonResponse({ id: seat.agent_id, framework: seat.harness, status: 'active' }); }
+      if (route.endsWith('/chat')) {
+        chats.push(seat.seat_id);
+        if (seat.seat_id === 'oc-1') throw new Error('unpublished unknown network outcome');
+        return jsonResponse({ response: JSON.stringify(reply(poke('join', seat), { status: 'submitted', transaction_hash: `0x${'a'.repeat(64)}` })) });
+      }
+      if (route.endsWith('/sleep')) { liveStatuses.set(seat.agent_id, 'sleeping'); return jsonResponse({ id: seat.agent_id, framework: seat.harness, status: 'sleeping' }); }
+      return jsonResponse({ id: seat.agent_id, framework: seat.harness, status: liveStatuses.get(seat.agent_id) });
+    } });
+  await assert.rejects(adapter.dispatch({ seat: seats[0], request: poke('join', seats[0]) }), /MARITIME_NETWORK_OUTCOME_UNKNOWN/);
+  await Promise.all(seats.slice(1).map(seat => adapter.dispatch({ seat, request: poke('join', seat), deadline_at_ms: Date.now() + 5000 })));
+  assert.deepEqual(new Set(chats), new Set(seats.map(seat => seat.seat_id)));
+  assert.equal(held.size, 1);
+  assert.ok(held.has(seats[0].agent_id));
+  await assert.rejects(adapter.dispatch({ seat: seats[0], request: { ...poke('join', seats[0]), request_id: 'new-attempt' } }), /MARITIME_SEAT_QUARANTINED/);
+});

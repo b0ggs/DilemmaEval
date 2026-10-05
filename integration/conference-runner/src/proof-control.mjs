@@ -3,6 +3,7 @@ import { lstat, mkdir, open, readFile, realpath } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import path from 'node:path';
 import { REPOSITORY_ROOT, validateConfig } from './config.mjs';
+import { validateDebugConfig, validateDebugEvidence } from './debug.mjs';
 import { assessControlledChainReadiness, configFingerprint, runtimeEvidenceFingerprint,
   validateControlledRuntimeEvidence } from './readiness.mjs';
 
@@ -190,11 +191,12 @@ async function inputState(options, selected) {
   const nowMs = deadlines(options);
   const source = await readJson(selected.config_path);
   const evidenceFile = await readJson(selected.evidence_path);
-  const config = validateConfig(source.value);
-  const evidence = validateControlledRuntimeEvidence(config, evidenceFile.value, { now: nowMs, allowDiagnosticsOnly: true });
+  const config = options.debug ? validateDebugConfig(source.value) : validateConfig(source.value);
+  const evidence = options.debug ? validateDebugEvidence(config, evidenceFile.value) :
+    validateControlledRuntimeEvidence(config, evidenceFile.value, { now: nowMs, allowDiagnosticsOnly: true });
   if (evidence.chain_id !== 84532 || evidence.game_address?.toLowerCase() !== config.game_address.toLowerCase() ||
       !HASH.test(evidence.game_code_hash ?? '') || !DIGEST.test(evidence.chain_defaults_fingerprint ?? '') ||
-      !DIGEST.test(evidence.lifecycle_state_digest ?? '')) fail('PROOF_READINESS_BINDINGS_REQUIRED');
+      !options.debug && !DIGEST.test(evidence.lifecycle_state_digest ?? '')) fail('PROOF_READINESS_BINDINGS_REQUIRED');
   return { source, evidenceFile, config, evidence };
 }
 
@@ -285,7 +287,7 @@ async function assertVerificationUnchanged(options, current) {
 async function refresh(options, selected, inputs) {
   if (typeof options.chain?.preflight !== 'function' || typeof options.chain?.readBlockHash !== 'function' ||
       typeof options.provider?.getTransactionCount !== 'function') fail('PROOF_READ_ADAPTER_REQUIRED');
-  if (typeof options.validateReadinessCurrent !== 'function') fail('PROOF_CURRENT_READINESS_REQUIRED');
+  if (!options.debug && typeof options.validateReadinessCurrent !== 'function') fail('PROOF_CURRENT_READINESS_REQUIRED');
   await inspectProcesses(selected, options.ownedProcesses);
   const { config, evidence } = inputs;
   const preflight = await bounded(options, () => options.chain.preflight(), 'PROOF_CHAIN_READ_FAILED');
@@ -305,6 +307,13 @@ async function refresh(options, selected, inputs) {
       options.provider.getTransactionCount(address, 'latest'), options.provider.getTransactionCount(address, 'pending')
     ]), 'PROOF_NONCE_UNAVAILABLE');
     if (!Number.isSafeInteger(latest) || latest < 0 || !Number.isSafeInteger(pending) || pending !== latest) fail('PROOF_PENDING_NONCE');
+  }
+  if (options.debug) {
+    deadlines(options);
+    return { purpose: 'debug', chain_id: 84532, game_address: config.game_address,
+      block_number: preflight.block_number, block_hash: preflight.block_hash, active_game_id: '0',
+      code_hash: evidence.game_code_hash, chain_defaults_fingerprint: evidence.chain_defaults_fingerprint,
+      runtime_verified: false };
   }
   const verificationStartedAtMs = clock(options);
   const current = await bounded(options, () => options.validateReadinessCurrent({ config, evidence,
@@ -332,11 +341,11 @@ async function refresh(options, selected, inputs) {
 }
 
 function bindingsFor(options, selected, inputs, preparedConfig) {
-  return { schema_version: 1, ...selected, stop_new_games_at_ms: options.stopNewGamesAtMs,
+  return { schema_version: 1, ...(options.debug ? { purpose: 'debug' } : {}), ...selected, stop_new_games_at_ms: options.stopNewGamesAtMs,
     hard_stop_at_ms: options.hardStopAtMs, source_config_file_sha256: inputs.source.sha256,
     runtime_evidence_file_sha256: inputs.evidenceFile.sha256,
     source_config_sha256: configFingerprint(inputs.config), prepared_config_sha256: configFingerprint(preparedConfig),
-    runtime_evidence_sha256: runtimeEvidenceFingerprint(inputs.evidence), lifecycle_state_digest: inputs.evidence.lifecycle_state_digest };
+    runtime_evidence_sha256: runtimeEvidenceFingerprint(inputs.evidence), lifecycle_state_digest: inputs.evidence.lifecycle_state_digest ?? null };
 }
 
 async function assertInputsUnchanged(selected, inputs) {
@@ -351,7 +360,7 @@ export async function planControlledProof(options) {
   const selected = await paths(options, { fresh: true });
   const inputs = await inputState(options, selected);
   const preflight = await refresh(options, selected, inputs);
-  const preparedConfig = validateConfig({ ...inputs.config, start_block: preflight.block_number,
+  const preparedConfig = (options.debug ? validateDebugConfig : validateConfig)({ ...inputs.config, start_block: preflight.block_number,
     start_time: new Date(clock(options)).toISOString(), stop_time: new Date(options.stopNewGamesAtMs).toISOString(),
     intermission_ms: 0 });
   await assertInputsUnchanged(selected, inputs);
@@ -398,7 +407,7 @@ export async function validatePreparedProof(options) {
   const inputs = await inputState(options, selected);
   const preparedFile = await readJson(path.join(selected.directory, 'config.json'));
   const preparedConfig = preparedFile.value;
-  validateConfig(preparedConfig);
+  (options.debug ? validateDebugConfig : validateConfig)(preparedConfig);
   const bindingsFile = await readJson(path.join(selected.directory, 'proof-bindings.json'));
   const bindings = bindingsFile.value;
   const expected = bindingsFor(options, selected, inputs, preparedConfig);
@@ -448,7 +457,8 @@ export async function createGuardedLauncher(options) {
     if (configFingerprint(latestPrepared.value) !== current.bindings.prepared_config_sha256 ||
         configFingerprint(latestBindings.value) !== pinnedBindings) fail('PROOF_BINDINGS_CHANGED');
     await inspectProcesses(current.bindings, options.ownedProcesses);
-    validateControlledRuntimeEvidence(source.value, evidence.value, { now: clock(options), allowDiagnosticsOnly: true });
+    if (options.debug) validateDebugEvidence(validateDebugConfig(source.value), evidence.value);
+    else validateControlledRuntimeEvidence(source.value, evidence.value, { now: clock(options), allowDiagnosticsOnly: true });
     await assertVerificationUnchanged(options, current);
     const result = await bounded(options, () => options.launcher.create({ ...structuredClone(intent),
       not_after_ms: Math.min(options.stopNewGamesAtMs, clock(options) + 20_000) }, { signal: options.signal }), 'PROOF_CREATION_UNCERTAIN');

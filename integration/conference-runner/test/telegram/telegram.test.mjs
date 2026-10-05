@@ -282,3 +282,19 @@ test('read-only setup verification uses metadata only, and flags writable specta
   assert.deepEqual(verified.groups[1].issues, ['SPECTATOR_READ_ONLY_UNVERIFIED']);
   assert.deepEqual(new Set(methods), new Set(['getMe', 'getChat', 'getChatMember']));
 });
+
+
+test('debug prefixes every Dealer and agent send and forbids a scoreboard writer', async t => {
+  const sends = [];
+  const f = await fixture(t, async (url, request) => {
+    assert.ok(url.endsWith('/sendMessage'));
+    sends.push(JSON.parse(request.body));
+    return response({ ok: true, result: { message_id: sends.length } });
+  }, { config: { ...config, purpose: 'debug' } });
+  await f.mirror.publish({ messages: { openclaw: [message()], hermes: [] },
+    events: [event('completed', { awards: [] })] });
+  f.advance(); await f.mirror.flush();
+  assert.equal(sends.length, 3);
+  assert.ok(sends.every(send => send.text.startsWith('[DEBUG]')));
+  assert.throws(() => createTelegramMirror({ ...f.options, scoreboard: {} }), /DEBUG_SCOREBOARD_FORBIDDEN/);
+});

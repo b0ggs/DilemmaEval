@@ -555,3 +555,33 @@ test('uncertain remote creation timeout retains fuse and forbids all retries', a
 test('retired historical executable cannot load any signer, mutate files or call live services', async () => {
   await assert.rejects(import('../../../conference/operations/saved-helpers/controlled-proof.mjs'), /PROOF_VERSIONED_CLI_REQUIRED/);
 });
+
+
+test('debug admission needs no diagnostic certificate or continuity callback but retains nonce/fuse gates', async t => {
+  const f = await setup(t);
+  const { buildDebugEvidence } = await import('../src/debug.mjs');
+  f.config.purpose = 'debug'; f.options.debug = true;
+  await json(f.options.configPath, f.config);
+  const evidence = buildDebugEvidence({ config: f.config, preflight: f.preflight });
+  await json(f.options.evidencePath, evidence);
+  f.options.validateReadinessCurrent = () => { throw new Error('must never wake for admission'); };
+  const prepared = await prepareControlledProof(f.options);
+  assert.equal(prepared.preflight.runtime_verified, false);
+  assert.equal(prepared.bindings.purpose, 'debug');
+  const guard = await createGuardedLauncher({ ...f.options, launcher: { create: async () => ({ status: 'accepted' }) } });
+  assert.equal((await guard.create(intent)).status, 'accepted');
+  await assert.rejects(guard.create(intent), /FUSE_USED/);
+});
+
+test('debug admission still rejects pending wallet nonces and proof rejects debug inputs', async t => {
+  const f = await setup(t);
+  const { buildDebugEvidence } = await import('../src/debug.mjs');
+  f.config.purpose = 'debug'; f.options.debug = true;
+  await json(f.options.configPath, f.config);
+  await json(f.options.evidencePath, buildDebugEvidence({ config: f.config, preflight: f.preflight }));
+  let reads = 0;
+  f.options.provider.getTransactionCount = async (address, state) => { reads++; return state === 'pending' ? 1 : 0; };
+  await assert.rejects(prepareControlledProof(f.options), /PROOF_PENDING_NONCE/);
+  assert.ok(reads >= 2);
+  await assert.rejects(prepareControlledProof({ ...f.options, debug: false }), /CONFIG_UNRECOGNIZED_FIELD/);
+});

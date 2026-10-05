@@ -107,7 +107,7 @@ export async function writeProofReport(filename, report) {
  * Wrap an agent adapter with proof-only evidence. The report receives only
  * allowlisted public identity, fixed status/error codes and a transaction hash.
  */
-export function createProofDispatchJournal({ adapter, report, persist, stopController, now = Date.now } = {}) {
+export function createProofDispatchJournal({ adapter, report, persist, stopController, now = Date.now, debug = false } = {}) {
   if (typeof adapter?.dispatch !== 'function' || !report || !Array.isArray(report.dispatches) ||
       typeof persist !== 'function' || !(stopController instanceof AbortController) || typeof now !== 'function') {
     throw new TypeError('PROOF_DISPATCH_JOURNAL_INVALID');
@@ -132,7 +132,7 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
   }
 
   function stopFor(record) {
-    if (failure || record.operation === 'claim' || record.status === 'rejected-before-submit') return;
+    if (debug || failure || record.operation === 'claim' || record.status === 'rejected-before-submit') return;
     failure = sanitizedFailure(record);
     stopController.abort();
   }

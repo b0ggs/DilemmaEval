@@ -472,7 +472,8 @@ function productionReadFixture(change = {}, activation = false) {
       requested_model: 'gpt-6.1-sol', returned_model: 'gpt-6.1-sol', started_at_ms: at - 50, completed_at_ms: at - 25,
       response_id_sha256: hash('response-public-fixture') }], ...change.receipt };
   if (change.call) Object.assign(receipt.calls[0], change.call);
-  const fixture = { receipt, opts, plugin: prepare[5], fixed, env: 'HOME=/data\0', ...change };
+  const { receipt: receiptChange, ...otherChanges } = change;
+  const fixture = { receipt, opts, plugin: prepare[5], fixed, env: 'HOME=/data\0', ...otherChanges };
   const prefix = `
 const f=JSON.parse(process.argv[4]),fs={
  lstatSync:p=>({isFile:()=>true,isSymbolicLink:()=>false,size:100,mode:0o100600}),realpathSync:p=>p,
@@ -510,8 +511,14 @@ test('production receipt reader verifies same request, live process and fixed sa
     { receipt: { helper_sha256: 'private-unsafe-fixture' } }, { deadlineAtMs: Date.now() - 1000 }]) {
     const result = productionReadFixture(change);
     assert.equal(result.status, 1, JSON.stringify(change));
-    assert.equal(result.output, '');
+    const failure = JSON.parse(result.output);
+    assert.match(failure.error.code, /^OPENCLAW_RECEIPT_[A-Z_]+$/);
+    assert.doesNotMatch(result.output, /private-unsafe|private-fallback/);
   }
+  assert.equal(JSON.parse(productionReadFixture({ receipt: { blocked: true, refusal_phase: 'response-completion' } }).output).error.code,
+    'OPENCLAW_RECEIPT_REFUSED_RESPONSE_COMPLETION');
+  assert.equal(JSON.parse(productionReadFixture({ call: { public_request_id: 'different-request' } }).output).error.code,
+    'OPENCLAW_RECEIPT_REQUEST_MISSING');
 });
 
 

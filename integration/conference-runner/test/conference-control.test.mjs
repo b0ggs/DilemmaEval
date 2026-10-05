@@ -213,3 +213,19 @@ test('versioned audit requires explicit output and proof-run requires a loopback
     '--operator-url', 'https://example.invalid', '--scoreboard-bindings', path.join(fixture.directory, 'scoreboards.json')]), /CONTROL_OPERATOR_URL_INVALID/);
   assert.equal((await runConferenceControl(['--version'])).cli_version, 2);
 });
+
+
+test('debug flags are optional booleans and never require scoreboard or verification paths', async t => {
+  const f = await setup(t);
+  const proof = ['--config', '/tmp/config', '--evidence', '/tmp/evidence', '--readiness-dir', '/tmp/readiness',
+    '--proof-dir', '/tmp/proof', '--operator-dir', '/tmp/operator', '--runner-dirs', '["/tmp/runner"]',
+    '--stop-new-games-at', '2030-01-01T00:01:00Z', '--hard-stop-at', '2030-01-01T00:02:00Z',
+    '--secrets-env', '/tmp/secrets', '--artifact-plan', '/tmp/artifacts', '--operations-manifest', '/tmp/operations'];
+  assert.equal(parseControlArguments(['proof-prepare', '--debug', ...proof]).args.debug, true);
+  assert.equal(parseControlArguments(['proof-run', ...proof, '--debug', '--operator-pid', '1',
+    '--operator-url', 'http://127.0.0.1:8791']).args.debug, true);
+  assert.throws(() => parseControlArguments(['proof-prepare', ...proof]), /ARGUMENTS_REQUIRED/);
+  assert.throws(() => parseControlArguments(['proof-prepare', ...proof, '--debug', '--debug']), /ARGUMENTS_INVALID/);
+  assert.equal(parseControlArguments(['diagnose', ...f.args, '--deadline', '2030-01-01T00:01:00Z',
+    '--cleanup-deadline', '2030-01-01T00:02:00Z', '--secrets-env', '/tmp/secrets', '--seat', 'oc-1']).args.seat, 'oc-1');
+});

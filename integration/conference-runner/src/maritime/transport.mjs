@@ -34,9 +34,19 @@ const MARITIME_FAILURE_CODES = new Set([
   'MARITIME_DEADLINE_INVALID', 'MARITIME_SIGNAL_INVALID',
   'MARITIME_RUNTIME_COMMAND_INVALID', 'MARITIME_RUNTIME_COMMAND_REQUIRED',
   'HERMES_CONFIG_UPDATE_OUTCOME_UNKNOWN', 'MODEL_CONFIG_UPDATE_OUTCOME_UNKNOWN',
-  'INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH'
+  'INSTALL_PUBLIC_ARTIFACT_INTEGRITY_MISMATCH', 'MARITIME_SEAT_QUARANTINED', 'MARITIME_QUARANTINE_INVALID'
+]);
+const NATIVE_RECEIPT_CODES = new Set([
+  ...['FILES','OPERATION','FORMAT','EXPIRED','IDENTITY','BLOCKED','ENVIRONMENT','PROCESS','SOURCE',
+    'CALL_INCOMPLETE','TURN_INCOMPLETE','PROCESS_BIRTH','PROCESS_COMMAND','CALL_EVIDENCE','REQUEST_MISSING']
+    .map(code => `OPENCLAW_RECEIPT_${code}`),
+  ...['admission','stopped','oauth-refresh','provider-route','websocket','environment','config','oauth',
+    'request-body','request-identity','request-model','tool-continuation','physical-fuse','upstream-send',
+    'upstream-response','stream-read','sse-json','response-model','response-event','response-completion','response-tools']
+    .map(code => `OPENCLAW_RECEIPT_REFUSED_${code.toUpperCase().replaceAll('-', '_')}`)
 ]);
 const CONTINUITY_FAILURE_CODES = new Set([
+  'OBSERVER_TRANSITION_FAILED', 'HERMES_OAUTH_POOL_UNVERIFIED', 'DEBUG_AGENT_PREPARATION_FAILED',
   'READINESS_ARTIFACTS_INVALID', 'READINESS_CONTINUITY_INPUT_INVALID', 'READINESS_EVIDENCE_INVALID',
   'READINESS_DEADLINE_EXPIRED', 'READINESS_LIFECYCLE_UNCONFIRMED', 'READINESS_MIXED_GENERATION',
   'READINESS_INSPECTION_FAILED', 'READINESS_MODEL_INVALID', 'READINESS_MODEL_ROUTE_UNVERIFIED',
@@ -49,14 +59,14 @@ export function safeMaritimeErrorCode(code, fallback = null) {
 
 export function safeMaritimeDiagnosticCode(code, fallback = null) {
   return safePlayerErrorCode(code, typeof code === 'string' &&
-    (MARITIME_FAILURE_CODES.has(code) || CONTINUITY_FAILURE_CODES.has(code)) ? code : fallback);
+    (MARITIME_FAILURE_CODES.has(code) || CONTINUITY_FAILURE_CODES.has(code) || NATIVE_RECEIPT_CODES.has(code)) ? code : fallback);
 }
 
-function withFailureMetadata(failure, error) {
+export function withFailureMetadata(failure, error) {
   const transport = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
   const diagnostic = safeMaritimeDiagnosticCode(error?.diagnostic_code, safeMaritimeDiagnosticCode(error?.code));
-  if (transport !== null) failure.transport_code = transport;
-  if (diagnostic !== null) failure.diagnostic_code = diagnostic;
+  if (transport !== null) failure.transport_code ??= transport;
+  if (diagnostic !== null) failure.diagnostic_code ??= diagnostic;
   return failure;
 }
 
@@ -456,7 +466,7 @@ export function buildRuntimeDiagnosticShellCommand(request, binding, requestPath
 const SECRET_LOOKING = /(?:0[xX])?[0-9a-fA-F]{64}|(?:mk|sk)_[A-Za-z0-9_-]{8,}/;
 const PRIVATE_REPLY_LOOKING = /(?:^|\s)Bearer\s+\S+|\b(?:mk|sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}|["'](?:private[_ -]?key|salt)["']\s*:/i;
 
-function fixedCliDiagnostic(response) {
+export function fixedCliDiagnostic(response) {
   if (typeof response !== 'string') return undefined;
   try {
     const value = JSON.parse(response);
@@ -464,7 +474,7 @@ function fixedCliDiagnostic(response) {
         Object.keys(value).sort().join('\0') !== 'error\0ok' || value.ok !== false ||
         !value.error || typeof value.error !== 'object' || Array.isArray(value.error) ||
         Object.keys(value.error).length !== 1 || !Object.hasOwn(value.error, 'code')) return undefined;
-    return safePlayerErrorCode(value.error.code, null) ?? undefined;
+    return safeMaritimeDiagnosticCode(value.error.code, null) ?? undefined;
   } catch { return undefined; }
 }
 
@@ -508,7 +518,7 @@ function validateModelConfigurationResult(result, seat, apiKey) {
 
 export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchImpl = globalThis.fetch,
   timeoutMs = 120_000, oneAwake = false, maxAwake, maxAgents = 3, wakeDelayMs = 10_000,
-  verifyRecoveredResponse = verifyCompletedReceipt, diagnosticStageRetries = 1, runtimeContinuity } = {}) {
+  verifyRecoveredResponse = verifyCompletedReceipt, diagnosticStageRetries = 1, runtimeContinuity, debug = false, quarantine } = {}) {
   if (config?.chain_id !== 84532) throw new TypeError('BASE_SEPOLIA_REQUIRED');
   if (typeof apiKey !== 'string' || !apiKey || /[\r\n]/.test(apiKey)) throw new TypeError('MARITIME_CREDENTIAL_MISSING');
   validateMaritimeRoster(config.roster);
@@ -527,6 +537,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
       Array.isArray(runtimeContinuity) || Object.keys(runtimeContinuity).sort().join('\0') !== 'prepareAction\0verify' ||
       typeof runtimeContinuity.verify !== 'function' || typeof runtimeContinuity.prepareAction !== 'function' ||
       maxAwake === undefined || maxAwake > 5)) throw new TypeError('MARITIME_RUNTIME_CONTINUITY_INVALID');
+  if (debug && (config.purpose !== 'debug' || !quarantine ||
+      ['assertAvailable','begin','complete','reservedAgentIds'].some(key => typeof quarantine[key] !== 'function'))) {
+    throw new TypeError('MARITIME_QUARANTINE_INVALID');
+  }
   const continuity = runtimeContinuity === undefined ? null : Object.freeze({
     verify: runtimeContinuity.verify, prepareAction: runtimeContinuity.prepareAction
   });
@@ -536,9 +550,14 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
   let rotationQueue = Promise.resolve(), rotationBlocked = false;
   // Legacy oneAwake retains its established serial queue without account inventory probes.
   const leasePool = maxAwake === undefined ? null : createMaritimeAwakeLeasePool({ maxAwake,
-    agentIds: roster.map(seat => seat.agent_id), readInventory: ({ deadlineAtMs, signal }) => maritimeRequest({
+    agentIds: roster.map(seat => seat.agent_id), readInventory: async ({ deadlineAtMs, signal }) => {
+      const agents = await maritimeRequest({
       apiKey, fetchImpl, timeoutMs: continuity ? requestTimeout({ deadlineAtMs, signal, remotePostStarted: false, timeoutMs }) : timeoutMs,
-      path: '/api/agents', signal }) });
+      path: '/api/agents', signal });
+      if (!debug) return agents;
+      const reserved = new Set(await quarantine.reservedAgentIds());
+      return agents.map(agent => reserved.has(agent.id) ? { ...agent, status: 'quarantined' } : agent);
+    } });
   const acquireLease = (boundary, agentId) => leasePool.acquire({ agentId, deadlineAtMs: boundary.deadlineAtMs, signal: boundary.signal });
   function certifiedLifecycle(assigned, boundary, post) {
     const agentPath = `/api/agents/${encodeURIComponent(assigned.agent_id)}`;
@@ -645,6 +664,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         if (previous.digest !== digest) throw new MaritimeAdapterError('MARITIME_REQUEST_ID_REUSED');
         return structuredClone(await previous.promise);
       }
+      if (debug) await quarantine.assertAvailable(assigned);
       if (busy.has(assigned.seat_id)) throw new MaritimeAdapterError('MARITIME_SEAT_BUSY');
       const binding = bindings.get(assigned.seat_id);
       if (!discussion && !binding && config.mode === 'live') throw new MaritimeAdapterError('MARITIME_RUNTIME_COMMAND_REQUIRED');
@@ -667,16 +687,19 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
       const certified = continuity && certifiedLifecycle(assigned, boundary, post);
       const execute = async () => {
         let releaseLease = () => {};
-        let leaseAcquired = false;
+        let leaseAcquired = false, quarantined = false;
         try {
           assertDispatchBoundary(boundary);
-          if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { ambiguous: false, retryable: true });
+          if (!debug && rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { ambiguous: false, retryable: true });
           if (maxAwake !== undefined) {
             releaseLease = await acquireLease(boundary, assigned.agent_id);
             leaseAcquired = true;
           }
+          if (debug) {
+            await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
+          }
           if (certified) {
-            if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
+            if (!debug && rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
             await certified.start();
             if (!discussion) await certified.prepareAction(snapshot);
           } else if (awakeLimit !== undefined) {
@@ -762,10 +785,13 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               result = await recoverInvalid(invalid);
             }
           }
+          if (debug) {
+            await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
+          }
           if (certified) {
             await certified.verify();
             await certified.sleep();
-            if (!rotationBlocked) { releaseLease(); leaseAcquired = false; }
+            if (!debug && !rotationBlocked) { releaseLease(); leaseAcquired = false; }
           } else if (awakeLimit !== undefined) {
             try {
               const sleeping = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` });
@@ -778,17 +804,24 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               // but the awake slot still cannot be rotated. Unknown sleep
               // outcomes remain ambiguous for the whole dispatch.
               rotationBlocked = true;
-              if (error?.ambiguous) throw error;
+              if (debug || error?.ambiguous) throw error;
             }
             // A permit is released only after a successful sleep response.
-            if (!rotationBlocked && maxAwake !== undefined) { releaseLease(); leaseAcquired = false; }
+            if (!debug && !rotationBlocked && maxAwake !== undefined) { releaseLease(); leaseAcquired = false; }
+          }
+          if (debug && quarantined) {
+            await quarantine.complete(assigned, snapshot.request_id); quarantined = false;
+            if (leaseAcquired) { releaseLease(); leaseAcquired = false; }
           }
           return structuredClone(result);
         } catch (error) {
+          if (debug && quarantined && !boundary.remotePostStarted) {
+            await quarantine.complete(assigned, snapshot.request_id); quarantined = false;
+          }
           if (maxAwake !== undefined && leaseAcquired && !boundary.remotePostStarted) {
             releaseLease(); leaseAcquired = false;
           }
-          if (awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
+          if (!debug && awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
           if (certified && boundary.remotePostStarted && !error?.ambiguous) {
             throw withFailureMetadata(new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true }), error);
           }
@@ -839,6 +872,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         if (previous.digest !== digest) throw new MaritimeAdapterError('MARITIME_REQUEST_ID_REUSED');
         return structuredClone(await previous.promise);
       }
+      if (debug) await quarantine.assertAvailable(assigned);
       if (busy.has(assigned.seat_id)) throw new MaritimeAdapterError('MARITIME_SEAT_BUSY');
       busy.add(assigned.seat_id);
       const boundary = { deadlineAtMs, signal, remotePostStarted: false };
@@ -853,16 +887,19 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
       const certified = continuity && certifiedLifecycle(assigned, boundary, post);
       const execute = async () => {
         let releaseLease = () => {};
-        let leaseAcquired = false;
+        let leaseAcquired = false, quarantined = false;
         try {
           assertDispatchBoundary(boundary);
-          if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
+          if (!debug && rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
           if (maxAwake !== undefined) {
             releaseLease = await acquireLease(boundary, assigned.agent_id);
             leaseAcquired = true;
           }
+          if (debug) {
+            await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
+          }
           if (certified) {
-            if (rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
+            if (!debug && rotationBlocked) throw new MaritimeAdapterError('MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED', { retryable: true });
             await certified.start();
           } else if (awakeLimit !== undefined) {
             await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/reload-env` });
@@ -913,23 +950,33 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             invalid.diagnostic_code = fixedCliDiagnostic(responseText) ?? 'MARITIME_REPLY_PROTOCOL_INVALID';
             throw invalid;
           }
+          if (debug) {
+            await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
+          }
           if (certified) {
             await certified.verify();
             await certified.sleep();
-            if (!rotationBlocked) { releaseLease(); leaseAcquired = false; }
+            if (!debug && !rotationBlocked) { releaseLease(); leaseAcquired = false; }
           } else if (awakeLimit !== undefined) {
             const sleeping = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/sleep` });
             if (String(sleeping?.status ?? '').toLowerCase() !== 'sleeping') {
               throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
             }
-            if (maxAwake !== undefined) { releaseLease(); leaseAcquired = false; }
+            if (!debug && maxAwake !== undefined) { releaseLease(); leaseAcquired = false; }
+          }
+          if (debug && quarantined) {
+            await quarantine.complete(assigned, snapshot.request_id); quarantined = false;
+            if (leaseAcquired) { releaseLease(); leaseAcquired = false; }
           }
           return structuredClone(result);
         } catch (error) {
+          if (debug && quarantined && !boundary.remotePostStarted) {
+            await quarantine.complete(assigned, snapshot.request_id); quarantined = false;
+          }
           if (maxAwake !== undefined && leaseAcquired && !boundary.remotePostStarted) {
             releaseLease(); leaseAcquired = false;
           }
-          if (awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
+          if (!debug && awakeLimit !== undefined && (error?.ambiguous || certified && boundary.remotePostStarted)) rotationBlocked = true;
           if (certified && boundary.remotePostStarted && !error?.ambiguous) {
             throw withFailureMetadata(new MaritimeAdapterError(error instanceof MaritimeAdapterError ? error.code : 'MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: true }), error);
           }

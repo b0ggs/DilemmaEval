@@ -125,6 +125,7 @@ export function validateControlledRuntimeEvidence(config,evidence,{
   if (!Number.isSafeInteger(nowMs) || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 1 || maxAgeMs > RUNTIME_EVIDENCE_MAX_AGE_MS) {
     throw new Error('RUNTIME_EVIDENCE_CLOCK_INVALID');
   }
+  if (config?.purpose === 'debug' || evidence?.purpose === 'debug') throw new Error('RUNTIME_DEBUG_EVIDENCE_REJECTED');
   rejectPrivateEvidence(evidence);
   if (evidence?.producer_version !== undefined) validateProducerEvidence(config, evidence);
   else if (!allowLegacyFixtures) throw new Error('RUNTIME_PRODUCER_REQUIRED');

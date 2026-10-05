@@ -96,7 +96,7 @@ export function formatDealerEvent(event, config) {
     lines.push(`${seatLabel(data.wallet_address, config)} joined.`);
   }
   lines.push(`https://sepolia.basescan.org/tx/${event.transaction_hash}`);
-  const text = lines.join('\n');
+  const text = `${config.purpose === 'debug' ? '[DEBUG] ' : ''}${lines.join('\n')}`;
   ensure(text.length <= MAX_TEXT_LENGTH, 'DEALER_MESSAGE_TOO_LONG');
   return text;
 }
@@ -110,7 +110,7 @@ function formatAgentMessage(message, team, config) {
   ensure(Number.isSafeInteger(message.sequence) && message.sequence > 0, 'INVALID_MESSAGE_SEQUENCE');
   ensure(typeof message.request_id === 'string' && message.request_id.length > 0, 'INVALID_MESSAGE_REQUEST');
   ensure(typeof message.message === 'string' && message.message.length > 0, 'INVALID_MESSAGE_TEXT');
-  const text = `${seat.seat_id} (${team === 'openclaw' ? 'OpenClaw' : 'Hermes'}) · Game ${message.game_id} · Round ${message.round}\n${message.message}`;
+  const text = `${config.purpose === 'debug' ? '[DEBUG] ' : ''}${seat.seat_id} (${team === 'openclaw' ? 'OpenClaw' : 'Hermes'}) · Game ${message.game_id} · Round ${message.round}\n${message.message}`;
   // Accepted words are preserved, including whitespace and punctuation. Never silently truncate.
   ensure(text.length <= MAX_TEXT_LENGTH, 'AGENT_MESSAGE_TOO_LONG');
   return text;
@@ -148,6 +148,7 @@ export function createTelegramMirror({ config, runtimeDir, token, fetchImpl = gl
   ensure(Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0 && requestTimeoutMs <= 30_000, 'INVALID_TELEGRAM_TIMEOUT');
   const chats = Object.fromEntries(TEAMS.map((team) => [team, config.telegram?.[team]?.chat_id == null ? null : String(config.telegram[team].chat_id)]));
   const enabled = typeof token === 'string' && token.length > 0 && (config.mode === 'live' || fetchImpl !== globalThis.fetch);
+  ensure(config.purpose !== 'debug' || scoreboard === undefined, 'DEBUG_SCOREBOARD_FORBIDDEN');
   const pinned = scoreboard ? createPinnedScoreboard({ config, options: scoreboard, chats, now, enabled,
     request: ({ method, body }) => request({ token, method, body, fetchImpl, timeoutMs: requestTimeoutMs }),
   }) : null;

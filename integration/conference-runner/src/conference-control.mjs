@@ -17,19 +17,19 @@ const RUN = [...PROOF, 'operator-pid', 'operator-url', 'scoreboard-bindings'];
 const AUDIT = ['proof-dir', 'game-id', 'scoreboard-bindings', 'secrets-env', 'output'];
 const HELP = `Conference control v2 (Node >=22)
   plan|status --config FILE --runtime-dir NEW_DIR --artifact-plan FILE --operations-manifest FILE
-  diagnose (same paths) --deadline UTC_ISO --cleanup-deadline UTC_ISO --secrets-env FILE
-  proof-plan|proof-status|proof-prepare --config FILE --evidence FILE --readiness-dir DIR
+  diagnose [--seat oc-1|hs-1] (same paths) --deadline UTC_ISO --cleanup-deadline UTC_ISO --secrets-env FILE
+  proof-plan|proof-status|proof-prepare [--debug] --config FILE --evidence FILE --readiness-dir DIR
     --proof-dir NEW_DIR --operator-dir DIR --runner-dirs JSON_ARRAY
     --stop-new-games-at UTC_ISO --hard-stop-at UTC_ISO --secrets-env FILE
     --artifact-plan FILE --operations-manifest FILE --verification-root EXISTING_PRIVATE_DIR
-  proof-run (same proof paths/deadlines) --operator-pid PID --operator-url LOOPBACK_URL --scoreboard-bindings FILE
+  proof-run [--debug] (same proof paths/deadlines) --operator-pid PID --operator-url LOOPBACK_URL --scoreboard-bindings FILE
   proof-audit --proof-dir DIR --game-id ID --scoreboard-bindings FILE --secrets-env FILE --output NEW_FILE
 All paths must be absolute. plan/status are local and read-only. proof-plan/proof-status
 read chain/account metadata. diagnose wakes/configures/chats/sleeps agents but never signs.
 proof-prepare wakes/inspects/sleeps all ten and writes a fresh preparation; it never signs.
 proof-run revalidates all ten immediately before at most one game creation, then runs gameplay.
 proof-audit reads chain/Telegram and writes a separate audit; it never overwrites the run report.
-Live operations require an explicitly authorized window. This CLI does not load signing keys.
+Live operations use the standing authorization recorded in AGENTS.md. This CLI does not load signing keys.
 `;
 
 function fail(code) { throw new Error(code); }
@@ -46,19 +46,24 @@ function timestamp(value) {
 export function parseControlArguments(argv) {
   const [command, ...rest] = argv;
   if (['--help', '--version'].includes(command) && rest.length === 0) return { command, args: {} };
-  if (!COMMANDS.has(command) || rest.length % 2 !== 0) fail('CONTROL_ARGUMENTS_INVALID');
+  if (!COMMANDS.has(command)) fail('CONTROL_ARGUMENTS_INVALID');
   const permitted = new Set(command === 'proof-run' ? RUN : command === 'proof-audit' ? AUDIT :
     command.startsWith('proof-') ? PROOF : command === 'diagnose' ? DIAGNOSTIC : COMMON);
+  if (command === 'diagnose') permitted.add('seat');
+  if (['proof-prepare', 'proof-run', 'proof-plan', 'proof-status'].includes(command)) permitted.add('debug');
   const args = {};
   for (let index = 0; index < rest.length; index += 2) {
     const key = rest[index].replace(/^--/, '');
+    if (key === 'debug' && rest[index] === '--debug' && permitted.has(key) && !Object.hasOwn(args, key)) { args.debug = true; index--; continue; }
     if (!rest[index].startsWith('--') || !permitted.has(key) || Object.hasOwn(args, key) ||
         !rest[index + 1]) fail('CONTROL_ARGUMENTS_INVALID');
     args[key] = rest[index + 1];
   }
-  for (const key of permitted) if (!Object.hasOwn(args, key)) fail('CONTROL_ARGUMENTS_REQUIRED');
+  for (const key of permitted) if (!['debug', 'seat'].includes(key) && !(args.debug && ['scoreboard-bindings', 'verification-root'].includes(key)) && !Object.hasOwn(args, key)) fail('CONTROL_ARGUMENTS_REQUIRED');
   for (const [key, value] of Object.entries(args)) {
-    if (['deadline', 'cleanup-deadline', 'stop-new-games-at', 'hard-stop-at'].includes(key)) timestamp(value);
+    if (key === 'debug') continue;
+    if (key === 'seat') { if (!/^(?:oc|hs)-[1-5]$/.test(value)) fail('CONTROL_ARGUMENTS_INVALID'); }
+    else if (['deadline', 'cleanup-deadline', 'stop-new-games-at', 'hard-stop-at'].includes(key)) timestamp(value);
     else if (key === 'runner-dirs') {
       let directories; try { directories = JSON.parse(value); } catch { fail('CONTROL_RUNNER_DIRS_INVALID'); }
       if (!Array.isArray(directories) || directories.length === 0 || directories.some(item => typeof item !== 'string') ||
@@ -109,7 +114,9 @@ async function verificationRoot(value) {
 // provider text, so arbitrary uppercase exception strings are not accepted.
 export function controlErrorCode(error) {
   const code = error?.code ?? error?.message;
-  return CONTROL_CODES.has(code) ? code : 'CONTROL_OPERATION_FAILED';
+  return CONTROL_CODES.has(code) || ['DEBUG_CONFIG_PURPOSE_REQUIRED', 'DEBUG_TEN_SEATS_REQUIRED',
+    'DEBUG_EVIDENCE_INVALID', 'DEBUG_CONTINUITY_INVALID', 'MARITIME_QUARANTINE_INVALID',
+    'MARITIME_SEAT_QUARANTINED'].includes(code) ? code : 'CONTROL_OPERATION_FAILED';
 }
 const CONTROL_CODES = new Set([
   'CONTINUITY_RESULT_INVALID',
@@ -352,7 +359,7 @@ export async function runConferenceControl(argv, dependencies = {}) {
   if (command === '--version') return { schema_version: 1, cli_version: CONFERENCE_CONTROL_VERSION };
   assertCoordinatorEnvironment(dependencies.env ?? process.env);
   const config = await (dependencies.loadConfig ?? loadConfig)(command === 'proof-audit' ?
-    path.join(args['proof-dir'], 'config.json') : args.config);
+    path.join(args['proof-dir'], 'config.json') : args.config, { debug: args.debug === true });
   if (config.mode !== 'live') fail('CONTROL_LIVE_CONFIG_REQUIRED');
   if (config.roster.length !== 10 || ['openclaw', 'hermes'].some(team =>
     config.roster.filter(seat => seat.team === team).length !== 5)) fail('CONTROL_TEN_SEATS_REQUIRED');
@@ -378,6 +385,12 @@ export async function runConferenceControl(argv, dependencies = {}) {
     const { makeProvider, createChainReader } = dependencies.chainModule ?? await import('./chain/reader.mjs');
     const provider = makeProvider(config.rpc_url);
     try {
+      if (args.seat) {
+        const { runSeatDiagnostic } = dependencies.seatDiagnostic ?? await import('./maritime/seat-diagnostic.mjs');
+        return await runSeatDiagnostic({ ...inputs, seatId: args.seat, apiKey: secrets.MARITIME_API_KEY,
+          chain: createChainReader({ config, provider }), deadlineAtMs: timestamp(args.deadline),
+          cleanupDeadlineAtMs: timestamp(args['cleanup-deadline']) });
+      }
       const result = await readiness.createReadinessRun({ ...inputs,
         deadlineAtMs: timestamp(args.deadline), cleanupDeadlineAtMs: timestamp(args['cleanup-deadline']),
         apiKey: secrets.MARITIME_API_KEY, chain: createChainReader({ config, provider }) }).run();
@@ -389,12 +402,12 @@ export async function runConferenceControl(argv, dependencies = {}) {
   const proof = dependencies.proof ?? await import('./proof-control.mjs');
   const artifacts = await buildControlArtifacts({ config,
     artifactPlan: await json(args['artifact-plan']), operationsManifest: await json(args['operations-manifest']) });
-  const verificationDirectory = await verificationRoot(args['verification-root']);
+  const verificationDirectory = args.debug ? undefined : await verificationRoot(args['verification-root']);
   const secrets = await (dependencies.loadSecrets ?? loadCoordinatorSecrets)(args['secrets-env']);
   const { makeProvider, createChainReader } = dependencies.chainModule ?? await import('./chain/reader.mjs');
   const provider = makeProvider(config.rpc_url);
   try {
-    const options = { configPath: args.config, evidencePath: args.evidence,
+    const options = { debug: args.debug === true, configPath: args.config, evidencePath: args.evidence,
       readinessDirectory: args['readiness-dir'], directory: args['proof-dir'],
       operatorDirectory: args['operator-dir'], runnerDirectories: JSON.parse(args['runner-dirs']),
       verificationRoot: verificationDirectory, signal: dependencies.signal,
@@ -407,22 +420,25 @@ export async function runConferenceControl(argv, dependencies = {}) {
     if (command === 'proof-run') {
       const preflight = dependencies.livePreflight ?? await import('./proof-live-preflight.mjs');
       const owner = await preflight.inspectProofOperator({ operatorDirectory: args['operator-dir'], expectedPid: Number(args['operator-pid']) });
-      const scoreboard = await json(args['scoreboard-bindings']);
+      const scoreboard = args.debug ? undefined : await json(args['scoreboard-bindings']);
       options.ownedProcesses = [owner];
       const prepared = await proof.validatePreparedProof({ ...options, readOnly: true });
-      await preflight.verifyProofSpectators({ config: prepared.preparedConfig, scoreboard, token: secrets.TELEGRAM_BOT_TOKEN });
+      await (args.debug ? preflight.verifyDebugSpectators : preflight.verifyProofSpectators)({ config: prepared.preparedConfig, scoreboard, token: secrets.TELEGRAM_BOT_TOKEN });
       const { createRuntimeContinuity } = dependencies.continuity ?? await import('./maritime/continuity.mjs');
-      const runtimeContinuity = createRuntimeContinuity({ config, evidence: await json(args.evidence), artifacts,
-        hardStopAtMs: options.hardStopAtMs });
+      const runtimeContinuity = args.debug ? (await import('./debug.mjs')).createDebugContinuity({
+        config: prepared.preparedConfig, artifacts, hardStopAtMs: options.hardStopAtMs }) :
+        createRuntimeContinuity({ config, evidence: await json(args.evidence), artifacts, hardStopAtMs: options.hardStopAtMs });
+      const quarantine = args.debug ? await (await import('./maritime/quarantine.mjs')).createSeatQuarantine({
+        directory: args['operator-dir'], config }) : undefined;
       const { createMaritimeAdapter } = dependencies.maritime ?? await import('./maritime/transport.mjs');
       const agents = createMaritimeAdapter({ config: prepared.preparedConfig, apiKey: secrets.MARITIME_API_KEY,
-        runtimeEvidence: { schema_version: 2, run_id: config.run_id, seats: artifacts }, runtimeContinuity,
+        runtimeEvidence: { schema_version: 2, run_id: config.run_id, seats: artifacts }, runtimeContinuity, debug: args.debug === true, quarantine,
         maxAwake: 5, maxAgents: 10, timeoutMs: prepared.preparedConfig.agent_timeout_ms ?? 120_000 });
       const { createOperatorAdapters } = dependencies.operator ?? await import('./operator.mjs');
       const operator = createOperatorAdapters({ url: args['operator-url'], token: secrets.DILEMMA_LAUNCHER_TOKEN });
       const { createTelegramMirror } = dependencies.telegram ?? await import('./telegram/index.mjs');
       const spectator = createTelegramMirror({ config: prepared.preparedConfig,
-        runtimeDir: path.join(args['proof-dir'], 'runtime'), token: secrets.TELEGRAM_BOT_TOKEN, scoreboard });
+        runtimeDir: path.join(args['proof-dir'], 'runtime'), token: secrets.TELEGRAM_BOT_TOKEN, ...(args.debug ? {} : { scoreboard }) });
       const { runControlledProof } = dependencies.execution ?? await import('./proof-run.mjs');
       const result = await runControlledProof({ proofOptions: options, agents, ...operator, spectator, signal: dependencies.signal });
       return { schema_version: 1, cli_version: CONFERENCE_CONTROL_VERSION, status: result.status,

@@ -482,13 +482,18 @@ try{
  const cfg=JSON.parse(fs.readFileSync(path,'utf8'));m.inspectOpenClawOAuthConfigText(JSON.stringify(cfg));
  const p=cfg.plugins??={};
  if(typeof p!=='object'||Array.isArray(p)||p.enabled===false||p.deny?.includes('${PRODUCTION_OBSERVER_ID}')||
- p.entries?.['${PRODUCTION_OBSERVER_ID}']!==undefined)throw 0;
+ p.entries?.['${PRODUCTION_OBSERVER_ID}']!==undefined&&p.entries['${PRODUCTION_OBSERVER_ID}']?.enabled!==false)throw 0;
  if(p.allow!==undefined&&(!Array.isArray(p.allow)||p.allow.some(x=>typeof x!=='string')))throw 0;
  p.load??={};p.entries??={};
  if(typeof p.load!=='object'||Array.isArray(p.load)||typeof p.entries!=='object'||Array.isArray(p.entries)||
  p.load.paths!==undefined&&!Array.isArray(p.load.paths))throw 0;
- p.load.paths??=[];p.load.paths.push(o.directory);
+ p.load.paths??=[];
  if(p.allow!==undefined&&!p.allow.includes('${PRODUCTION_OBSERVER_ID}'))p.allow.push('${PRODUCTION_OBSERVER_ID}');
+ if(p.entries['${PRODUCTION_OBSERVER_ID}']?.enabled===false&&p.load.paths){
+  const oldRoot=o.directory.slice(0,o.directory.lastIndexOf('/'))+'/';
+  p.load.paths=p.load.paths.filter(x=>typeof x==='string'&&!x.startsWith(oldRoot));
+ }
+ p.load.paths.push(o.directory);
  p.entries['${PRODUCTION_OBSERVER_ID}']={enabled:true};
  // The native provider supports this parameter. Preserve every other model,
  // tool, wallet and unrelated plugin setting.
@@ -528,50 +533,68 @@ function buildOpenClawProductionReadCommand(input = {}, activationOnly = false) 
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+let boundary='FILES';
+const fail=code=>{throw new Error('OPENCLAW_RECEIPT_'+code);};
 try{
  const require=createRequire('/app/package.json');
  const o=JSON.parse(process.argv[1]),activationOnly=process.argv[3]==='activation',
  hash=value=>createHash('sha256').update(value).digest('hex');
  const paths=['operation.json','receipt.json','index.mjs'];
  for(const name of paths){const p=o.directory+'/'+name,s=fs.lstatSync(p);
-  if(!s.isFile()||s.isSymbolicLink()||fs.realpathSync(p)!==p||s.size<1||s.size>1048576||(s.mode&0o077))throw 0;}
+  if(!s.isFile()||s.isSymbolicLink()||fs.realpathSync(p)!==p||s.size<1||s.size>1048576||(s.mode&0o077))fail('FILES');}
+ boundary='OPERATION';
  const op=JSON.parse(fs.readFileSync(o.directory+'/operation.json','utf8'));
- for(const k of ['seat_id','operation_id','deadline_at_ms','config_path','module_path','directory'])if(op[k]!==o[k])throw 0;
+ for(const k of ['seat_id','operation_id','deadline_at_ms','config_path','module_path','directory'])if(op[k]!==o[k])fail('OPERATION');
+ boundary='FORMAT';
  const r=JSON.parse(fs.readFileSync(o.directory+'/receipt.json','utf8'));
- if(Date.now()>=o.deadline_at_ms||r.schema_version!==1||r.seat_id!==o.seat_id||r.operation_id!==o.operation_id||
- r.deadline_at_ms!==o.deadline_at_ms||r.blocked!==false||r.native_gateway_environment_verified!==true||
- !Number.isSafeInteger(r.gateway_pid)||r.gateway_pid<1||r.gateway_stopped!==false||
- !Array.isArray(r.activations)||!r.activations.length||r.activations.length>64||!Array.isArray(r.calls)||r.calls.length>64||
- r.plugin_sha256!==process.argv[2]||hash(fs.readFileSync(o.directory+'/index.mjs'))!==r.plugin_sha256||
+ if(Date.now()>=o.deadline_at_ms)fail('EXPIRED');
+ if(r.schema_version!==1||r.seat_id!==o.seat_id||r.operation_id!==o.operation_id||r.deadline_at_ms!==o.deadline_at_ms)fail('IDENTITY');
+ if(r.blocked!==false){
+  const phases=['admission','stopped','oauth-refresh','provider-route','websocket','environment','config','oauth',
+   'request-body','request-identity','request-model','tool-continuation','physical-fuse','upstream-send',
+   'upstream-response','stream-read','sse-json','response-model','response-event','response-completion','response-tools'];
+  fail(phases.includes(r.refusal_phase)?'REFUSED_'+r.refusal_phase.toUpperCase().replaceAll('-','_'):'BLOCKED');
+ }
+ if(r.native_gateway_environment_verified!==true)fail('ENVIRONMENT');
+ if(!Number.isSafeInteger(r.gateway_pid)||r.gateway_pid<1||r.gateway_stopped!==false)fail('PROCESS');
+ if(!Array.isArray(r.activations)||!r.activations.length||r.activations.length>64||!Array.isArray(r.calls)||r.calls.length>64)fail('FORMAT');
+ boundary='SOURCE';
+ if(r.plugin_sha256!==process.argv[2]||hash(fs.readFileSync(o.directory+'/index.mjs'))!==r.plugin_sha256||
  hash(fs.readFileSync(o.module_path))!==r.helper_sha256||hash(fs.readFileSync(o.config_path))!==r.config_sha256||
  hash(fs.readFileSync('/app/openclaw.mjs'))!==r.native_entrypoint_sha256||
  hash(fs.readFileSync(require.resolve('openclaw/plugin-sdk/provider-auth')))!==r.native_auth_sdk_sha256||
- require('/app/package.json').name!=='openclaw'||require('/app/package.json').version!=='2026.7.1'||
- r.calls.some(c=>c.completed!==true)||r.calls.length&&r.calls.at(-1).native_turn_completed!==true)throw 0;
+ require('/app/package.json').name!=='openclaw'||require('/app/package.json').version!=='2026.7.1')fail('SOURCE');
+ if(r.calls.some(c=>c.completed!==true))fail('CALL_INCOMPLETE');
+ if(r.calls.length&&r.calls.at(-1).native_turn_completed!==true)fail('TURN_INCOMPLETE');
+ boundary='PROCESS';
  const proc='/proc/'+r.gateway_pid,stat=fs.readFileSync(proc+'/stat','utf8');
- if(stat.slice(stat.lastIndexOf(')')+2).split(' ')[19]!==r.gateway_start_ticks)throw 0;
+ if(stat.slice(stat.lastIndexOf(')')+2).split(' ')[19]!==r.gateway_start_ticks)fail('PROCESS_BIRTH');
  const argv=fs.readFileSync(proc+'/cmdline','utf8').split('\\0');
- if(!argv.some(a=>a==='openclaw-gateway'||a==='gateway'))throw 0;
+ if(!argv.some(a=>a==='openclaw-gateway'||a==='gateway'))fail('PROCESS_COMMAND');
+ boundary='ENVIRONMENT';
  const env=Object.fromEntries(fs.readFileSync(proc+'/environ','utf8').split('\\0').filter(x=>x.includes('=')).map(x=>
   [x.slice(0,x.indexOf('=')),x.slice(x.indexOf('=')+1)]));
  if(['OPENAI_API_KEY','CODEX_API_KEY','OPENCLAW_PROFILE','OPENCLAW_AGENT_DIR','OPENCLAW_OAUTH_DIR'].some(k=>env[k])||
  ['OPENAI_BASE_URL','OPENAI_API_BASE'].some(k=>env[k]!==undefined&&env[k]!=='https://chatgpt.com/backend-api/codex')||
  env.HOME!=='/data'||env.OPENCLAW_STATE_DIR&&env.OPENCLAW_STATE_DIR!=='/data/.openclaw'||
- env.OPENCLAW_CONFIG_PATH&&env.OPENCLAW_CONFIG_PATH!==o.config_path)throw 0;
+ env.OPENCLAW_CONFIG_PATH&&env.OPENCLAW_CONFIG_PATH!==o.config_path)fail('ENVIRONMENT');
  if(activationOnly){
   process.stdout.write(JSON.stringify({schema_version:1,seat_id:o.seat_id,operation_id:o.operation_id,observer_active:true,
    gateway_pid:r.gateway_pid,gateway_start_ticks:r.gateway_start_ticks,plugin_sha256:r.plugin_sha256,
    helper_sha256:r.helper_sha256,native_entrypoint_sha256:r.native_entrypoint_sha256,native_auth_sdk_sha256:r.native_auth_sdk_sha256,
    config_sha256:r.config_sha256,native_gateway_environment_verified:true,actual_model_call_verified:false}));
  }else{
+ boundary='CALL_EVIDENCE';
  const rows=r.calls.filter(c=>c.public_request_id===o.public_request_id);
- if(!rows.length||rows.at(-1).native_turn_completed!==true||rows.some(c=>c.completed!==true||c.returned_model_verified!==true||c.oauth_verified!==true||
+ if(!rows.length)fail('REQUEST_MISSING');
+ if(rows.at(-1).native_turn_completed!==true)fail('TURN_INCOMPLETE');
+ if(rows.some(c=>c.completed!==true||c.returned_model_verified!==true||c.oauth_verified!==true||
  c.oauth_profile_exclusive!==true||c.api_fallback_absent!==true||c.endpoint_verified!==true||
  c.requested_model!=='gpt-6.1-sol'||c.returned_model!=='gpt-6.1-sol'||
  !Number.isSafeInteger(c.started_at_ms)||!r.activations.some(a=>a.pid===c.gateway_pid&&a.start_ticks===c.gateway_start_ticks&&
   Number.isSafeInteger(a.started_at_ms)&&a.started_at_ms<=c.started_at_ms)||
  !Number.isSafeInteger(c.completed_at_ms)||c.completed_at_ms<c.started_at_ms||c.completed_at_ms>=o.deadline_at_ms||
- !/^[a-f0-9]{64}$/.test(c.response_id_sha256)))throw 0;
+ !/^[a-f0-9]{64}$/.test(c.response_id_sha256)) )fail('CALL_EVIDENCE');
  process.stdout.write(JSON.stringify({schema_version:1,seat_id:o.seat_id,operation_id:o.operation_id,
  public_request_id:o.public_request_id,gateway_pid:r.gateway_pid,gateway_start_ticks:r.gateway_start_ticks,
  plugin_sha256:r.plugin_sha256,helper_sha256:r.helper_sha256,native_entrypoint_sha256:r.native_entrypoint_sha256,
@@ -582,7 +605,10 @@ try{
   started_at_ms:c.started_at_ms,completed_at_ms:c.completed_at_ms,
   completed:true,oauth_verified:true,requested_model:'gpt-6.1-sol',returned_model:'gpt-6.1-sol'}))}));
 }
-}catch{process.exitCode=1;}
+}catch(error){
+ const code=/^OPENCLAW_RECEIPT_[A-Z_]+$/.test(error?.message??'')?error.message:'OPENCLAW_RECEIPT_'+boundary;
+ process.stdout.write(JSON.stringify({ok:false,error:{code}}));process.exitCode=1;
+}
 `;
   return ['node', '--input-type=module', '-e', source, JSON.stringify(o), expectedPluginHash, activationOnly ? 'activation' : 'receipt'];
 }

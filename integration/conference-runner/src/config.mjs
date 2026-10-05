@@ -52,7 +52,11 @@ export function validateConfig(input, { allowIncomplete = false } = {}) {
   return c;
 }
 
-export async function loadConfig(path, options) { return validateConfig(JSON.parse(await readFile(path,'utf8')),options); }
+export async function loadConfig(path, options) {
+  const input = JSON.parse(await readFile(path, 'utf8'));
+  if (options?.debug) return (await import('./debug.mjs')).validateDebugConfig(input);
+  return validateConfig(input, options);
+}
 
 export async function prepareRuntimeDirectory(directory) {
   if (!isAbsolute(directory)) throw new Error('RUNTIME_ABSOLUTE_PATH_REQUIRED');

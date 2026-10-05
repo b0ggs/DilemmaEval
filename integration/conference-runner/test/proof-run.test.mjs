@@ -17,7 +17,7 @@ import { GAME_ABI } from '../src/chain/abi.mjs';
 const hash = value => `0x${BigInt(value).toString(16).padStart(64, '0')}`;
 const json = (filename, value) => writeFile(filename, JSON.stringify(value));
 
-async function fixture(t, { cancelled = false, hardStopOffset = 60000, adapterTimeout = 1000 } = {}) {
+async function fixture(t, { cancelled = false, hardStopOffset = 60000, adapterTimeout = 1000, debug = false } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'proof-run-fixture-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   let time = Date.parse('2026-10-02T18:00:00Z');
@@ -63,7 +63,10 @@ async function fixture(t, { cancelled = false, hardStopOffset = 60000, adapterTi
     chain: adapters.chain, provider: { getTransactionCount: async () => 0 },
     validateReadinessCurrent: async ({ evidence: value }) => ({ ready: true,
       evidence_sha256: runtimeEvidenceFingerprint(value), lifecycle_state_digest: value.lifecycle_state_digest }) };
-  await json(options.configPath, config); await json(options.evidencePath, evidence);
+  if (debug) { config.purpose = 'debug'; options.debug = true; }
+  await json(options.configPath, config);
+  await json(options.evidencePath, debug ? (await import('../src/debug.mjs')).buildDebugEvidence({ config,
+    preflight: await adapters.chain.preflight() }) : evidence);
   await prepareControlledProof(options);
   let creates = 0, publishes = 0, advances = 0, dispatches = 0;
   const counts = () => ({ creates, publishes, advances, dispatches });
@@ -401,4 +404,50 @@ test('serial readiness verification can exceed ordinary adapter timeout while la
   assert.equal(report.creation.status, 'accepted');
   assert.equal(report.failure.code, 'PROOF_HARD_DEADLINE');
   assert.equal(report.runner_stopped, true);
+});
+
+
+test('debug continues an uncertain seat through terminal chain defaults without claims or proof credit', async t => {
+  const f = await fixture(t, { debug: true, hardStopOffset: 600000 });
+  const pause = f.dependencies.pause;
+  f.dependencies.pause = async () => { await pause(); f.adapters.mine(4); };
+  const original = f.dependencies.agents.dispatch;
+  const sent = [];
+  let quarantined = false;
+  f.dependencies.agents.dispatch = async args => {
+    sent.push([args.seat.seat_id, args.request.requested_action ?? args.request.type]);
+    assert.notEqual(args.request.requested_action, 'claim');
+    if (args.seat.seat_id === 'oc-1' && args.request.type === 'discussion' && !quarantined) {
+      quarantined = true;
+      throw Object.assign(new Error('unknown native operation'), { code: 'MARITIME_TIMEOUT', ambiguous: true,
+        diagnostic_code: 'OPENCLAW_RECEIPT_REFUSED_RESPONSE_COMPLETION' });
+    }
+    if (args.seat.seat_id === 'oc-1' && quarantined) throw Object.assign(new Error('quarantined'),
+      { code: 'MARITIME_SEAT_QUARANTINED', ambiguous: false, retryable: false });
+    return original(args);
+  };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(report.status, 'debug-complete', JSON.stringify(report));
+  assert.equal(report.failure, null);
+  assert.equal(report.final_chain.active_game_id, '0');
+  assert.equal(report.candidate_proof_complete, false);
+  assert.equal(report.proof_complete, false);
+  assert.equal(report.awaiting_independent_audit, false);
+  assert.ok(report.defaults > 0);
+  assert.ok(report.dispatches.some(row => row.diagnostic_code === 'OPENCLAW_RECEIPT_REFUSED_RESPONSE_COMPLETION'));
+  assert.ok(sent.some(([seat, action]) => seat === 'hs-5' && action === 'commit'));
+});
+
+test('debug seat-scoped dispatch expiry does not stop the table', async t => {
+  const f = await fixture(t, { debug: true, hardStopOffset: 600000 });
+  const original = f.dependencies.agents.dispatch;
+  f.dependencies.agents.dispatch = async args => {
+    if (args.seat.seat_id === 'oc-1') throw Object.assign(new Error('expired before submit'),
+      { code: 'MARITIME_DISPATCH_EXPIRED', ambiguous: false, retryable: true });
+    return original(args);
+  };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(report.status, 'debug-complete', JSON.stringify(report));
+  assert.equal(report.failure, null);
+  assert.ok(report.dispatches.some(row => row.seat_id === 'hs-5' && row.operation === 'reveal'));
 });

@@ -220,3 +220,23 @@ export async function verifyProofSpectators({ config, scoreboard, token, fetchIm
   if (documents.some((document, index) => document.fingerprint !== current[index].fingerprint || !same(document.identity, current[index].identity))) fail('PROOF_SPECTATOR_STATE_CHANGED');
   return { schema_version: 1, verified: true };
 }
+
+/** Debug room/access checks deliberately never read or bind pins/scoreboards. */
+export async function verifyDebugSpectators({ config, token, fetchImpl = globalThis.fetch }) {
+  const { validateDebugConfig } = await import('./debug.mjs');
+  validateDebugConfig(config);
+  if (typeof token !== 'string' || !/^[a-zA-Z0-9:_-]{1,256}$/.test(token)) fail('PROOF_SPECTATOR_CONFIG_INVALID');
+  const chats = TEAMS.map(team => config.telegram[team].chat_id);
+  if (chats.some(chat => !/^-\d+$/.test(chat ?? '')) || new Set(chats).size !== 2) fail('PROOF_SPECTATOR_CONFIG_INVALID');
+  const request = (method, body) => telegramRead({ method, body, token, fetchImpl, timeoutMs: 10000 });
+  const bot = await request('getMe', {});
+  if (!Number.isSafeInteger(bot.id) || bot.is_bot !== true) fail('PROOF_TELEGRAM_IDENTITY_UNVERIFIED');
+  for (const chatId of chats) {
+    const chat = await request('getChat', { chat_id: chatId });
+    const member = await request('getChatMember', { chat_id: chatId, user_id: bot.id });
+    if (String(chat.id) !== chatId || !['group', 'supergroup'].includes(chat.type) ||
+        member.status !== 'administrator' || member.user?.id !== bot.id || member.user.is_bot !== true) fail('PROOF_TELEGRAM_IDENTITY_UNVERIFIED');
+    if (chat.permissions?.can_send_messages !== false) fail('PROOF_TELEGRAM_PERMISSIONS_UNVERIFIED');
+  }
+  return { schema_version: 1, verified: true };
+}

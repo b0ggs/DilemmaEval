@@ -139,6 +139,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     if (typeof adapter?.[method] !== 'function') throw new TypeError(`Missing adapter method ${method}.`);
   }
   if (config.mode === 'live' && typeof chain.readBlockHash !== 'function') throw new TypeError('Live runner requires chain.readBlockHash.');
+  const debug = config.purpose === 'debug';
   const stopAt = Date.parse(config.stop_time);
   const startAt = Date.parse(config.start_time);
   if (!Number.isFinite(stopAt) || !Number.isFinite(startAt) || stopAt <= startAt) throw new TypeError('Invalid run schedule.');
@@ -557,7 +558,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       if (evaluateChainSnapshot(coreSnapshot(snapshot)).eligible) { await advance(); return; }
       // Every living player must have a durably accepted strategy message before
       // committing. Unknown or rejected discussions must not silently disappear.
-      if (discussionStates.some(status => status !== 'acknowledged')) return;
+      if (!debug && discussionStates.some(status => status !== 'acknowledged')) return;
       await Promise.all(config.roster.filter((seat) => {
         const player = playerFor(snapshot, seat); return player?.alive && !player.committed;
       }).map((seat) => dispatch(seat, snapshot, 'commit')));
@@ -627,7 +628,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       try {
         await refresh();
         await play();
-        await settle();
+        if (!debug) await settle();
         await maybeLaunch();
         await refreshMessages();
         await updateScheduling();

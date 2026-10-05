@@ -89,13 +89,14 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
   const options = { ...proofOptions, now: clock };
   // No adapter capable of an external effect is called before this gate passes.
   const prepared = await validatePreparedProof({ ...options, readOnly: true });
+  const debug = options.debug === true;
   const directory = prepared.bindings.directory;
   const runtimeDir = path.join(directory, 'runtime');
   const reportPath = path.join(directory, 'proof-run.json');
   await mustNotExist(runtimeDir);
   await mustNotExist(reportPath);
   const stamp = () => new Date(clock()).toISOString();
-  const report = { schema_version: 1, type: 'controlled-proof-run', run_id: prepared.preparedConfig.run_id,
+  const report = { schema_version: 1, type: debug ? 'controlled-debug-run' : 'controlled-proof-run', ...(debug ? { purpose: 'debug' } : {}), run_id: prepared.preparedConfig.run_id,
     started_at: stamp(), finished_at: null, status: 'starting', maximum_fresh_games: 1,
     launch_attempts: 0, creation: null, game_id: null, dispatches: [], phase_actions: [],
     runtime_evidence_sha256: prepared.bindings.runtime_evidence_sha256,
@@ -180,7 +181,7 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
     } finally { deadlineController.signal.removeEventListener('abort', onAbort); }
   }
 
-  const journal = createProofDispatchJournal({ report, persist, stopController, now: clock,
+  const journal = createProofDispatchJournal({ report, persist, stopController, now: clock, debug,
     adapter: { dispatch: async args => {
       // Confirmation can first arrive inside tick's refresh, before play sends
       // its first request and before the outer loop receives that tick's state.
@@ -268,8 +269,8 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
       await journal.flush();
       report.final_chain = snapshotSummary(state.snapshot);
       observeConfirmedGame(state);
-      if (journal.getFailure() || report.dispatches.some(row => BAD_DISPATCH.has(row.status))) stop('PROOF_AGENT_OPERATION_UNCERTAIN');
-      const issues = (state.health ?? []).map(issue => issue?.code);
+      if (!debug && (journal.getFailure() || report.dispatches.some(row => BAD_DISPATCH.has(row.status)))) stop('PROOF_AGENT_OPERATION_UNCERTAIN');
+      const issues = (state.health ?? []).filter(issue => !debug || !issue?.seat_id && issue?.code !== 'SPECTATOR_UNAVAILABLE').map(issue => issue?.code);
       if (issues.some(code => code !== 'LAUNCH_REJECTED' &&
           !(code === 'LAUNCH_PENDING' && creationStarted && report.creation?.status === 'accepted' && !report.game_id))) {
         stop('PROOF_RUNNER_HEALTH_BLOCKED');
@@ -280,17 +281,22 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
         const payable = state.snapshot.players.some(player => player.joined &&
           (state.snapshot.outcome === 'cancelled' ? BigInt(player.refunded_wei ?? '0') < BigInt(state.snapshot.config.entryFeeWei ?? '0')
             : BigInt(player.claimed_wei ?? '0') < BigInt(player.award_wei ?? '0')));
-        if (!payable && !pendingDispatches.size) {
+        if ((debug || !payable) && !pendingDispatches.size) {
           if (typeof spectator.flush === 'function') await boundedCall(() => spectator.flush(), 'PROOF_SPECTATOR_UNCERTAIN', { mutation: true });
           report.telegram = publicSpectatorHealth(await guardedSpectator.health(), prepared.preparedConfig);
           if (report.telegram.ok && report.telegram.pending === 0 && report.telegram.inflight === 0 && report.telegram.scoreboard_ready) {
             const completeSeats = prepared.preparedConfig.roster.every(seat => ['join', 'commit', 'reveal'].every(operation =>
               report.dispatches.some(row => row.seat_id === seat.seat_id && row.game_id === report.game_id && row.operation === operation && row.status === 'submitted')) &&
               report.dispatches.some(row => row.seat_id === seat.seat_id && row.game_id === report.game_id && row.operation === 'discussion' && row.has_team_message));
-            report.candidate_proof_complete = state.snapshot.outcome === 'completed' && completeSeats &&
+            report.candidate_proof_complete = !debug && state.snapshot.outcome === 'completed' && completeSeats &&
               report.final_chain.players === prepared.preparedConfig.roster.length && state.snapshot.active_game_id === '0';
             report.awaiting_independent_audit = report.candidate_proof_complete;
-            report.status = report.candidate_proof_complete ? 'candidate-complete' : 'terminal-incomplete';
+            report.status = debug ? 'debug-complete' : report.candidate_proof_complete ? 'candidate-complete' : 'terminal-incomplete';
+            if (debug) {
+              report.all_seats_acted = completeSeats;
+              report.defaults = state.events.filter(event => event.game_id === report.game_id && event.kind === 'round-resolved')
+                .reduce((count, event) => count + (event.data?.choices ?? []).filter(choice => choice.defaulted).length, 0);
+            }
             break;
           }
         }
@@ -313,7 +319,7 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
     let persistenceFailed = false;
     try { await journal.flush(); }
     catch { persistenceFailed = true; stop('PROOF_REPORT_WRITE_FAILED'); }
-    if (report.dispatches.some(row => BAD_DISPATCH.has(row.status))) stop('PROOF_AGENT_OPERATION_UNCERTAIN');
+    if (!debug && report.dispatches.some(row => BAD_DISPATCH.has(row.status))) stop('PROOF_AGENT_OPERATION_UNCERTAIN');
     report.pending_dispatches = report.dispatches.filter(row => row.status === 'started').length;
     if (report.pending_dispatches) stop('PROOF_DISPATCH_UNRESOLVED');
     if (report.failure) { report.candidate_proof_complete = false; report.awaiting_independent_audit = false; }

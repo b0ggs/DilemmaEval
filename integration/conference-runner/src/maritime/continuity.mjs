@@ -3,7 +3,7 @@ import { posix } from 'node:path';
 import { PINNED_GAME_REVISION } from '../../../game-bridge/src/index.js';
 import { validateControlledRuntimeEvidence, runtimeEvidenceFingerprint } from '../readiness.mjs';
 import { verifyPublicArtifactIntegrity } from './install.mjs';
-import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './transport.mjs';
+import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode, fixedCliDiagnostic } from './transport.mjs';
 import { buildDiagnosticReceiptReadCommand, validateDiagnosticReceipt } from './diagnostic-receipt.mjs';
 import { buildExecutionPermit, buildExecutionPermitStageCommand, executionPermitFingerprint } from './execution-permit.mjs';
 
@@ -70,7 +70,7 @@ function checkedArtifact(config, seat, evidence, artifacts) {
 
 function jsonResult(value, code) {
   if (value?.exitCode !== 0 || typeof value.stdout !== 'string' || Buffer.byteLength(value.stdout) > 16_384 ||
-      (value.stderr !== undefined && value.stderr !== '')) fail(code);
+      (value.stderr !== undefined && value.stderr !== '')) fail(code, { diagnostic_code: fixedCliDiagnostic(value?.stdout) });
   try { return JSON.parse(value.stdout); } catch { fail(code); }
 }
 
