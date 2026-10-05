@@ -62,9 +62,34 @@ try:
   tmp=pathlib.Path(str(p)+'.observer-transition.tmp');fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
   with os.fdopen(fd,'w') as out: out.write(text);out.flush();os.fsync(out.fileno())
   os.replace(tmp,p)
+  parent=os.open(p.parent,os.O_RDONLY|os.O_DIRECTORY)
+  try: os.fsync(parent)
+  finally: os.close(parent)
  print(json.dumps({'schema_version':1,'seat_id':s['seat_id'],'observer_enabled':enabled,'process_refresh_required':True},separators=(',',':')))
 except Exception:
  print('{"ok":false,"error":{"code":"OBSERVER_TRANSITION_FAILED"}}');sys.exit(1)
 `;
   return ['python3', '-c', source, script, settingsPath, String(enabled)];
+}
+
+/** Confirm the selection after process refresh/snapshot restoration. */
+export function buildObserverInspectionCommand({ artifact }) {
+  const settingsPath = artifact.gameplay_command[2];
+  if (artifact.harness === 'openclaw') return ['node', '--input-type=module', '-e', `
+import fs from 'node:fs';try{const s=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),
+c=JSON.parse(fs.readFileSync(s.openclaw_config_path,'utf8'));
+console.log(JSON.stringify({schema_version:1,seat_id:s.seat_id,observer_enabled:c.plugins?.entries?.['conference-oauth-observer']?.enabled===true}));
+}catch{console.log('{"ok":false,"error":{"code":"OBSERVER_TRANSITION_FAILED"}}');process.exitCode=1;}
+`, settingsPath];
+  if (artifact.harness !== 'hermes') throw new Error('OBSERVER_TRANSITION_INVALID');
+  return ['/opt/hermes/.venv/bin/python', '-B', '-c', `
+import sys,json,pathlib,yaml
+try:
+ s=json.loads(pathlib.Path(sys.argv[1]).read_text());c=yaml.safe_load(pathlib.Path(s['hermes_config_path']).read_text());p=c.get('plugins',{})
+ enabled=p.get('enabled',[]);disabled=p.get('disabled',[])
+ if not isinstance(enabled,list) or not isinstance(disabled,list): raise ValueError()
+ print(json.dumps({'schema_version':1,'seat_id':s['seat_id'],'observer_enabled':'dilemma-conference-oauth' in enabled and 'dilemma-conference-oauth' not in disabled}))
+except Exception:
+ print('{"ok":false,"error":{"code":"OBSERVER_TRANSITION_FAILED"}}');sys.exit(1)
+`, settingsPath];
 }

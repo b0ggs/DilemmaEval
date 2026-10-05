@@ -70,7 +70,7 @@ export async function createSeatQuarantine({ directory, config, now = Date.now }
       if (!row || row.request_id !== requestId || !(completedRequestId === requestId ||
           Number.isSafeInteger(jobEndedAtMs) && jobEndedAtMs >= row.started_at_ms &&
           Number.isSafeInteger(sleepingObservedAtMs) && sleepingObservedAtMs > jobEndedAtMs &&
-          sleepingObservedAtMs <= now() && status === 'sleeping')) fail();
+          sleepingObservedAtMs <= now() && ['sleeping', 'stopped'].includes(status))) fail();
       await mutate(() => { delete state.seats[seat.seat_id]; });
     },
     async reservedAgentIds() { await writes; return Object.values(state.seats).map(row => row.agent_id); }

@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { posix, join } from 'node:path';
 import { createMaritimeInstaller } from './install.mjs';
 import { maritimeRequest, safeMaritimeDiagnosticCode } from './transport.mjs';
-import { buildObserverTransitionCommand } from './observer-transition.mjs';
+import { buildObserverTransitionCommand, buildObserverInspectionCommand } from './observer-transition.mjs';
 import { buildOpenClawOAuthInspectionCommand } from './openclaw-oauth.mjs';
 import { nativeCommandResult } from './seat-diagnostic.mjs';
 import { writeProofReport } from '../../../../conference/operations/saved-helpers/proof-dispatch-journal.mjs';
@@ -12,9 +12,10 @@ import { writeProofReport } from '../../../../conference/operations/saved-helper
  * seat. It never creates a game or signs, claims, or sends Telegram messages. */
 export async function prepareDebugAgents({ config, artifacts, apiKey, runtimeDir,
   seatIds = config.roster.map(seat => seat.seat_id),
+  installSources = true,
   fetchImpl = globalThis.fetch, installer = createMaritimeInstaller({ apiKey, fetchImpl }),
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), onWake = async () => {} }) {
-  if (config.chain_id !== 84532 || config.roster.length !== 10 || artifacts.length !== 10) throw new Error('DEBUG_TEN_SEATS_REQUIRED');
+  if (config.chain_id !== 84532 || config.roster.length !== 10 || artifacts.length !== 10 || typeof installSources !== 'boolean') throw new Error('DEBUG_TEN_SEATS_REQUIRED');
   if (!Array.isArray(seatIds) || !seatIds.length || new Set(seatIds).size !== seatIds.length ||
       seatIds.some(id => !config.roster.some(seat => seat.seat_id === id))) throw new Error('DEBUG_TEN_SEATS_REQUIRED');
   await mkdir(runtimeDir, { mode: 0o700 });
@@ -33,14 +34,18 @@ export async function prepareDebugAgents({ config, artifacts, apiKey, runtimeDir
     try {
       const inventory = await request('/api/agents');
       if (!Array.isArray(inventory) || inventory.filter(agent => !['sleeping', 'stopped'].includes(agent.status)).length >= 5 ||
-          !inventory.some(agent => agent.id === seat.agent_id && agent.framework === seat.harness && agent.status === 'sleeping')) fail('MARITIME_INVENTORY_INVALID');
+          !inventory.some(agent => agent.id === seat.agent_id && agent.framework === seat.harness && ['sleeping', 'stopped'].includes(agent.status))) fail('MARITIME_INVENTORY_INVALID');
       await onWake(seat); row.wake_started = true; await persist();
       await request(`${prefix}/start`, 'POST'); await pause(10000);
-      await (installer.refreshPublicArtifact ?? installer.install)(artifact); row.installed = true;
+      if (installSources) await (installer.refreshPublicArtifact ?? installer.install)(artifact);
+      else await installer.inspectInstallation(artifact);
+      row.installed = true;
       const transition = nativeCommandResult(await execute(buildObserverTransitionCommand({ artifact })));
       if (transition.observer_enabled !== false || transition.seat_id !== seat.seat_id) fail('OBSERVER_TRANSITION_FAILED');
       row.observer_disabled = true;
       await request(`${prefix}/reload-env`, 'POST'); await pause(10000);
+      const observed = nativeCommandResult(await execute(buildObserverInspectionCommand({ artifact })));
+      if (observed.observer_enabled !== false || observed.seat_id !== seat.seat_id) fail('OBSERVER_TRANSITION_FAILED');
       nativeCommandResult(await execute(artifact.model_config_check_command));
       const route = nativeCommandResult(await execute(artifact.model_route_check_command));
       if (route.model_route_verified !== true) fail('READINESS_MODEL_ROUTE_UNVERIFIED');

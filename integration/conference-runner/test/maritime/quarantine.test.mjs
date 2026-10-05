@@ -23,4 +23,11 @@ test('unknown seats survive a new adapter/attempt and cannot release on nonce or
   await resumed.resolve({ seat, requestId, status: 'sleeping', jobEndedAtMs: 150, sleepingObservedAtMs: 160 });
   await resumed.assertAvailable(seat);
   assert.deepEqual(await resumed.reservedAgentIds(), []);
+  await resumed.begin(seat, 'next-request');
+  await assert.rejects(resumed.resolve({ seat, requestId: 'next-request', status: 'active',
+    jobEndedAtMs: 200, sleepingObservedAtMs: 210 }), /QUARANTINE_INVALID/);
+  now = 220;
+  await resumed.resolve({ seat, requestId: 'next-request', status: 'stopped',
+    jobEndedAtMs: 200, sleepingObservedAtMs: 210 });
+  await resumed.assertAvailable(seat);
 });
