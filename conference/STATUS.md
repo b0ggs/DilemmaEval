@@ -21,15 +21,15 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   account awake 0. hs-1 needed a fresh conversation after protocol-invalid replies;
   failed jobs were stopped and later stopped reads resolved quarantine. No replay.
 - Step 5: Game 21 completed; all ten acted, four defaults, Telegram correct.
-- Cleanup 18:59 UTC: active game 0, awake 0, quarantine empty, operator stopped.
-- Current: Game 22 running; pre-proof full suite passed 631/631.
+- Cleanup 20:15 UTC: active game 0, awake 0, quarantine empty, operator stopped.
+- Current: Game 22 terminal with 27 defaults. Full suite 631/631.
 - Next-attempt fix: 140-character discussion draft with terminal length check;
   retain strict 200-character validation and name overflow. Transport 48/48.
 - Step 2d: OC1 production diagnosis names `OPENCLAW_RECEIPT_FILES` during
   activation; per-call provenance unresolved. Observer disabled again; OAuth-only
   route and awake 0 confirmed. Use D3 for final proof if still unresolved.
-- Preflight October 5 18:13 UTC: active game 0, awake 0, quarantine empty;
-  owner nonce 476 clear, all players admitted/funded, owner balance 0.14625 ETH.
+- Preflight October 5 20:17 UTC: active game 0, awake 0, quarantine empty;
+  owner nonce 498 clear, all players admitted/funded. Preparing third attempt.
 - Game 20: ten awards unpaid. Claims authorized while no game is running.
 - Hermes actual OAuth/Sol diagnostics passed historically; OpenClaw production
   receipt verification remains unresolved. Debug disables per-call observers once;
@@ -43,8 +43,8 @@ gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram ro
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
 October 5 counters under this authorization: creations 2/10 (total 2/30),
-additional wakes 26/60, owner/operator gas 0.00000775/0.07 ETH.
-Game 21 terminal and cleaned up; second debug attempt executing.
+additional wakes 26/60, owner/operator gas 0.00001761/0.07 ETH.
+Games 21–22 terminal and cleaned up; third attempt uses the counted-draft fix.
 
 ## Run map
 
@@ -69,11 +69,11 @@ Game 21 terminal and cleaned up; second debug attempt executing.
   `src/maritime/prepare-debug.mjs`; reuse existing installer, fresh private output.
 - Operator entry: `node --env-file=PRIVATE_OWNER_ENV src/chain/cli.mjs operator`.
   Existing journal: `/Users/wade/.local/state/dilemmaeval-conference/`
-  `converge-rehearsal-2026-09-24-r8/operator` (67-record baseline; running).
+  `converge-rehearsal-2026-09-24-r8/operator` (67-record baseline; one signer).
 - Original implementation reference: [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md).
 - Historical evidence archive: [RUN-STATUS.md](archive/RUN-STATUS.md).
 
 ## Attempt log
 
 A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid; 56/56 DEBUG messages sent; terminal/awake 0/active 0 confirmed.
-A2 / Game 22: all ten joined; oc-4 R1 / oc-5 R2 team-message invalid, quarantined; first post-fix failure; game/cleanup pending.
+A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults; 50/50 DEBUG messages sent; terminal/awake 0/active 0 confirmed. First post-fix failure.
