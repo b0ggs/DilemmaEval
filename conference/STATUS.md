@@ -20,10 +20,11 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Live debug diagnostics passed on oc-1 and hs-1, with observers disabled and
   account awake 0. hs-1 needed a fresh conversation after protocol-invalid replies;
   failed jobs were stopped and later stopped reads resolved quarantine. No replay.
-- Next: prepare and run a debug 5v5 with fresh inputs, fuse and attempt directory.
+- Stopped at the user's request before internet loss; implementation `2037f07` pushed.
+- Next session: step 5, prepare/run the first debug 5v5 with fresh inputs and fuse.
   OC1's named per-call diagnosis is still pending (step 2d).
-- Live read October 5 16:38 UTC: active game 0, account awake 0, all eleven
-  nonces clear, all players funded/admitted. Refresh before mutation.
+- Stop checkpoint October 5 17:58 UTC: fresh active game 0 and account awake 0;
+  no test, game or operator running. Refresh nonces/funding before mutation.
 - Game 20: ten awards unpaid. Claims authorized while no game is running.
 - Hermes actual OAuth/Sol diagnostics passed historically; OpenClaw production
   receipt verification remains unresolved. Debug disables per-call observers once;
