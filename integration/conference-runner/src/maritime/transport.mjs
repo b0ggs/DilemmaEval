@@ -741,7 +741,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           const payload = await post({
             path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/chat`,
-            body: { message: buildAgentPrompt(snapshot, binding, staged?.path), conversation_id: `${config.run_id}:${assigned.seat_id}:${snapshot.game_id}` }
+            body: { message: buildAgentPrompt(snapshot, binding, staged?.path), conversation_id: `${config.run_id}:${assigned.seat_id}:${snapshot.game_id}:${createHash('sha256').update(snapshot.request_id).digest('hex').slice(0,32)}` }
           });
           const recoverInvalid = async invalid => {
             if (discussion || !['join', 'commit', 'reveal'].includes(snapshot.requested_action) || !binding) throw invalid;
@@ -783,7 +783,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               const diagnosticCode = fixedCliDiagnostic(responseText);
               invalid.diagnostic_code = diagnosticCode ??
                 (/RESPONSE_IDENTITY_MISMATCH/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_IDENTITY_MISMATCH' :
-                  /INVALID_JSON/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_INVALID_JSON' : 'MARITIME_REPLY_PROTOCOL_INVALID');
+                  validationError instanceof SyntaxError || /INVALID_JSON/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_INVALID_JSON' : 'MARITIME_REPLY_PROTOCOL_INVALID');
               result = await recoverInvalid(invalid);
             }
           }
@@ -930,7 +930,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           const payload = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/chat`,
             body: { message: buildRuntimeDiagnosticPrompt(snapshot, binding, staged.path),
-              conversation_id: `${config.run_id}:${assigned.seat_id}:runtime-diagnostic` } });
+              conversation_id: `${config.run_id}:${assigned.seat_id}:runtime-diagnostic:${createHash('sha256').update(snapshot.request_id).digest('hex').slice(0,32)}` } });
           const responseText = payload?.response;
           if (!payload || payload.error != null ||
               Object.keys(payload).some(key => !['response','error'].includes(key)) ||
@@ -944,9 +944,11 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           let result;
           try { result = validateRuntimeDiagnosticResponse(JSON.parse(responseText), snapshot); }
-          catch {
+          catch (validationError) {
             const invalid = new MaritimeAdapterError('MARITIME_DIAGNOSTIC_RESPONSE_INVALID', { ambiguous: true });
-            invalid.diagnostic_code = fixedCliDiagnostic(responseText) ?? 'MARITIME_REPLY_PROTOCOL_INVALID';
+            invalid.diagnostic_code = fixedCliDiagnostic(responseText) ??
+              (validationError instanceof SyntaxError ? 'MARITIME_REPLY_INVALID_JSON' :
+                /RESPONSE_IDENTITY_MISMATCH/.test(validationError?.message ?? '') ? 'MARITIME_REPLY_IDENTITY_MISMATCH' : 'MARITIME_REPLY_PROTOCOL_INVALID');
             throw invalid;
           }
           if (certified) {

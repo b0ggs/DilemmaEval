@@ -258,6 +258,44 @@ function modelConfigurationEvidence(seat) {
     automatic_fallback: false, fallback_model: null, response_metadata_required: true };
 }
 
+test('native action conversations keep earlier response formats separate while retaining supplied team history', async () => {
+  const seat = roster[2], conversations = new Map(), requests = [];
+  const adapter = createMaritimeAdapter({ config, apiKey: 'fixture-credential', runtimeEvidence: runtimeEvidenceV2(),
+    fetchImpl: async (url, options) => {
+      assert.ok(new URL(url).pathname.endsWith('/chat'));
+      const body = JSON.parse(options.body), request = JSON.parse(body.message.split('REQUEST_JSON\n')[1]);
+      requests.push(request);
+      if (!conversations.has(body.conversation_id)) conversations.set(body.conversation_id,
+        request.type === 'discussion' ? discussionReply(request, { team_message: 'Consider the team payout and the risk of betrayal.' }) :
+          request.type === 'runtime-diagnostic' ? diagnosticReply(request) : reply(request));
+      // A reused conversation retains its earlier reply format/identity.
+      return jsonResponse({ response: JSON.stringify(conversations.get(body.conversation_id)) });
+    } });
+  const actions = [poke('join', seat), discussion(seat), poke('commit', seat), poke('reveal', seat),
+    { ...discussion(seat), round: 2, request_id: 'discussion:hs-1:round-2' }];
+  for (const request of actions) {
+    request.team_chat = { through_sequence: 1, messages: [{ schema_version: 1, game_id: '7', round: 0,
+      phase: 'join', team: seat.team, seat_id: seat.seat_id, sequence: 1,
+      received_at: '2026-10-05T00:00:00Z', request_id: 'history:hs-1', message: 'Consider the team payout.' }] };
+    await adapter.dispatch({ seat, request });
+    assert.deepEqual(requests.at(-1), request);
+  }
+  for (const mode of ['gameplay-input', 'commit-input']) await adapter.diagnose({ seat, request: diagnostic(mode, seat) });
+  assert.equal(conversations.size, actions.length + 2);
+  await adapter.dispatch({ seat, request: actions[0] });
+  assert.equal(requests.length, actions.length + 2, 'a completed request must not send another native chat');
+});
+
+test('discussion and diagnostic JSON syntax failures retain the named parse boundary without the reply body', async () => {
+  const adapter = createMaritimeAdapter({ config, apiKey: 'fixture-credential', runtimeEvidence: runtimeEvidenceV2(),
+    fetchImpl: async () => jsonResponse({ response: 'non-JSON provider reply' }) });
+  for (const [method, request] of [['dispatch', discussion()], ['diagnose', diagnostic()]]) {
+    await assert.rejects(adapter[method]({ seat: roster[0], request }), error =>
+      error.ambiguous === true && error.diagnostic_code === 'MARITIME_REPLY_INVALID_JSON' &&
+      !Object.hasOwn(error, 'raw_response') && !error.message.includes('provider reply'));
+  }
+});
+
 function seatFromUrl(configuration, url) {
   const agentId = new URL(url).pathname.split('/')[3];
   return configuration.roster.find(row => row.agent_id === agentId);

@@ -20,11 +20,13 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Live debug diagnostics passed on oc-1 and hs-1, with observers disabled and
   account awake 0. hs-1 needed a fresh conversation after protocol-invalid replies;
   failed jobs were stopped and later stopped reads resolved quarantine. No replay.
-- Stopped at the user's request before internet loss; implementation `2037f07` pushed.
-- Next session: step 5, prepare/run the first debug 5v5 with fresh inputs and fuse.
+- Step 5: first debug 5v5 prepared; single operator and runner now executing.
+- Next: observe all-ten gameplay and confirm terminal/account cleanup.
+- Next-attempt fix: isolate native conversations per request; name JSON parse
+  failures. Transport tests 47/47; coordinator only, no agent-source changes.
   OC1's named per-call diagnosis is still pending (step 2d).
-- Stop checkpoint October 5 17:58 UTC: fresh active game 0 and account awake 0;
-  no test, game or operator running. Refresh nonces/funding before mutation.
+- Preflight October 5 18:13 UTC: active game 0, awake 0, quarantine empty;
+  owner nonce 476 clear, all players admitted/funded, owner balance 0.14625 ETH.
 - Game 20: ten awards unpaid. Claims authorized while no game is running.
 - Hermes actual OAuth/Sol diagnostics passed historically; OpenClaw production
   receipt verification remains unresolved. Debug disables per-call observers once;
@@ -37,9 +39,9 @@ Standing D1 authorization persists across sessions/compaction until revoked:
 gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram rooms.
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
-October 5 counters under this authorization: creations 0/10 (total 0/30),
-additional wakes 24/60, owner/operator gas 0/0.07 ETH.
-Step 3 live acceptance complete; no game created.
+October 5 counters under this authorization: creations 1/10 (total 1/30),
+additional wakes 24/60, owner/operator gas 0.00000095/0.07 ETH.
+Game 21 executing; no additional creation until cleanup.
 
 ## Run map
 
@@ -59,6 +61,7 @@ Step 3 live acceptance complete; no game created.
 - Current input config/artifact plan/manifest:
   `/private/tmp/conference-game20-claims-oauth-20261004-v7/`.
 - Current v2 private reports/counters: `/private/tmp/dilemma-fast-iteration-20261005/`.
+  First debug: `debug-game-1/`; inputs and deadlines: `debug-game-1-inputs/`.
 - One-time source deploy/observer transition: `prepareDebugAgents` in
   `src/maritime/prepare-debug.mjs`; reuse existing installer, fresh private output.
 - Operator entry: `node --env-file=PRIVATE_OWNER_ENV src/chain/cli.mjs operator`.
@@ -69,5 +72,4 @@ Step 3 live acceptance complete; no game created.
 
 ## Attempt log
 
-No attempts under D1 yet. Record game, first failure cause, defaults, Telegram,
-terminal chain read and account-awake read after each attempt.
+A1 / Game 21: all ten acted; R1–2 zero defaults; hs-1 R3 discussion protocol-invalid, quarantined; game/cleanup pending.
