@@ -15,7 +15,7 @@ const hardStop = start + 3_600_000;
 const runId = '01234567-89ab-4cde-8fab-0123456789ab';
 const blockHash = `0x${'ab'.repeat(32)}`;
 const instance = 'cd'.repeat(32);
-const model = { model_endpoint: 'https://api.maritime.sh/api/llm/v1', model: 'gpt-5.4-mini',
+const model = { model_endpoint: 'https://chatgpt.com/backend-api/codex', model: 'gpt-6.1-sol',
   reasoning_effort: 'low', max_output_tokens: 2048, automatic_fallback: false };
 const config = { ...baseline, mode: 'live', stop_time: new Date(hardStop).toISOString(), roster: ['openclaw', 'hermes'].flatMap((team, t) =>
   Array.from({ length: 5 }, (_, index) => ({ seat_id: `${t ? 'hs' : 'oc'}-${index + 1}`, team, harness: team,

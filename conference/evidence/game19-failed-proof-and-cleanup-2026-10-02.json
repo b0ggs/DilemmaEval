@@ -1,0 +1,685 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-02T23:01:39.846Z",
+  "implementation_checkpoint": "0582d74",
+  "milestones": {
+    "M1": "passed live in attempts A and B; certificates expired",
+    "M2": "reconciled and passed B final gate",
+    "M3": "incomplete; Game19 failed zero-default proof"
+  },
+  "game_id": "19",
+  "proof_complete": false,
+  "creation_transaction": "0xc2237c36da4ad8032be33b09b93ab0d0ff595fa179a8ae2d7190d9554d5c9f4c",
+  "proof_stopped_at": "2026-10-02T20:48:59.131Z",
+  "proof_failure_code": "PROOF_AGENT_OPERATION_UNCERTAIN",
+  "original_proof_hard_stop_at": "2026-10-02T21:06:12.321Z",
+  "original_proof_deadline_extended": false,
+  "dispatch_counts": {
+    "join:submitted": 10,
+    "discussion:observed": 24,
+    "commit:submitted": 19,
+    "reveal:submitted": 19,
+    "discussion:ambiguous": 1,
+    "discussion:cancelled-after-submit": 3
+  },
+  "unknown_round3_discussion_seats": [
+    "oc-2",
+    "oc-3",
+    "oc-4",
+    "oc-5"
+  ],
+  "round3_commit_requests": 0,
+  "root_cause": "Original transport cause not retained; two bounded native history inspections did not find the exact failed request. Cause remains unidentified; not established as timeout, provider outage or model failure.",
+  "readiness": {
+    "diagnostic_validations": 20,
+    "completed_operations": 412,
+    "preparation_continuity_operations": 182,
+    "precreation_continuity_operations": 182,
+    "evidence_sha256": "283b0ada0406b83b7356ed489c37407a018aed7b4595ed9d6cbf93f3ddc211d1",
+    "maximum_account_awake": 5,
+    "lifetime_seconds": 600
+  },
+  "chain_cleanup": {
+    "complete": true,
+    "scope_started_at": "2026-10-02T21:05:06.269Z",
+    "scope_hard_stop_at": "2026-10-02T21:30:06.269Z",
+    "finished_at": "2026-10-02T21:17:20.333Z",
+    "phase_advances": 4,
+    "new_games": 0,
+    "player_requests": 0,
+    "outcome": "completed",
+    "active_game_id": "0",
+    "terminal_receipt": {
+      "transaction_hash": "0x4030f58b1470570d11a4531932751f7955ae8dce00ee072d2ce25d5e1e109c47",
+      "block_number": "47603765",
+      "block_hash": "0xcc92fdbd342ed63dd0fb53fc73d7140bc56cf181c2305114f759594624a344a9",
+      "status": 1
+    },
+    "defaulted_rounds": [
+      {
+        "round": 3,
+        "defaulted_player_count": 9
+      },
+      {
+        "round": 4,
+        "defaulted_player_count": 9
+      }
+    ],
+    "original_proof_evidence_unchanged": true
+  },
+  "operator": {
+    "stopped": true,
+    "confirmed_records": 59
+  },
+  "claims_cleanup": {
+    "complete": false,
+    "claims_dispatched": 0,
+    "claims_confirmed": 0,
+    "failure_code": "READINESS_RUN_FAILED_SLEEP_UNCONFIRMED",
+    "readiness_operation_status_counts": {
+      "complete": 129,
+      "unknown": 7
+    },
+    "first_failure_boundary": "hs-1 commit-input staging: fetch returned; validation failed before chat; exact HTTP/body cause not retained",
+    "first_gameplay_diagnostics_passed": 5,
+    "commit_diagnostic_chats": 0,
+    "provider_error_seats": [
+      "hs-2",
+      "hs-3"
+    ],
+    "provider_observation": "Both existing containers stopped; no replacement or reset performed",
+    "attempt": "first failed attempt, preserved"
+  },
+  "telegram_cleanup": {
+    "complete": false,
+    "first_attempt": {
+      "sent": 24,
+      "pending": 30,
+      "inflight": 0,
+      "uncertain": 2,
+      "rejected": 0
+    },
+    "uncertain_event": {
+      "kind": "round-resolved",
+      "round": 1,
+      "transaction_hash": "0x429f313bc829b4442b590f1570ce6d32339705dd50ed0b7c5a3a8baaefaa392a",
+      "log_index": 753,
+      "teams": [
+        "openclaw",
+        "hermes"
+      ],
+      "replayed": false
+    },
+    "pending_only_drain": "complete",
+    "pending_entries_drained": 30,
+    "finished_at": "2026-10-02T21:40:06.239Z",
+    "final_queue": {
+      "sent": 54,
+      "pending": 0,
+      "inflight": 0,
+      "uncertain": 2,
+      "rejected": 0
+    },
+    "pins_verified": true,
+    "dealer_failed_proof_notices": [
+      {
+        "team": "openclaw",
+        "message_id": 54,
+        "status": "sent"
+      },
+      {
+        "team": "hermes",
+        "message_id": 56,
+        "status": "sent"
+      }
+    ]
+  },
+  "host_sleep": {
+    "confirmed_by": "macOS power log",
+    "started_at": "2026-10-02T21:19:03Z",
+    "ended_at": "2026-10-02T21:31:58Z",
+    "duration_seconds": 775,
+    "effect": "Interrupted Telegram cleanup; earlier proof/readiness failure predates sleep"
+  },
+  "latest_inventory": {
+    "observed_at": "2026-10-02T22:15:04.934Z",
+    "all_ten_sleeping": true,
+    "account_awake": 0
+  },
+  "evidence_sha256": {
+    "proof/proof-run.json": "8c914509b37d3041f81a6331718911165767436167c3481a84e0ffbf48072d32",
+    "proof/launch-once.json": "b1477b05bc3347146fd55d1d27c6909a80eb33a590da58cc74c2d11f83b1d17d",
+    "proof/runtime/coordinator/records.json": "ecd0693ea826177b6f6e73f4c40a33cc57d80e6407ba9c0cc844953978ac3156",
+    "chain-cleanup-game19-20261002/final.json": "7e33d2f86b4fd3d5055de044171b003b790376706d4c85c1756228bf27944974",
+    "claims-cleanup-20261002/cleanup-report.json": "e515a9f4bfd18976ed744ce88834799e0f0d95c8f8c538d7128cc3e9d8b34140",
+    "claims-cleanup-20261002/readiness/readiness-journal.json": "edbf874f69a1d09c27e90e63f09366fd486e1a51743fcb929ffe0651972c434d",
+    "oc2-sole-session-inspection-20261002/result.json": "f27e0523bd7d6843e57ee31ac08f13441dff865955a459b1db7f4df86fd88007",
+    "independent-audit.json": "5637976dd5c81ce8a0085b843721c82f8fa936bfa951f32f486d8e377d015c30",
+    "audit-result.json": "b296c8259a87914c61d1bfc631e978867c769eb9acad01ba9e2ae7252d5d3969",
+    "claims-cleanup-second-20261002/cleanup-report.json": "bdad1126619c52fd67dead79d655c5c05130a9d0dcb75ecf94ec50e7a9318b6f",
+    "final-observation.json": "1595bfd7a35e004f5d25c357af490943a340f57fd7b49a5c82704fa64b3fff09",
+    "failed-game-costs-20261002/result.json": "ae50e4e12a8216d27559cc3ce7a4c3f421092429f1a5fa7eee22961b403ef817",
+    "oc4-claim-reconciliation-20261002/result.json": "bc7ec3c1398fac816a8bf0300e11870de24d0b2178f801a9550afd9378a46ec4",
+    "oc4-new-claim-safety-second-20261002/result.json": "6d381386a56208e68e5e3f6b9ce7fdecd1f17c5d600d0f7de3830c02847156f4",
+    "oc2-gateway-log-inspection-20261002/result.json": "848e5e9e40a22f123ea92660304123f5ff3fe0427fb3833d65269534d80f35e1"
+  },
+  "agent_cleanup": {
+    "hs2_and_hs3_started_without_replacement": true,
+    "public_artifact_hashes_verified": true,
+    "model_checks_passed": false,
+    "hs3_model_check_error": "INSTALL_RUNTIME_FAILED",
+    "all_ten_sleeping_observed": true,
+    "provider_error_statuses_cleared_by_start_sleep": true,
+    "original_failed_evidence_preserved": true
+  },
+  "native_history_inspection": {
+    "finished_at": "2026-10-02T21:48:37.781Z",
+    "status": "exact_session_mapping_unavailable",
+    "session_rows": 1,
+    "read_only_history_calls": 0,
+    "unknown_operations": 0,
+    "cleanup_confirmed": true,
+    "followup": {
+      "finished_at": "2026-10-02T21:56:06.293Z",
+      "inspection_status": "request_not_observed",
+      "original_unknown_not_reclassified": true,
+      "original_failure_cause": "UNIDENTIFIED",
+      "new_chats": 0,
+      "gameplay_requests": 0,
+      "original_evidence_unchanged": true,
+      "unknown_operations": 0,
+      "cleanup_confirmed": true,
+      "message_count": 59,
+      "exact_request_observed": false
+    }
+  },
+  "independent_audit": {
+    "verified_at": "2026-10-02T21:56:01.972Z",
+    "proof_complete": false,
+    "chain_issues": [
+      "PROOF_DEFAULTED_ACTIONS"
+    ],
+    "defaulted_count": 18,
+    "joined_count": 10,
+    "note": "Audit stopped on defaults; downstream unprocessed zero counters do not negate confirmed round 1 and 2 evidence."
+  },
+  "claims_cleanup_second": {
+    "started_at": "2026-10-02T21:58:48.215Z",
+    "hard_stop_at": "2026-10-02T22:25:00.000Z",
+    "finished_at": "2026-10-02T22:13:48.665Z",
+    "status": "stopped",
+    "complete": false,
+    "failure": {
+      "code": "CLAIMS_OPERATION_UNRESOLVED"
+    },
+    "uncertain": true,
+    "all_awards_claimed": false,
+    "all_seats_sleeping": true,
+    "lifecycle_confirmed": false,
+    "original_evidence_preserved": true,
+    "diagnostics_complete": true,
+    "diagnostic_count": 20,
+    "claims_confirmed": 7,
+    "unknown_claim_seat": "oc-4",
+    "unattempted_payable_seat": "oc-5",
+    "observation_is_final": true,
+    "claims": [
+      {
+        "seat_id": "hs-1",
+        "wallet_address": "0x6d241e69650c08c505ee19668cc251052e23056f",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0x2747ddef68de24978ea86fcb8ecfd18872e92874131ab8124f17d5ffe43fc9f7",
+        "receipt": {
+          "transaction_hash": "0x2747ddef68de24978ea86fcb8ecfd18872e92874131ab8124f17d5ffe43fc9f7",
+          "block_number": "47605145",
+          "block_hash": "0x29488b04d0823d7f891e98d36bf05861a5e03bd5e4fc3cbc6b1c4e0a05912d84",
+          "log_index": 17,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "hs-3",
+        "wallet_address": "0xc017b209745d18d1125bc56cbf9e7a1839bc46bd",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0x2b7c307054d8371a7457b786dfac77e4c490b8396aeb53d0533a3596abb6bdb1",
+        "receipt": {
+          "transaction_hash": "0x2b7c307054d8371a7457b786dfac77e4c490b8396aeb53d0533a3596abb6bdb1",
+          "block_number": "47605180",
+          "block_hash": "0x247fa127e3671d6a85b9603ffcc72bfc0af730d1ddbbd321833f0d5658b6dd46",
+          "log_index": 35,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "hs-4",
+        "wallet_address": "0xb4b27a75cae4167a849dbe87585f165f3a81af44",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0xcd70c33ef0b15fa2c8565aea15bc65aff9dddba8f965c0ea68eec10fd2026ae6",
+        "receipt": {
+          "transaction_hash": "0xcd70c33ef0b15fa2c8565aea15bc65aff9dddba8f965c0ea68eec10fd2026ae6",
+          "block_number": "47605213",
+          "block_hash": "0x4a7c6320cc577885072f8d41b60c056070e51b7786753f0bf86b8f07c40b9605",
+          "log_index": 22,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "hs-5",
+        "wallet_address": "0x77b468c94965557fdf59c15f132555bb128392a6",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0x21937c22b8489e0d4be62d4899c88f67fc49a314a4310d4b6b06b748523615a3",
+        "receipt": {
+          "transaction_hash": "0x21937c22b8489e0d4be62d4899c88f67fc49a314a4310d4b6b06b748523615a3",
+          "block_number": "47605246",
+          "block_hash": "0xb476e186de564dcd0e0e2e399fef55e7e698ca9ade6bd6e3b7155eb18fd28d4e",
+          "log_index": 10,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "oc-1",
+        "wallet_address": "0xb9dab46bcd953eb2a3ab4d49a11f800e6be5f356",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0xf4d57cf6e26e98022e8601f6b57e75bdc278ad88a5e578763812d50e33fb0c7d",
+        "receipt": {
+          "transaction_hash": "0xf4d57cf6e26e98022e8601f6b57e75bdc278ad88a5e578763812d50e33fb0c7d",
+          "block_number": "47605282",
+          "block_hash": "0x471ad4c2b459b79e76a458840a8130c7de513416c86e97d1952b9428e04c6ec8",
+          "log_index": 0,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "oc-2",
+        "wallet_address": "0x421bbbc3cc480147b2586f91b1d25b8bc817916b",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0xda3ac3dff6809aafe8b4aeac5acb3a3f00775016788a3d5fc50cd3c09b6ac30e",
+        "receipt": {
+          "transaction_hash": "0xda3ac3dff6809aafe8b4aeac5acb3a3f00775016788a3d5fc50cd3c09b6ac30e",
+          "block_number": "47605322",
+          "block_hash": "0xde62cacb00ca5dcb136191d594bb935febe3526ec5eef3d6c31ff2fac29a0e98",
+          "log_index": 24,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "oc-3",
+        "wallet_address": "0xad689b9d285593decd62b3a016ae91808f01228c",
+        "status": "submitted",
+        "chain_confirmed": true,
+        "transaction_hash": "0x93313a741243e108e70183255624942d379622d5bab359e1fb051ac28b471019",
+        "receipt": {
+          "transaction_hash": "0x93313a741243e108e70183255624942d379622d5bab359e1fb051ac28b471019",
+          "block_number": "47605357",
+          "block_hash": "0x174b5554d8006fb9fc0a919abb5c830d243b6ec7c988d7f0b2fd3509275c52fe",
+          "log_index": 27,
+          "amount_wei": "108900000000000"
+        }
+      },
+      {
+        "seat_id": "oc-4",
+        "wallet_address": "0x538f2aad18639ee4f479a54969c97767087cc794",
+        "status": "unknown",
+        "chain_confirmed": false,
+        "transaction_hash": null,
+        "receipt": null
+      }
+    ]
+  },
+  "final_observation": {
+    "observed_at": "2026-10-02T22:15:04.934Z",
+    "active_game_id": "0",
+    "remaining_awards": [
+      {
+        "wallet_address": "0x538f2Aad18639ee4f479a54969c97767087Cc794",
+        "award_wei": "108900000000000",
+        "claimed_wei": "0"
+      },
+      {
+        "wallet_address": "0xf979F1D771b762E177Fb1c86e9D8c4dff05982DA",
+        "award_wei": "108900000000000",
+        "claimed_wei": "0"
+      }
+    ],
+    "all_wallet_nonces_equal": true,
+    "oc4_latest_nonce": 8,
+    "oc4_pending_nonce": 8,
+    "operator_stopped": true,
+    "operator_records": 59,
+    "signer_lock_present": false,
+    "original_proof_evidence_unchanged": true
+  },
+  "measured_costs": {
+    "observed_at": "2026-10-02T22:14:54.631Z",
+    "coverage": "Known recorded transactions and all normalized canonical public event transactions. Unrecorded transactions are not inferred.",
+    "game": {
+      "period_start": "2026-10-02T20:29:14.000Z",
+      "period_end": "2026-10-02T21:16:58.000Z",
+      "transaction_count": 58,
+      "l2_execution_fee_wei": "6738007977000000",
+      "l1_fee_wei": "340291649878"
+    },
+    "settlement": {
+      "period_start": "2026-10-02T21:16:58.000Z",
+      "period_end": "2026-10-02T22:13:48.665Z",
+      "transaction_count": 7,
+      "l2_execution_fee_wei": "899391010000000",
+      "l1_fee_wei": "54182776559",
+      "complete": false
+    },
+    "provider_usage": {
+      "diagnostics": {
+        "complete": true,
+        "totals": {
+          "computeMinutes": 0,
+          "hostingCostCents": 0,
+          "llmCostCents": 23.540499999999998,
+          "totalCostCents": 23.540499999999998
+        }
+      },
+      "setup_and_verification": {
+        "complete": true,
+        "totals": {
+          "computeMinutes": 9.81,
+          "hostingCostCents": 0,
+          "llmCostCents": 0,
+          "totalCostCents": 0
+        }
+      },
+      "game": {
+        "complete": true,
+        "totals": {
+          "computeMinutes": 84.38,
+          "hostingCostCents": 0,
+          "llmCostCents": 57.75600000000001,
+          "totalCostCents": 57.75600000000001
+        }
+      },
+      "settlement": {
+        "complete": true,
+        "totals": {
+          "computeMinutes": 10.5,
+          "hostingCostCents": 0,
+          "llmCostCents": 69.3563,
+          "totalCostCents": 69.3563
+        }
+      }
+    },
+    "prior_setup_costs_known": false
+  },
+  "oc4_claim_reconciliation": {
+    "started_at": "2026-10-02T22:27:18.993Z",
+    "finished_at": "2026-10-02T22:27:52.691Z",
+    "status": "unclaimed_original_operation_unknown",
+    "original_request_status": "unknown",
+    "original_uncertainty_resolved": false,
+    "retry_allowed": false,
+    "unknown_operations": 0,
+    "journal": {
+      "schema_version": 1,
+      "journal_status": "missing",
+      "journal_stage": null,
+      "operation_matches": false,
+      "request_identity_matches": false,
+      "response_present": false,
+      "response_identity_matches": false,
+      "response_status": null,
+      "response_error_code": null,
+      "transaction_hash": null,
+      "execution_permit_required": true
+    },
+    "chain_before": {
+      "block_number": "47605875",
+      "block_hash": "0x79d6b3a9587dc779ed3021de2dfa4de55ea4268e2774fa41ce687bb09997c3d6",
+      "claimed_wei": "0",
+      "award_wei": "108900000000000",
+      "latest_nonce": 8,
+      "pending_nonce": 8,
+      "nonce_before": 8,
+      "nonce_unchanged": true,
+      "matching_claim_count": 0,
+      "claim": null
+    },
+    "chain_after": {
+      "block_number": "47605886",
+      "block_hash": "0x05cc7379a51f4d5031dafebd926cc3dda9faa0936819546a2d6d18e8f45204b7",
+      "claimed_wei": "0",
+      "award_wei": "108900000000000",
+      "latest_nonce": 8,
+      "pending_nonce": 8,
+      "nonce_before": 8,
+      "nonce_unchanged": true,
+      "matching_claim_count": 0,
+      "claim": null
+    },
+    "final_inventory": {
+      "all_ten_sleeping": true,
+      "account_awake": 0
+    },
+    "original_evidence_unchanged": true,
+    "lifecycle_cleanup_confirmed": true
+  },
+  "next_action": "Run full documented checks for the reviewed two-file historical scoreboard-default preflight correction, checkpoint it, then refresh the existing gates for a separate bounded 5v5 proof. Original Game19 remains failed.",
+  "oc4_new_invocation_observation": {
+    "finished_at": "2026-10-02T22:44:08.025Z",
+    "status": "new_invocation_preconditions_observed",
+    "continuity_policy": "observed-runtime-continuity-v1",
+    "remote_generation_attested": false,
+    "new_invocation_eligible": true,
+    "original_request_status": "unknown",
+    "original_uncertainty_resolved": false,
+    "retry_allowed": false,
+    "runtime": {
+      "schema_version": 1,
+      "observed_at_ms": 1790981036931,
+      "public_artifact_verified": true,
+      "public_artifact_file_count": 16,
+      "settings_verified": true,
+      "permit_checks": {
+        "identity": true,
+        "request_hash": true,
+        "artifact_hash": true,
+        "artifact_manifest": true,
+        "readiness_hash": true,
+        "times": true
+      },
+      "original_permit_verified": true,
+      "original_permit_status": "present",
+      "original_permit_fence_verified": true,
+      "original_permit_expired": true,
+      "original_permit_expires_at_ms": 1790979262433,
+      "prior_public_receipt_retained": true,
+      "claim_directory_present": true,
+      "seat_lock_absent": true,
+      "processes_before": {
+        "complete": true,
+        "matching_process_count": 0,
+        "matching_process_or_child_count": 0,
+        "vanished_during_scan": 0
+      },
+      "processes_after": {
+        "complete": true,
+        "matching_process_count": 0,
+        "matching_process_or_child_count": 0,
+        "vanished_during_scan": 0
+      },
+      "journal": {
+        "schema_version": 1,
+        "journal_status": "missing",
+        "journal_stage": null,
+        "operation_matches": false,
+        "request_identity_matches": false,
+        "response_present": false,
+        "response_identity_matches": false,
+        "response_status": null,
+        "response_error_code": null,
+        "transaction_hash": null,
+        "execution_permit_required": true
+      },
+      "new_invocation_checks_passed": true
+    },
+    "chain_before": {
+      "block_number": "47606363",
+      "block_hash": "0xc3de19153266153b436514ecb4769de127e3d6228d43f24d8ac40e12a8d2be5b",
+      "claimed_wei": "0",
+      "award_wei": "108900000000000",
+      "latest_nonce": 8,
+      "pending_nonce": 8,
+      "nonce_before": 8,
+      "nonce_unchanged": true,
+      "matching_claim_count": 0,
+      "claim": null
+    },
+    "chain_after": {
+      "block_number": "47606373",
+      "block_hash": "0x09413a19907fbb74250a58f33015fce27af642151595e7ceb7c18201e3c10d14",
+      "claimed_wei": "0",
+      "award_wei": "108900000000000",
+      "latest_nonce": 8,
+      "pending_nonce": 8,
+      "nonce_before": 8,
+      "nonce_unchanged": true,
+      "matching_claim_count": 0,
+      "claim": null
+    },
+    "final_inventory": {
+      "all_ten_sleeping": true,
+      "account_awake": 0
+    },
+    "unknown_operations": 0,
+    "original_evidence_unchanged": true,
+    "lifecycle_cleanup_confirmed": true,
+    "requires_fresh_readiness_and_chain_recheck": true
+  },
+  "gateway_log_inspection": {
+    "finished_at": "2026-10-02T22:45:23.301Z",
+    "inspection_status": "log_tail_inspected",
+    "original_unknown_not_reclassified": true,
+    "original_failure_cause": "UNIDENTIFIED",
+    "raw_output_retained": false,
+    "new_chats": 0,
+    "gameplay_requests": 0,
+    "original_evidence_unchanged": true,
+    "final_inventory": {
+      "all_ten_sleeping": true,
+      "account_awake": 0
+    },
+    "unknown_operations": 0,
+    "cleanup_confirmed": true,
+    "inspection_complete": true,
+    "coverage": {
+      "line_count": 49,
+      "truncated": false,
+      "earliest_timestamp": "2026-10-02T22:00:52.709Z",
+      "latest_timestamp": "2026-10-02T22:08:53.984Z",
+      "observed_timestamps_span_original_window": false,
+      "exact_request_present": false,
+      "exact_conversation_present": false
+    }
+  },
+  "metadata_repair": {
+    "checkpoint": "c9e62d5",
+    "scope": "Preserve allowlisted error metadata only; existing failure, ambiguity, retry, deadline and no-replay classifications unchanged",
+    "independently_reviewed": true,
+    "runner_defaults_passed": 564,
+    "unchanged_shared_and_site_passes": 199,
+    "total_default_checks_passed": 763,
+    "failures": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "original_game19_cause_recovered": false
+  },
+  "claims_cleanup_remaining": {
+    "started_at": "2026-10-02T22:54:54.047Z",
+    "finished_at": "2026-10-02T23:00:26.392Z",
+    "status": "claims-complete",
+    "complete": true,
+    "all_awards_claimed": true,
+    "all_seats_sleeping": true,
+    "lifecycle_confirmed": true,
+    "original_evidence_preserved": true,
+    "uncertain": false,
+    "failure": null,
+    "claims": [
+      {
+        "seat_id": "oc-4",
+        "wallet_address": "0x538f2aad18639ee4f479a54969c97767087cc794",
+        "expected_award_wei": "108900000000000",
+        "transaction_hash": "0x4a767d185d0f9f2a3e39346e6aea0cc097fe3afd03ba665ae40a09bfa911f15b",
+        "chain_confirmed": true,
+        "receipt": {
+          "transaction_hash": "0x4a767d185d0f9f2a3e39346e6aea0cc097fe3afd03ba665ae40a09bfa911f15b",
+          "block_number": "47606824",
+          "block_hash": "0xe355f4d81bb74049209c36762e1b82ebb1198c92ee07d4c009b015108ecbb522",
+          "log_index": 24,
+          "amount_wei": "108900000000000"
+        },
+        "finished_at": "2026-10-02T22:59:13.915Z"
+      },
+      {
+        "seat_id": "oc-5",
+        "wallet_address": "0xf979f1d771b762e177fb1c86e9d8c4dff05982da",
+        "expected_award_wei": "108900000000000",
+        "transaction_hash": "0x8dbcaed0acb16fb777aa759f54d83fe65181749f20d082b4668c8d39b4b0e7b5",
+        "chain_confirmed": true,
+        "receipt": {
+          "transaction_hash": "0x8dbcaed0acb16fb777aa759f54d83fe65181749f20d082b4668c8d39b4b0e7b5",
+          "block_number": "47606858",
+          "block_hash": "0xe8072b3e4128499685b4a50d4616b067156077f077a4b382d0676b9a62f38c82",
+          "log_index": 19,
+          "amount_wei": "108900000000000"
+        },
+        "finished_at": "2026-10-02T23:00:20.625Z"
+      }
+    ],
+    "original_unknown_replayed": false
+  },
+  "discussion_path_diagnostic": {
+    "started_at": "2026-10-02T23:00:43.465Z",
+    "finished_at": "2026-10-02T23:01:39.846Z",
+    "cutoff_at": "2026-10-02T23:04:59.862Z",
+    "status": "diagnostic-returned",
+    "diagnostic_complete": true,
+    "readiness_reused": true,
+    "nonces_unchanged": true,
+    "all_seats_sleeping": true,
+    "original_evidence_preserved": true,
+    "uncertain": false,
+    "failure": null,
+    "dispatch": {
+      "status": "validated",
+      "response_status": "observed",
+      "has_team_message": true,
+      "started_at": "2026-10-02T23:00:51.570Z",
+      "finished_at": "2026-10-02T23:01:34.386Z"
+    },
+    "new_games": 0,
+    "new_gameplay_permits": 0,
+    "telegram_publications": 0,
+    "original_unknown_resolved": false,
+    "helper_sha256": "1c6194f17aa4d8e35a6217e3639a93a6452daf9729e5151a46ef2f2fb70503f8"
+  },
+  "cleanup_and_diagnostic_independent_review": {
+    "reviewed_at": "2026-10-02T23:06:30Z",
+    "result": "PASS",
+    "reviewer": "m2_state_recovery",
+    "method": "Read-only local evidence review; no additional live calls",
+    "frozen_file_digests_verified": 25,
+    "readiness_diagnostic_inputs_verified": 20,
+    "complete_readiness_operations": 412,
+    "new_claims_confirmed_from_saved_canonical_evidence": 2,
+    "all_positive_awards_paid": 9,
+    "discussion_operations_returned": 21,
+    "discussion_chats": 1,
+    "runtime_read_execs": 18,
+    "nonces_unchanged": 11,
+    "historical_game19_proof_complete": false,
+    "original_failure_cause_recovered": false
+  }
+}

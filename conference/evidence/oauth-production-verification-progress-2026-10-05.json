@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-05T01:38:44.206Z",
+  "branch": "codex/converge-demo-2026-09-25",
+  "chain_id": 84532,
+  "runner_validation": {
+    "tests": 609,
+    "passed": 609,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "source_files_unchanged": 94
+  },
+  "production_diagnostics": {
+    "hermes_verified_requests": 10,
+    "hermes_verified_seats": 5,
+    "openclaw_chat_requests_forwarded": 0,
+    "all_ten_certified": false,
+    "actual_native_oauth": true,
+    "requested_and_returned_model": "gpt-6.1-sol",
+    "configured_reasoning": "low",
+    "configured_output_tokens": 2048,
+    "wire_output_cap_verified": false
+  },
+  "latest_attempt": {
+    "status": "stopped",
+    "failure": "READINESS_RUN_FAILED_SLEEP_UNCONFIRMED",
+    "claims_submitted": 0,
+    "original_all_seats_sleeping": false,
+    "original_report_preserved": true
+  },
+  "independent_reconciliation": {
+    "all_ten_sleeping": true,
+    "account_awake": 0,
+    "empty_activation_marker_digest_defect_reproduced": true,
+    "openclaw_1_and_2_selected_observer_absent": true,
+    "refresh_loss_cause_proven": false
+  },
+  "new_games_created": 0,
+  "new_game_creation_cutoff": "2026-10-05T01:15:00Z",
+  "hard_stop": "2026-10-05T02:00:00Z",
+  "game20_settlement_complete": false,
+  "milestones_complete": false,
+  "private_state_and_uncertain_requests_preserved": true
+}

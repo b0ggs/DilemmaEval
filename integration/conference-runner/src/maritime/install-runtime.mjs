@@ -5,10 +5,12 @@ import { spawn } from 'node:child_process';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HERMES_RUNTIME_IDENTITY, runtimeIdentityForSettings } from './runtime-identity.mjs';
+import { HERMES_OAUTH_PROFILE, updateHermesOAuthConfigText, inspectHermesOAuthConfigText } from './hermes-oauth.mjs';
+import { OPENCLAW_OAUTH_PROFILE, updateOpenClawOAuthConfigText, inspectOpenClawOAuthConfigText } from './openclaw-oauth.mjs';
 
 export const HERMES_TERMINAL_PASSTHROUGH_ENV = 'GAMEPLAY_WALLET_PRIVATE_KEY';
 export const REQUIRED_MODEL_PROFILE = Object.freeze({
-  model: 'gpt-5.4-mini', reasoning_effort: 'low', max_output_tokens: 2048,
+  model: 'gpt-6.1-sol', reasoning_effort: 'low', max_output_tokens: 2048,
   automatic_fallback: false, fallback_model: null, response_metadata_required: true
 });
 
@@ -78,72 +80,18 @@ function yamlList(value) {
   });
 }
 
-function configureHermesModelLines(lines) {
-  const modelKeys = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^model\s*:/.test(line));
-  if (modelKeys.length > 1) throw new Error('HERMES_MODEL_CONFIG_DUPLICATE');
-  let modelIndex, modelEnd;
-  if (modelKeys.length === 0) {
-    lines.unshift('model:', '  default: "gpt-5.4-mini"', '  model: "gpt-5.4-mini"',
-      '  reasoning_effort: "low"', '  max_tokens: 2048', '');
-    modelIndex = 0; modelEnd = 5;
-  } else {
-    modelIndex = modelKeys[0].index;
-    if (!/^model:\s*(?:#.*)?$/.test(lines[modelIndex])) throw new Error('HERMES_MODEL_CONFIG_NOT_MAPPING');
-    modelEnd = lines.length;
-    for (let index = modelIndex + 1; index < lines.length; index++) {
-      if (lines[index].trim() && !/^\s/.test(lines[index]) && !/^\s*#/.test(lines[index])) {
-        modelEnd = index; break;
-      }
-    }
-    const required = [
-      ['default', '  default: "gpt-5.4-mini"'],
-      ['model', '  model: "gpt-5.4-mini"'],
-      ['reasoning_effort', '  reasoning_effort: "low"'],
-      ['max_tokens', '  max_tokens: 2048']
-    ];
-    for (const [key, replacement] of required) {
-      const matches = [];
-      for (let index = modelIndex + 1; index < modelEnd; index++) {
-        if (new RegExp(`^\\s+${key}\\s*:`).test(lines[index])) matches.push(index);
-      }
-      if (matches.length > 1) throw new Error('HERMES_MODEL_CONFIG_DUPLICATE');
-      if (matches.length === 1) lines[matches[0]] = replacement;
-      else { lines.splice(modelEnd, 0, replacement); modelEnd++; }
-    }
-  }
-}
-
-function configureHermesAgentLines(lines) {
-  const agents = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^agent\s*:/.test(line));
-  if (agents.length > 1) throw new Error('HERMES_AGENT_CONFIG_DUPLICATE');
-  if (agents.length === 0) { lines.unshift('agent:', '  reasoning_effort: "low"', ''); return; }
-  const start = agents[0].index;
-  if (!/^agent:\s*(?:#.*)?$/.test(lines[start])) throw new Error('HERMES_AGENT_CONFIG_NOT_MAPPING');
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i++) {
-    if (lines[i].trim() && !/^\s/.test(lines[i]) && !/^\s*#/.test(lines[i])) { end = i; break; }
-  }
-  const matches = [];
-  for (let i = start + 1; i < end; i++) if (/^\s+reasoning_effort\s*:/.test(lines[i])) matches.push(i);
-  if (matches.length > 1) throw new Error('HERMES_AGENT_CONFIG_DUPLICATE');
-  if (matches.length === 1) lines[matches[0]] = '  reasoning_effort: "low"';
-  else lines.splice(start + 1, 0, '  reasoning_effort: "low"');
-}
-
 /** Conservatively edits the Hermes model mapping and terminal allowlist. */
 export function updateHermesConfigText(text) {
   if (typeof text !== 'string' || text.includes('\0')) throw new TypeError('HERMES_CONFIG_INVALID');
+  text = updateHermesOAuthConfigText(text);
   const finalNewline = text.endsWith('\n');
   const lines = text.split('\n');
   if (finalNewline) lines.pop();
   if (lines.length === 1 && lines[0] === '') lines.pop();
   if (lines.some(line => /^\s*\t|^ *\t/.test(line))) throw new Error('HERMES_CONFIG_TABS_REJECTED');
-  configureHermesAgentLines(lines);
-  configureHermesModelLines(lines);
   const terminalKeys = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^terminal\s*:/.test(line));
   if (terminalKeys.length > 1) throw new Error('HERMES_TERMINAL_CONFIG_DUPLICATE');
   if (terminalKeys.length === 0) {
-    if (lines.length && lines.at(-1) !== '') lines.push('');
     lines.push('terminal:', '  env_passthrough:', `    - ${HERMES_TERMINAL_PASSTHROUGH_ENV}`);
     return `${lines.join('\n')}\n`;
   }
@@ -422,14 +370,6 @@ export async function configureHermesHarness(settings) {
   // Hermes can rematerialize its volume without the seat-private directory;
   // recreate only this validated path before the ownership inspection.
   await preparePrivateStateDirectory(settings);
-  const runtimeSourcePath = '/opt/hermes/run_agent.py';
-  const runtimeSource = await readFile(runtimeSourcePath, 'utf8');
-  const patchedRuntimeSource = updateHermesMiniResponsesText(runtimeSource);
-  if (patchedRuntimeSource !== runtimeSource) {
-    await writeFile(runtimeSourcePath, patchedRuntimeSource, 'utf8');
-    const runtimeHandle = await open(runtimeSourcePath, 'r');
-    try { await runtimeHandle.sync(); } finally { await runtimeHandle.close(); }
-  }
   const path = hermesConfigPath(settings);
   await configureHermesTerminalEnvPassthrough(path);
   return { schema_version: 1, seat_id: settings.seat_id,
@@ -438,43 +378,13 @@ export async function configureHermesHarness(settings) {
 }
 
 export function updateOpenClawConfigText(text) {
-  let value;
-  try { value = text.trim() ? JSON.parse(text) : {}; }
-  catch { throw new Error('OPENCLAW_CONFIG_INVALID'); }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('OPENCLAW_CONFIG_INVALID');
-  value.agents ??= {};
-  value.agents.defaults ??= {};
-  if (typeof value.agents !== 'object' || Array.isArray(value.agents) ||
-      typeof value.agents.defaults !== 'object' || Array.isArray(value.agents.defaults)) {
-    throw new Error('OPENCLAW_CONFIG_INVALID');
-  }
-  const defaults = value.agents.defaults;
-  defaults.model = { ...(defaults.model && typeof defaults.model === 'object' && !Array.isArray(defaults.model) ?
-    defaults.model : {}), primary: 'openai/gpt-5.4-mini', fallbacks: [] };
-  defaults.thinkingDefault = 'low';
-  defaults.models = { ...(defaults.models && typeof defaults.models === 'object' && !Array.isArray(defaults.models) ? defaults.models : {}) };
-  const selected = defaults.models['openai/gpt-5.4-mini'];
-  defaults.models['openai/gpt-5.4-mini'] = {
-    ...(selected && typeof selected === 'object' && !Array.isArray(selected) ? selected : {}),
-    params: { ...(selected?.params && typeof selected.params === 'object' && !Array.isArray(selected.params) ? selected.params : {}), maxTokens: 2048 }
-  };
-  if (defaults.params && typeof defaults.params === 'object' && !Array.isArray(defaults.params)) {
-    const { maxTokens, ...rest } = defaults.params;
-    defaults.params = rest;
-  }
-  delete defaults.maxOutputTokens;
-  return `${JSON.stringify(value, null, 2)}\n`;
+  if (typeof text !== 'string') throw new Error('OPENCLAW_CONFIG_INVALID');
+  return updateOpenClawOAuthConfigText(text.trim() ? text : '{}');
 }
 
 export function inspectOpenClawConfigText(text) {
-  let value;
-  try { value = JSON.parse(text); } catch { throw new Error('MODEL_CONFIG_INVALID'); }
-  const defaults = value?.agents?.defaults;
-  if (defaults?.model?.primary !== 'openai/gpt-5.4-mini' || !Array.isArray(defaults.model.fallbacks) ||
-      defaults.model.fallbacks.length !== 0 || defaults.thinkingDefault !== 'low' ||
-      defaults.models?.['openai/gpt-5.4-mini']?.params?.maxTokens !== 2048 || 'maxOutputTokens' in (defaults ?? {})) {
-    throw new Error('MODEL_CONFIG_INVALID');
-  }
+  try { inspectOpenClawOAuthConfigText(text); }
+  catch { throw new Error('MODEL_CONFIG_INVALID'); }
   return { ...REQUIRED_MODEL_PROFILE };
 }
 
@@ -536,36 +446,32 @@ export async function inspectModel(settings) {
     configured: true, ...profile };
 }
 
-/** Inspect only the selected route. Never return configuration or env values. */
+/** Configuration/environment evidence only; this does not certify a native call. */
 export async function inspectModelRoute(settings, { env = process.env, readFileImpl = readFile } = {}) {
-  const endpoint = 'https://api.maritime.sh/api/llm/v1';
+  const endpoint = HERMES_OAUTH_PROFILE.endpoint;
   const reject = () => { throw new Error('READINESS_MODEL_ROUTE_UNVERIFIED'); };
   try {
-    for (const key of ['OPENAI_BASE_URL','OPENAI_API_BASE']) if (env[key] !== undefined && env[key] !== endpoint) reject();
+    for (const key of ['OPENAI_API_KEY', 'CODEX_API_KEY']) {
+      if (env[key] !== undefined && env[key] !== '') reject();
+    }
+    for (const key of ['OPENAI_BASE_URL', 'OPENAI_API_BASE']) {
+      if (env[key] !== undefined && env[key] !== endpoint) reject();
+    }
     if (settings.harness === 'openclaw') {
-      const config = JSON.parse(await readFileImpl(openClawConfigPath(settings),'utf8'));
-      if (config.agents?.defaults?.model?.primary !== 'openai/gpt-5.4-mini' ||
-          config.models?.providers?.openai?.baseUrl !== endpoint) reject();
+      const profile = inspectOpenClawOAuthConfigText(await readFileImpl(openClawConfigPath(settings), 'utf8'));
+      if (profile.provider !== OPENCLAW_OAUTH_PROFILE.provider || profile.endpoint !== endpoint) reject();
     } else if (settings.harness === 'hermes') {
-      const lines = (await readFileImpl(hermesConfigPath(settings),'utf8')).split(/\r?\n/);
-      const indices = lines.map((line,index) => /^model\s*:/.test(line) ? index : -1).filter(index => index >= 0);
-      if (indices.length !== 1 || !/^model:\s*(?:#.*)?$/.test(lines[indices[0]])) reject();
-      let end = indices[0]+1;
-      while (end < lines.length && (!lines[end].trim() || /^\s|^#/.test(lines[end]))) end++;
-      const block = lines.slice(indices[0]+1,end);
-      const scalar = key => {
-        const matches = block.filter(line => new RegExp(`^\\s+${key}\\s*:`).test(line));
-        if (matches.length !== 1 || !new RegExp(`^  ${key}:`).test(matches[0])) reject();
-        const raw = matches[0].replace(new RegExp(`^  ${key}:\\s*`),'').trim();
-        if (raw.startsWith('"')) return JSON.parse(raw);
-        if (raw.startsWith("'")) { if (!/^'[^']*'$/.test(raw)) reject(); return raw.slice(1,-1); }
-        if (/[\s#&*!{}[\]]/.test(raw)) reject();
-        return raw;
-      };
-      if (scalar('provider') !== 'openai' || scalar('base_url') !== endpoint) reject();
+      const expectedEnv = { HERMES_INFERENCE_PROVIDER: HERMES_OAUTH_PROFILE.provider,
+        HERMES_TUI_PROVIDER: HERMES_OAUTH_PROFILE.provider, HERMES_INFERENCE_MODEL: HERMES_OAUTH_PROFILE.model,
+        HERMES_TUI_MODEL: HERMES_OAUTH_PROFILE.model, HERMES_CODEX_BASE_URL: endpoint };
+      for (const [key, expected] of Object.entries(expectedEnv)) {
+        if (env[key] !== undefined && env[key] !== expected) reject();
+      }
+      const profile = inspectHermesOAuthConfigText(await readFileImpl(hermesConfigPath(settings), 'utf8'));
+      if (profile.provider !== HERMES_OAUTH_PROFILE.provider || profile.endpoint !== endpoint) reject();
     } else reject();
   } catch { reject(); }
-  return { schema_version:1,seat_id:settings.seat_id,model_route_verified:true };
+  return { schema_version: 1, seat_id: settings.seat_id, model_route_verified: true };
 }
 
 export async function installRuntime(settingsPath) {
@@ -620,7 +526,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(async settings => ({
       schema_version: 1, seat_id: settings.seat_id,
       ...await inspectHermesTerminalEnvPassthrough(hermesConfigPath(settings)),
-      ...await inspectHermesMiniResponses(settings),
       ...await inspectHermesPrivateState(settings)
     })) : process.argv[2] === '--configure-hermes-config' ?
       readFile(process.argv[3], 'utf8').then(text => JSON.parse(text)).then(configureHermesHarness) :

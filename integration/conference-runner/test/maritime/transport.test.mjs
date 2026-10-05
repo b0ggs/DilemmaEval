@@ -253,7 +253,7 @@ function diagnosticReply(request) {
 
 function modelConfigurationEvidence(seat) {
   return { schema_version: 1, seat_id: seat.seat_id, harness: seat.harness, configured: true,
-    model: 'gpt-5.4-mini', reasoning_effort: 'low', max_output_tokens: 2048,
+    model: 'gpt-6.1-sol', reasoning_effort: 'low', max_output_tokens: 2048,
     automatic_fallback: false, fallback_model: null, response_metadata_required: true };
 }
 

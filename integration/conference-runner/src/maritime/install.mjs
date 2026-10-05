@@ -10,7 +10,7 @@ import { HERMES_RUNTIME_IDENTITY } from './runtime-identity.mjs';
 
 const SOURCE_FILES = [
   'game-bridge/src/index.js', 'shared/runtime-source.json', 'maritime-transport/src/validation.mjs',
-  ...['protocol.mjs', 'roster.mjs', 'runtime-identity.mjs', 'diagnostics.mjs', 'diagnostic-receipt.mjs', 'execution-permit.mjs', 'player-runtime.mjs', 'player-cli.mjs', 'install-runtime.mjs']
+  ...['protocol.mjs', 'roster.mjs', 'runtime-identity.mjs', 'diagnostics.mjs', 'diagnostic-receipt.mjs', 'execution-permit.mjs', 'player-runtime.mjs', 'player-cli.mjs', 'install-runtime.mjs', 'openclaw-oauth.mjs', 'hermes-oauth.mjs']
     .map(file => `conference-runner/src/maritime/${file}`)
 ];
 const MAX_ARTIFACT_HASH_OUTPUT_BYTES = 131_072;
@@ -209,7 +209,7 @@ export function createMaritimeInstaller({ apiKey, fetchImpl = globalThis.fetch, 
     await verifyRemoteArtifact(artifact, prefix);
     const result = await request({ path: `${prefix}/exec`, method: 'POST', body: { command, timeout: 30 } });
     let evidence; try { evidence = JSON.parse(result?.stdout); } catch { throw new MaritimeAdapterError(code); }
-    if (result?.exitCode !== 0 || evidence?.configured !== true || evidence.model !== 'gpt-5.4-mini' ||
+    if (result?.exitCode !== 0 || evidence?.configured !== true || evidence.model !== 'gpt-6.1-sol' ||
         evidence.reasoning_effort !== 'low' || evidence.max_output_tokens !== 2048 ||
         evidence.automatic_fallback !== false || evidence.fallback_model !== null ||
         evidence.response_metadata_required !== true) throw new MaritimeAdapterError(code);

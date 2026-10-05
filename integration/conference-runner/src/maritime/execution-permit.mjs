@@ -10,7 +10,8 @@ import { deriveEthereumAddress } from '../../../game-bridge/src/index.js';
 const HEX = /^[0-9a-f]{64}$/;
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const MAX_PERMIT_MS = 300_000;
-const MODEL = Object.freeze({ model_endpoint:'https://api.maritime.sh/api/llm/v1', model:'gpt-5.4-mini',
+// max_output_tokens records configured policy, not an observed wire cap.
+const MODEL = Object.freeze({ model_endpoint:'https://chatgpt.com/backend-api/codex', model:'gpt-6.1-sol',
   reasoning_effort:'low', max_output_tokens:2048, automatic_fallback:false });
 const KEYS = ['schema_version','type','request_id','request_sha256','seat_id','agent_id','team','harness',
   'wallet_address','chain_id','game_address','game_id','round','phase','requested_action','readiness_evidence_sha256',

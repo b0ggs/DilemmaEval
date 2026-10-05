@@ -66,7 +66,7 @@ async function setup({ unrelated = [], inventory, chat, sleep, timeoutMs = 1000 
       if (command.includes('--configure-model')) {
         call.kind = 'model-config';
         return jsonResponse({ exitCode: 0, stderr: '', stdout: JSON.stringify({
-          schema_version: 1, seat_id: seat.seat_id, harness: seat.harness, configured: true, model: 'gpt-5.4-mini',
+          schema_version: 1, seat_id: seat.seat_id, harness: seat.harness, configured: true, model: 'gpt-6.1-sol',
           reasoning_effort: 'low', max_output_tokens: 2048, automatic_fallback: false,
           fallback_model: null, response_metadata_required: true
         }) });

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "type": "live-serial-readiness-timing-bound",
+  "observed_at": "2026-10-02T19:00:33Z",
+  "source_journal_snapshot_sha256": "6ef24ba386215224069ccdc9352052213fc9b3b7bfafe63228cc0e60c09247c9",
+  "run_status": "running",
+  "run_elapsed_ms": 387000,
+  "readiness_lifetime_ms": 600000,
+  "remaining_diagnostic_activation_settles": 5,
+  "required_later_all_ten_verification_passes": 2,
+  "later_verification_activation_settles": 20,
+  "activation_settle_ms": 10000,
+  "minimum_creation_elapsed_ms": 637000,
+  "serial_window_cannot_fit": true,
+  "bound_excludes_all_remaining_network_model_io_time": true,
+  "completed_native_chats": 10,
+  "completed_sleeps": 5,
+  "final_run": {
+    "status": "failed",
+    "final_journal_sha256": "090f750cccfe2d0407ac17b7f433a3bb40ff12ac2919122331c5c75639dbafce",
+    "started_at_ms": 1790967246124,
+    "last_operation_completed_at_ms": 1790967701111,
+    "diagnostic_chats_returned": 12,
+    "successful_diagnostic_validations": 11,
+    "failed_operations": [
+      {
+        "sequence": 236,
+        "kind": "diagnostic-validation",
+        "seat_id": "oc-1",
+        "status": "unknown",
+        "started_at_ms": 1790967684048,
+        "completed_at_ms": 1790967695550,
+        "error_code": "READINESS_OPERATION_FAILED",
+        "ambiguous": true
+      }
+    ],
+    "cleanup_sleeps_returned": 6,
+    "all_seats_sleeping_certified": false,
+    "readiness_evidence_published": false,
+    "transactions": 0,
+    "telegram_messages": 0
+  }
+}

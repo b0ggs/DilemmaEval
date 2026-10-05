@@ -19,6 +19,8 @@ const RUNTIME_FINGERPRINT_SOURCES = [
   './maritime/roster.mjs',
   './maritime/runtime-identity.mjs',
   './maritime/install-runtime.mjs',
+  './maritime/openclaw-oauth.mjs',
+  './maritime/hermes-oauth.mjs',
   '../../game-bridge/src/index.js',
   '../../maritime-transport/src/validation.mjs',
   '../../shared/runtime-source.json'
@@ -149,7 +151,8 @@ export function validateControlledRuntimeEvidence(config,evidence,{
         row.final_agent_status!=='sleeping'||row.sleep_confirmed!==true||row.lifecycle_ambiguous!==false) {
       throw new Error('RUNTIME_LIFECYCLE_EVIDENCE_REQUIRED');
     }
-    if(row.model_profile?.model_endpoint!=='https://api.maritime.sh/api/llm/v1'||row.model_profile.model!=='gpt-5.4-mini'||
+    // max_output_tokens is the configured policy, not an observed wire cap.
+    if(row.model_profile?.model_endpoint!=='https://chatgpt.com/backend-api/codex'||row.model_profile.model!=='gpt-6.1-sol'||
         row.model_profile.reasoning_effort!=='low'||row.model_profile.max_output_tokens!==2048||
         row.model_profile.automatic_fallback!==false)throw new Error('RUNTIME_MODEL_PROFILE_UNVERIFIED');
     const gameplay=validateDiagnosticResult(row.diagnostics?.gameplay_input,seat,'gameplay-input');
@@ -247,7 +250,7 @@ export function validateRuntimeEvidence(config,evidence) {
   for(const seat of config.roster){
     const row=evidence.seats?.find(s=>s.seat_id===seat.seat_id&&s.agent_id===seat.agent_id);
     for(const key of ['tool_execution_verified','persistent_bundles_verified','spectator_access_blocked','wallet_identity_verified'])if(row?.[key]!==true)throw new Error(`RUNTIME_${key.toUpperCase()}_REQUIRED`);
-    if(row.model_endpoint!=='https://api.maritime.sh/api/llm/v1'||row.model!=='gpt-5.4-mini')throw new Error('RUNTIME_MODEL_PROFILE_UNVERIFIED');
+    if(row.model_endpoint!=='https://chatgpt.com/backend-api/codex'||row.model!=='gpt-6.1-sol')throw new Error('RUNTIME_MODEL_PROFILE_UNVERIFIED');
   }
   return evidence;
 }

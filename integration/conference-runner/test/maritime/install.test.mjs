@@ -37,5 +37,12 @@ test('installed instructions and harness recipe agree on team payout without cha
     assert.equal(artifact.artifact_sha256, createHash('sha256').update(
       JSON.stringify(artifact.files.map(({ path, sha256 }) => ({ path, sha256 })))).digest('hex'));
     assert.equal(artifact.files.some(file => file.path.includes('/private/')), false);
+    for (const module of ['hermes-oauth.mjs', 'openclaw-oauth.mjs']) {
+      const dependency = artifact.files.find(file => file.path.endsWith('/maritime/' + module));
+      assert.ok(dependency, 'installed runtime dependency ' + module);
+      assert.equal(dependency.sha256, createHash('sha256').update(dependency.content).digest('hex'));
+    }
+    assert.equal(installedRecipe.model_profile.primary_model, 'gpt-6.1-sol');
+    assert.equal(installedRecipe.model_profile.endpoint, 'https://chatgpt.com/backend-api/codex');
   }
 });

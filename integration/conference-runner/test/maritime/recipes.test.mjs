@@ -22,9 +22,11 @@ test('both harness recipes target summed confirmed team awards with player decis
   }
 });
 
-test('team instructions retain the existing mini model configuration and frozen game network', () => {
+test('team instructions select authorized OAuth Sol configuration and retain the frozen game network', () => {
   for (const recipe of [OPENCLAW_RECIPE, HERMES_RECIPE]) {
-    assert.equal(recipe.model_profile.primary_model, 'gpt-5.4-mini');
+    assert.equal(recipe.model_profile.provider, 'chatgpt-oauth');
+    assert.equal(recipe.model_profile.endpoint, 'https://chatgpt.com/backend-api/codex');
+    assert.equal(recipe.model_profile.primary_model, 'gpt-6.1-sol');
     assert.equal(recipe.model_profile.fallback_model, null);
     assert.equal(recipe.model_profile.automatic_fallback, false);
     assert.equal(recipe.model_profile.reasoning_effort, 'low');

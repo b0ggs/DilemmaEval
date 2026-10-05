@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-02T20:03:52.234398+00:00",
+  "source_checkpoint": "942ff11",
+  "milestone": "M1 complete; M3 attempt stopped",
+  "readiness": {
+    "diagnostic_chats": 20,
+    "diagnostic_validations": 20,
+    "operations": 412,
+    "all_operations_complete": true,
+    "all_seats_sleeping": true,
+    "evidence_sha256": "46bb89421e95af590176e2ad3480a7293818bad18b7d230753d5dda5a1392d5b",
+    "evidence_file_sha256": "6c935cf5d478bf926ec9927cf96ce8423f77ba896252a2d322f81ca2a7dcb466",
+    "journal_file_sha256": "882863791deb5e48852c31ed571abc3996b7eebcdee5fd176e2375a8550d4bb1"
+  },
+  "continuity_passes": [
+    {
+      "sha256": "17d22a375e114735f836940ba70fec8921098f98de2b2f4d7b89e6fa0d07b551",
+      "status": "complete",
+      "operations": 182,
+      "all_operations_complete": true
+    },
+    {
+      "sha256": "05f359246cfe4957e242bc333a1b8f6037cc65a0917af57b7a19669b42bfdc73",
+      "status": "complete",
+      "operations": 182,
+      "all_operations_complete": true
+    }
+  ],
+  "game_id": "18",
+  "creation_transaction": "0xc64139a63aa7ff6e94cec76917444ade19817ea66b915cbebfca755d076b7e5d",
+  "creation_block": "47601441",
+  "creation_accepted": true,
+  "created_within_original_window": true,
+  "agent_dispatches": 0,
+  "observed_players": 0,
+  "proof_complete": false,
+  "failure_code": "PROOF_RUNNER_HEALTH_BLOCKED",
+  "saved_runner_health_codes": [
+    "LAUNCH_PENDING"
+  ],
+  "report_file_sha256": "2bf7947f1a061e0d93c40c998b81fdfecb4b4920d765edacc2581ec682b700c1",
+  "launch_fuse_file_sha256": "1d22a4c4737c4eb6e97426fc4049bf3459cbb8479ae937b148e9f01b8d3f4a20",
+  "cleanup": {
+    "cancelled": true,
+    "transaction_hash": "0x5efa9d10eb687ea5d93e2be247c8ed976ed1e37a13cd442e160b89cdb096256d",
+    "confirmed_at": "2026-10-02T20:09:18.696Z",
+    "active_game_id": "0",
+    "players": 0,
+    "refunds_required": 0,
+    "telegram": {
+      "sent": 2,
+      "pending": 0,
+      "uncertain": 0,
+      "rejected": 0,
+      "pins_verified": true,
+      "completed_games": 0,
+      "cancelled_games": 2
+    },
+    "final_inventory": {
+      "all_ten_sleeping": true,
+      "account_awake": 0
+    },
+    "observed_at": "2026-10-02T20:09:44.739Z",
+    "operator_stopped": true,
+    "independent_local_review": "passed: cancellation/outbox acknowledgments/pins/ledger/operator/old diagnostic digests consistent",
+    "owner_records_confirmed": 49,
+    "owner_journal_sha256": "49bc2a1694e5f04bfa610c79abb6894ee27f4265ad3f9759214fa54f68b1472b",
+    "cancellation_message_ids": {
+      "openclaw": 27,
+      "hermes": 27
+    }
+  }
+}

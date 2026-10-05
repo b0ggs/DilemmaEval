@@ -500,7 +500,7 @@ function validateModelConfigurationResult(result, seat, apiKey) {
     'reasoning_effort', 'response_metadata_required', 'schema_version', 'seat_id'];
   if (!value || Object.keys(value).sort().join('\0') !== expected.sort().join('\0') || value.schema_version !== 1 ||
       value.seat_id !== seat.seat_id || value.harness !== seat.harness || value.configured !== true ||
-      value.model !== 'gpt-5.4-mini' || value.reasoning_effort !== 'low' || value.max_output_tokens !== 2048 ||
+      value.model !== 'gpt-6.1-sol' || value.reasoning_effort !== 'low' || value.max_output_tokens !== 2048 ||
       value.automatic_fallback !== false || value.fallback_model !== null || value.response_metadata_required !== true) {
     throw new MaritimeAdapterError('MODEL_CONFIG_UPDATE_OUTCOME_UNKNOWN', { ambiguous: true });
   }

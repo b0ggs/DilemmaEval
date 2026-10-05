@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {diagnosticReceiptPath,writeDiagnosticReceipt,validateDiagnosticReceipt,
   buildDiagnosticReceiptReadCommand} from '../../src/maritime/diagnostic-receipt.mjs';
 import {buildRuntimeDiagnosticArtifact,stagePublicRequest} from '../../src/maritime/transport.mjs';
-import {inspectModelRoute,updateOpenClawConfigText} from '../../src/maritime/install-runtime.mjs';
+import {inspectModelRoute,updateOpenClawConfigText,updateHermesConfigText} from '../../src/maritime/install-runtime.mjs';
 import {config,roster} from './fixtures.mjs';
 
 function diagnostic(seat=roster[0]) {
@@ -68,18 +68,32 @@ test('operator staging prepares Hermes diagnostic receipt directory for UID10000
   assert.equal(await fs.readFile(join(root,'private','preserved'),'utf8'),'fixture');
 });
 
-test('selected runtime route must match actual config and native environment without exposing either',async()=>{
-  const endpoint='https://api.maritime.sh/api/llm/v1';
+test('selected OAuth route must match config and the executing environment without exposing either',async()=>{
+  const endpoint='https://chatgpt.com/backend-api/codex';
   for(const harness of ['openclaw','hermes']) {
     const seat_id=harness==='openclaw'?'oc-1':'hs-1';
     const settings={harness,seat_id,persistent_root:'/volume',openclaw_config_path:'/volume/.openclaw/openclaw.json',
       hermes_config_path:'/volume/config.yaml',runtime_identity:{uid:10000,gid:10000}};
-    const make=route=>harness==='openclaw'?JSON.stringify({...JSON.parse(updateOpenClawConfigText('{}')),
-      models:{providers:{openai:{baseUrl:route}}}}):`model:\n  provider: "openai"\n  base_url: "${route}"\n`;
+    const make=route=>{
+      if(harness==='hermes')return updateHermesConfigText('').replace(endpoint,route);
+      const config=JSON.parse(updateOpenClawConfigText('{}'));
+      config.models.providers.openai.baseUrl=route;
+      return JSON.stringify(config);
+    };
     assert.deepEqual(await inspectModelRoute(settings,{env:{OPENAI_BASE_URL:endpoint},readFileImpl:async()=>make(endpoint)}),
       {schema_version:1,seat_id,model_route_verified:true});
-    for(const [text,env] of [[make('https://different.invalid'),{}],[make(endpoint),{OPENAI_BASE_URL:'https://different.invalid'}],
-      [harness==='hermes'?`${make(endpoint)}  base_url: "${endpoint}"\n`:'{}',{}]]) {
+    const rejected=[[make('https://different.invalid'),{}],
+      [make(endpoint),{OPENAI_BASE_URL:'https://api.maritime.sh/api/llm/v1'}],
+      [make(endpoint),{OPENAI_API_BASE:'https://different.invalid'}],
+      [make(endpoint),{OPENAI_API_KEY:'selected-api-fixture'}],
+      [make(endpoint),{CODEX_API_KEY:'selected-api-fixture'}],
+      [harness==='hermes'?make(endpoint).replace('model:\n','model:\n  base_url: "'+endpoint+'"\n'):'{}',{}]];
+    if(harness==='hermes')rejected.push([make(endpoint),{HERMES_INFERENCE_PROVIDER:'openai'}],
+      [make(endpoint),{HERMES_INFERENCE_MODEL:'gpt-5.4-mini'}],
+      [make(endpoint),{HERMES_TUI_PROVIDER:'openai'}],
+      [make(endpoint),{HERMES_TUI_MODEL:'gpt-5.4-mini'}],
+      [make(endpoint),{HERMES_CODEX_BASE_URL:'https://different.invalid'}]);
+    for(const [text,env] of rejected) {
       await assert.rejects(inspectModelRoute(settings,{env,readFileImpl:async()=>text}),error=>
         error.message==='READINESS_MODEL_ROUTE_UNVERIFIED'&&!error.cause);
     }

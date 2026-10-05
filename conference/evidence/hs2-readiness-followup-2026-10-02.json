@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "type": "hs2-readiness-blocker-followup",
+  "date": "2026-10-02",
+  "authorization": "User directed continuation of the existing three milestones without repeated routine approvals.",
+  "scope": {
+    "existing_seat": "hs-2",
+    "new_agents": 0,
+    "model_changes": 0,
+    "native_diagnostic_chats": 0,
+    "signatures": 0,
+    "transactions": 0,
+    "telegram_messages": 0
+  },
+  "observations": [
+    {
+      "case": "model-cause",
+      "started_at": "2026-10-02T18:31:28.765Z",
+      "finished_at": "2026-10-02T18:31:37.675Z",
+      "result_sha256": "d4802c578b1778e8dc3acc03ff88b893c9439a7aa3ecd3fb947194fb0102bee2",
+      "public_hashes_verified": true,
+      "model_verified": false,
+      "model_route_verified": false,
+      "sleep_response_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "final_inventory": {
+        "observed_at": "2026-10-02T18:31:37.674Z",
+        "account_count": 10,
+        "awake_count": 0,
+        "unrelated_awake_count": 0,
+        "seats": [
+          {
+            "seat_id": "hs-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-5",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-5",
+            "status": "sleeping"
+          }
+        ],
+        "all_ten_observed_sleeping": true
+      },
+      "unconfirmed_request": false,
+      "probe_summary": {
+        "exit_code": 1,
+        "stdout_present": true,
+        "stderr_present": false,
+        "stdout_bytes": 108,
+        "stderr_bytes": 0,
+        "stdout_json_valid": true,
+        "probe_ok": false,
+        "step": "inspect-model",
+        "error_code": "MODEL_CONFIG_INVALID"
+      },
+      "failure": {
+        "error_code": "INSPECTION_EXEC_INVALID",
+        "ambiguous": true
+      },
+      "activation_settle_ms": 0
+    },
+    {
+      "case": "reload-without-settle",
+      "started_at": "2026-10-02T18:37:04.281Z",
+      "finished_at": "2026-10-02T18:37:22.212Z",
+      "result_sha256": "b3922dde54e47bb0a89ede96582d853710deebabb0a9226dbb6dfc6f28bd5275",
+      "public_hashes_verified": false,
+      "model_verified": false,
+      "model_route_verified": false,
+      "sleep_response_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "final_inventory": {
+        "observed_at": "2026-10-02T18:37:22.211Z",
+        "account_count": 10,
+        "awake_count": 0,
+        "unrelated_awake_count": 0,
+        "seats": [
+          {
+            "seat_id": "hs-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-5",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-5",
+            "status": "sleeping"
+          }
+        ],
+        "all_ten_observed_sleeping": true
+      },
+      "unconfirmed_request": true,
+      "probe_summary": null,
+      "failure": {
+        "error_code": "MARITIME_HTTP_502",
+        "ambiguous": true
+      },
+      "activation_settle_ms": 0
+    },
+    {
+      "case": "reload-with-settle-and-required-config-repair",
+      "started_at": "2026-10-02T18:39:36.108Z",
+      "finished_at": "2026-10-02T18:40:05.887Z",
+      "result_sha256": "ba930322dbc22be9ccbc7cc3463ef4b9fd67677d4d21dc3f33b6df862c0b49c5",
+      "public_hashes_verified": true,
+      "model_verified": true,
+      "model_route_verified": true,
+      "sleep_response_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "final_inventory": {
+        "observed_at": "2026-10-02T18:40:05.884Z",
+        "account_count": 10,
+        "awake_count": 0,
+        "unrelated_awake_count": 0,
+        "seats": [
+          {
+            "seat_id": "hs-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-5",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-5",
+            "status": "sleeping"
+          }
+        ],
+        "all_ten_observed_sleeping": true
+      },
+      "unconfirmed_request": false,
+      "probe_summary": {
+        "exit_code": 0,
+        "stdout_present": true,
+        "stderr_present": false,
+        "stdout_bytes": 275,
+        "stderr_bytes": 0,
+        "stdout_json_valid": true,
+        "probe_ok": true,
+        "configuration_changed": true,
+        "changed_categories": [
+          "max_tokens",
+          "reasoning_effort",
+          "required-section",
+          "terminal-env-passthrough",
+          "whitespace"
+        ],
+        "unrelated_config_preserved": true
+      },
+      "failure": null,
+      "activation_settle_ms": 10000
+    },
+    {
+      "case": "ordinary-resume-with-settle",
+      "started_at": "2026-10-02T18:40:55.435Z",
+      "finished_at": "2026-10-02T18:41:15.184Z",
+      "result_sha256": "ccf147c928c3701cb6ae78d140ee36e6326618dde8135dafe8632f30a4579d18",
+      "public_hashes_verified": true,
+      "model_verified": true,
+      "model_route_verified": true,
+      "sleep_response_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "final_inventory": {
+        "observed_at": "2026-10-02T18:41:15.183Z",
+        "account_count": 10,
+        "awake_count": 0,
+        "unrelated_awake_count": 0,
+        "seats": [
+          {
+            "seat_id": "hs-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "hs-5",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-1",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-2",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-3",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-4",
+            "status": "sleeping"
+          },
+          {
+            "seat_id": "oc-5",
+            "status": "sleeping"
+          }
+        ],
+        "all_ten_observed_sleeping": true
+      },
+      "unconfirmed_request": false,
+      "probe_summary": {
+        "exit_code": 0,
+        "stdout_present": true,
+        "stderr_present": false,
+        "stdout_bytes": 98,
+        "stderr_bytes": 0,
+        "stdout_json_valid": true,
+        "probe_ok": true
+      },
+      "failure": null,
+      "activation_settle_ms": 10000
+    }
+  ],
+  "conclusion": {
+    "fresh_post_reload_hash_exec_without_settle": "MARITIME_HTTP_502",
+    "required_hermes_config_restored": true,
+    "reload_and_ordinary_resume_pass_with_settle": true,
+    "all_ten_readiness_proven": false,
+    "original_unknown_cause_recovered": false,
+    "original_unknown_journal_unchanged": true
+  },
+  "original_journal_sha256": "9326cbba3b5a3631a2c3a6810f8287123b5774af20495c48b6cf41e59fafdec9"
+}

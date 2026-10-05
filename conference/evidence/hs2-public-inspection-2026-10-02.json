@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "milestone": "M1",
+  "completed": false,
+  "inspection_result": {
+    "schema_version": 1,
+    "seat_id": "hs-2",
+    "public_hashes_verified": true,
+    "model_verified": false,
+    "model_route_verified": false,
+    "start_confirmed": true,
+    "sleep_response_confirmed": true,
+    "sleep_readback_confirmed": true,
+    "final_inventory": {
+      "observed_at": "2026-10-02T17:58:49.895Z",
+      "account_count": 10,
+      "awake_count": 0,
+      "unrelated_awake_count": 0,
+      "seats": [
+        {
+          "seat_id": "hs-1",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "hs-2",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "hs-3",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "hs-4",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "hs-5",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "oc-1",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "oc-2",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "oc-3",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "oc-4",
+          "status": "sleeping"
+        },
+        {
+          "seat_id": "oc-5",
+          "status": "sleeping"
+        }
+      ],
+      "all_ten_observed_sleeping": true
+    },
+    "chats": 0,
+    "uploads": 0,
+    "environment_changes": 0,
+    "transactions": 0,
+    "telegram_messages": 0,
+    "historical_unknown_operation_resolved": false,
+    "post_reload_boundary_reproduced": false,
+    "readiness_proven": false,
+    "failure": {
+      "error_code": "INSPECTION_EXEC_INVALID",
+      "ambiguous": true
+    },
+    "inspection_has_unconfirmed_requests": false,
+    "old_unknown_journal_unchanged": true,
+    "public_state_inspection_passed": false,
+    "finished_at": "2026-10-02T17:58:49.895Z",
+    "authorization": {
+      "schema_version": 1,
+      "authorized_by": "User: Please continue. I approve",
+      "approved_scope_sha256": "78938f7509302c05db27b81bad9224b8579f504cbb490ab5a82095714f7b44ec",
+      "started_at": "2026-10-02T17:58:38.593Z",
+      "inspection_cutoff": "2026-10-02T18:03:38.593Z",
+      "cleanup_hard_stop": "2026-10-02T18:08:38.593Z",
+      "maximum_starts": 1,
+      "maximum_sleeps": 1,
+      "maximum_public_execs": 3,
+      "maximum_chats": 0,
+      "game_authorized": false
+    },
+    "operation_count": 8,
+    "artifact_sha256": "0298c843253336d43a7b1685edded09a6c856927abea45ea42b2f2e0afff137f"
+  },
+  "public_artifacts_matched": 16,
+  "operation_summary": [
+    {
+      "sequence": 1,
+      "request_index": 0,
+      "kind": "initial-inventory",
+      "method": "GET",
+      "status": "returned",
+      "duration_ms": 1959
+    },
+    {
+      "sequence": 2,
+      "request_index": 1,
+      "kind": "start",
+      "method": "POST",
+      "status": "returned",
+      "duration_ms": 2368
+    },
+    {
+      "sequence": 3,
+      "request_index": 2,
+      "kind": "active-readback",
+      "method": "GET",
+      "status": "returned",
+      "duration_ms": 136
+    },
+    {
+      "sequence": 4,
+      "request_index": 3,
+      "kind": "public-hash-exec",
+      "method": "POST",
+      "status": "returned",
+      "duration_ms": 629
+    },
+    {
+      "sequence": 5,
+      "request_index": 4,
+      "kind": "model-check-exec",
+      "method": "POST",
+      "status": "returned",
+      "duration_ms": 1273
+    },
+    {
+      "sequence": 6,
+      "request_index": 6,
+      "kind": "sleep",
+      "method": "POST",
+      "status": "returned",
+      "duration_ms": 3847
+    },
+    {
+      "sequence": 7,
+      "request_index": 7,
+      "kind": "sleep-readback",
+      "method": "GET",
+      "status": "returned",
+      "duration_ms": 487
+    },
+    {
+      "sequence": 8,
+      "request_index": 8,
+      "kind": "final-inventory",
+      "method": "GET",
+      "status": "returned",
+      "duration_ms": 176
+    }
+  ],
+  "model_response_capture_limitations": {
+    "exit_code_retained": false,
+    "stdout_schema_retained": false,
+    "stderr_presence_retained": false,
+    "underlying_failure_known": false,
+    "interpretation": "The model-check request returned, but its response failed exit/output/JSON validation. The saved evidence cannot distinguish command failure from response validation failure. Do not infer model drift."
+  },
+  "original_unknown_runtime_request_replayed": false,
+  "route_request_sent": false,
+  "approved_single_start_consumed": true,
+  "stopped_on_first_failure": true,
+  "readiness_certificate_created": false,
+  "source_evidence_sha256": {
+    "authorization.json": "5a1d75c6c78c1e2bca1b22fce3c94185b85379dc9c58d833b0c1c17de2afa5cc",
+    "initial-inventory.json": "73810207f3827db4dfa800f1b1d658966ec81654287ea8dc4ce01b8831f7b154",
+    "operations.json": "72253bd4f8bd67c7b1e89597d3a746db328d537c41ccb011a56a3b6c4b0ac49e",
+    "result.json": "46e299f48f6ccf650c83cb98156a8b581fe216b1f52fdc8467c74e0866f8235d",
+    "inspect.mjs": "896378b7366227c0a4b3edebb47eafaa283353dd04761fbf0e1084096f94aa77"
+  },
+  "next_scope": "Separate hs-2-only model inspection with fixed step/error-code reporting; one start, public hash check, installed read-only model/route functions, cleanup sleep, no chats or edits. Not authorized.",
+  "local_followup_probe_checks": {
+    "fixture_only": true,
+    "passed": 4,
+    "network_calls": 0,
+    "file_changes_during_probe": 0,
+    "raw_configuration_leaks": 0
+  },
+  "game_authorized": false
+}

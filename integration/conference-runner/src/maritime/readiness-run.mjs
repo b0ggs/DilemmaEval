@@ -17,7 +17,8 @@ export const READINESS_PRODUCER_VERSION = 2;
 export const READINESS_FILES = Object.freeze({ evidence: 'readiness-v2.json', state: 'readiness-state.json', journal: 'readiness-journal.json' });
 const HASH = /^[0-9a-f]{64}$/;
 const BLOCK_HASH = /^0x[0-9a-f]{64}$/;
-const MODEL = Object.freeze({ model_endpoint: 'https://api.maritime.sh/api/llm/v1', model: 'gpt-5.4-mini',
+// max_output_tokens records configured policy, not an observed wire cap.
+const MODEL = Object.freeze({ model_endpoint: 'https://chatgpt.com/backend-api/codex', model: 'gpt-6.1-sol',
   reasoning_effort: 'low', max_output_tokens: 2048, automatic_fallback: false });
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) &&

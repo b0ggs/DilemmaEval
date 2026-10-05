@@ -50,7 +50,7 @@ async function setup(t) {
       artifact_sha256: 'ab'.repeat(32), activation_generation: 1, runtime_instance_fingerprint: 'de'.repeat(32),
       diagnostic_generations: { gameplay_input: 1, commit_input: 1 },
       final_agent_status: 'sleeping', sleep_confirmed: true, lifecycle_ambiguous: false,
-      model_profile: { model_endpoint: 'https://api.maritime.sh/api/llm/v1', model: 'gpt-5.4-mini',
+      model_profile: { model_endpoint: 'https://chatgpt.com/backend-api/codex', model: 'gpt-6.1-sol',
         reasoning_effort: 'low', max_output_tokens: 2048, automatic_fallback: false },
       diagnostics: { gameplay_input: diagnostic(seat, 'gameplay-input'), commit_input: diagnostic(seat, 'commit-input') } })) };
   const preflight = { chain_id: 84532, game_address: config.game_address, owner: config.expected_owner,

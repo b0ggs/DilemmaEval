@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "type": "canonical-public-scoreboard-recovery",
+  "started_at": "2026-10-02T18:53:24.719Z",
+  "finished_at": "2026-10-02T18:53:32.183Z",
+  "status": "verified",
+  "original_history_restored": false,
+  "historical_deliveries_replayed": 0,
+  "messages_sent": 0,
+  "signing_operations": 0,
+  "maritime_requests": 0,
+  "chain_checks": [
+    {
+      "label": "before-projection",
+      "observed_at": "2026-10-02T18:53:25.769Z",
+      "confirmed_block_number": "47599457",
+      "confirmed_block_hash": "0x6e6e08a5bc503ebeb3b7dcd8dd498d0da85b5756ea6da6dce3e0394c20bed8fb",
+      "active_game_id": "0",
+      "current_game_id": "17",
+      "cancellation": {
+        "transaction_hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e",
+        "block_number": "47294677",
+        "block_hash": "0x69333fd093167d985eb8ed1f5f49ac8d0f1d4e0d6aa1adbdf08c07a483e97046",
+        "log_index": 55
+      }
+    },
+    {
+      "label": "immediately-before-pin-acknowledgments",
+      "observed_at": "2026-10-02T18:53:29.252Z",
+      "confirmed_block_number": "47599459",
+      "confirmed_block_hash": "0x0583e8a30d140dcc3bd62d94d777d0ea14c494059f38611fd821e2705d0bd067",
+      "active_game_id": "0",
+      "current_game_id": "17",
+      "cancellation": {
+        "transaction_hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e",
+        "block_number": "47294677",
+        "block_hash": "0x69333fd093167d985eb8ed1f5f49ac8d0f1d4e0d6aa1adbdf08c07a483e97046",
+        "log_index": 55
+      }
+    },
+    {
+      "label": "after-pin-acknowledgments",
+      "observed_at": "2026-10-02T18:53:31.288Z",
+      "confirmed_block_number": "47599460",
+      "confirmed_block_hash": "0xfea59b84033bf111b2dbef65198e9374f016ac6607fbc8f0747755f4741b426c",
+      "active_game_id": "0",
+      "current_game_id": "17",
+      "cancellation": {
+        "transaction_hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e",
+        "block_number": "47294677",
+        "block_hash": "0x69333fd093167d985eb8ed1f5f49ac8d0f1d4e0d6aa1adbdf08c07a483e97046",
+        "log_index": 55
+      }
+    }
+  ],
+  "pin_checks": [
+    {
+      "label": "before-mirror-initialization",
+      "team": "openclaw",
+      "chat_id": "-1004378812354",
+      "message_id": 3,
+      "bot_owned": true,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+      "observed_at": "2026-10-02T18:53:28.241Z"
+    },
+    {
+      "label": "before-mirror-initialization",
+      "team": "hermes",
+      "chat_id": "-1004202252236",
+      "message_id": 3,
+      "bot_owned": true,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+      "observed_at": "2026-10-02T18:53:28.609Z"
+    },
+    {
+      "label": "immediately-before-pin-acknowledgments",
+      "team": "openclaw",
+      "chat_id": "-1004378812354",
+      "message_id": 3,
+      "bot_owned": true,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+      "observed_at": "2026-10-02T18:53:29.786Z"
+    },
+    {
+      "label": "immediately-before-pin-acknowledgments",
+      "team": "hermes",
+      "chat_id": "-1004202252236",
+      "message_id": 3,
+      "bot_owned": true,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+      "observed_at": "2026-10-02T18:53:30.047Z"
+    }
+  ],
+  "history": {
+    "observed_logs": 11,
+    "game_created": 1,
+    "cancelled": 1,
+    "completed": 0,
+    "round_resolved": 0
+  },
+  "proof_spectators_verified": true,
+  "scoreboard_sha256": "78538ed13361039017b287047c1a10c141a7b2bac36739c8b5fd7507e0332a14",
+  "outbox_sha256": "433ee33f07b6f673502e607e3efc3d95da25d903b5f42ed6950867048a854ab7",
+  "bindings_sha256": "497a84bd61664e873eeee6957919391921da71c2ac3ee3bb86c3049752576322",
+  "accounting": {
+    "completed": 0,
+    "cancelled": 1,
+    "wins": {
+      "openclaw": 0,
+      "hermes": 0
+    },
+    "ties": 0,
+    "awards_wei": {
+      "openclaw": "0",
+      "hermes": "0"
+    }
+  },
+  "issues": [],
+  "pin_acknowledgments": [
+    {
+      "sequence": 11,
+      "method": "editMessageText",
+      "team": "openclaw",
+      "chat_id": "-1004378812354",
+      "started_at": "2026-10-02T18:53:30.184Z",
+      "status": "returned",
+      "message_id": 3,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+      "finished_at": "2026-10-02T18:53:30.443Z",
+      "http_status": 400,
+      "response_bytes": 204,
+      "response_json": true,
+      "acknowledgment": "not-modified"
+    },
+    {
+      "sequence": 12,
+      "method": "editMessageText",
+      "team": "hermes",
+      "chat_id": "-1004202252236",
+      "started_at": "2026-10-02T18:53:30.184Z",
+      "status": "returned",
+      "message_id": 3,
+      "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+      "finished_at": "2026-10-02T18:53:30.483Z",
+      "http_status": 400,
+      "response_bytes": 204,
+      "response_json": true,
+      "acknowledgment": "not-modified"
+    }
+  ],
+  "recovery_report_sha256": "66a90c3b83dcd99288bda293ec7e5f55d5dfeda44886053f8c8e11eb27884d86",
+  "prior_attempt": {
+    "status": "failed-before-projection",
+    "code": "RECOVERY_HISTORY_GAME",
+    "messages_sent": 0,
+    "pin_edit_requests": 0,
+    "preserved": true
+  },
+  "historical_outboxes_modified": false,
+  "series_id": "five-v-five-mini-20260925",
+  "first_game_id": "17"
+}

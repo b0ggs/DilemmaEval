@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto';
 import { HERMES_RUNTIME_IDENTITY } from './runtime-identity.mjs';
 
 const MODEL_PROFILE = {
-  provider: 'maritime-openai-compatible',
-  endpoint: 'https://api.maritime.sh/api/llm/v1',
-  primary_model: 'gpt-5.4-mini',
+  provider: 'chatgpt-oauth',
+  endpoint: 'https://chatgpt.com/backend-api/codex',
+  primary_model: 'gpt-6.1-sol',
   fallback_model: null,
   automatic_fallback: false,
   temperature: 0,

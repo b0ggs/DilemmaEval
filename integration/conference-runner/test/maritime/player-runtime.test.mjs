@@ -17,6 +17,7 @@ import { createPlayerChainVerifier, privateDirectory, playerProcessRunner, lockS
 import { classifyPlayerBridgeError } from '../../src/maritime/diagnostics.mjs';
 import { enforceHermesConfigOwnership, inspectHermesConfigOwnership } from '../../src/maritime/install-runtime.mjs';
 import { updateHermesMiniResponsesText } from '../../src/maritime/install-runtime.mjs';
+import { inspectHermesOAuthConfigText } from '../../src/maritime/hermes-oauth.mjs';
 import { config, roster, operations, poke } from './fixtures.mjs';
 
 async function fixture(t, impl = {}) {
@@ -851,13 +852,15 @@ test('remote installer uses only production Foundry npm dependencies without scr
   assert.match(source, /status', '--porcelain', '--untracked-files=all/);
 });
 
-test('Hermes config update adds exactly the authorized variable name and is text-idempotent', () => {
+test('Hermes config update retains wallet passthrough while migrating the selected model to OAuth Sol', () => {
   const original = [
     'model:',
     '  default: "gpt-5.4"',
     '  model: "gpt-5.4"',
     '  provider: "openai"',
     '  base_url: "https://api.maritime.sh/api/llm/v1"',
+    '  api_key: old-selected-credential-fixture',
+    '  key_env: OPENAI_API_KEY',
     'terminal:',
     '  backend: local',
     '  env_passthrough:',
@@ -869,11 +872,18 @@ test('Hermes config update adds exactly the authorized variable name and is text
   const updated = updateHermesConfigText(original);
   assert.match(updated, /agent:\n  reasoning_effort: "low"/);
   assert.ok(updated.includes('    - SAFE_PUBLIC_SETTING'));
-  assert.match(updated, /^model:\n  default: "gpt-5\.4-mini"\n  model: "gpt-5\.4-mini"\n  provider: "openai"\n  base_url: "https:\/\/api\.maritime\.sh\/api\/llm\/v1"\n  reasoning_effort: "low"\n  max_tokens: 2048/m);
+  const profile = inspectHermesOAuthConfigText(updated);
+  assert.equal(profile.provider, 'openai-codex');
+  assert.equal(profile.endpoint, 'https://chatgpt.com/backend-api/codex');
+  assert.equal(profile.model, 'gpt-6.1-sol');
+  assert.equal(profile.oauth_verified, false);
+  assert.equal(profile.native_call_verified, false);
+  assert.doesNotMatch(updated, /old-selected-credential-fixture|OPENAI_API_KEY|api\.maritime\.sh/);
+  assert.ok(updated.includes('logging:\n  level: info'));
   assert.equal(updated.match(new RegExp(HERMES_TERMINAL_PASSTHROUGH_ENV, 'g')).length, 1);
   assert.equal(updateHermesConfigText(updated), updated);
   const fresh = updateHermesConfigText('');
-  assert.match(fresh, /^model:\n  default: "gpt-5\.4-mini"\n  model: "gpt-5\.4-mini"\n  reasoning_effort: "low"\n  max_tokens: 2048/m);
+  assert.equal(inspectHermesOAuthConfigText(fresh).model, 'gpt-6.1-sol');
   assert.match(fresh, /terminal:\n  env_passthrough:\n    - GAMEPLAY_WALLET_PRIVATE_KEY/);
 });
 
@@ -897,19 +907,21 @@ test('OpenClaw model config preserves unrelated fields and fails closed on drift
   const value = JSON.parse(after);
   assert.deepEqual(value.gateway, { port: 18789 });
   assert.equal(value.agents.defaults.workspace, '/data/workspace');
-  assert.deepEqual(value.agents.defaults.model, { primary: 'openai/gpt-5.4-mini', fallbacks: [] });
+  assert.deepEqual(value.agents.defaults.model, { primary: 'openai/gpt-6.1-sol', fallbacks: [] });
   assert.equal(value.agents.defaults.thinkingDefault, 'low');
   assert.deepEqual(value.agents.defaults.params, { cacheRetention: 'none' });
-  assert.equal(value.agents.defaults.models['openai/gpt-5.4-mini'].params.maxTokens, 2048);
+  assert.equal(value.agents.defaults.models['openai/gpt-6.1-sol'].params.maxTokens, 2048);
+  assert.equal(value.models.providers.openai.auth, 'oauth');
+  assert.equal(value.models.providers.openai.baseUrl, 'https://chatgpt.com/backend-api/codex');
   assert.equal(Object.hasOwn(value.agents.defaults, 'maxOutputTokens'), false);
   assert.deepEqual(inspectOpenClawConfigText(after), {
-    model: 'gpt-5.4-mini', reasoning_effort: 'low', max_output_tokens: 2048,
+    model: 'gpt-6.1-sol', reasoning_effort: 'low', max_output_tokens: 2048,
     automatic_fallback: false, fallback_model: null, response_metadata_required: true
   });
   assert.equal(updateOpenClawConfigText(after), after);
   value.agents.defaults.model.primary = 'openai/gpt-5.4';
   assert.throws(() => inspectOpenClawConfigText(JSON.stringify(value)), /MODEL_CONFIG_INVALID/);
-  value.agents.defaults.model.primary = 'openai/gpt-5.4-mini';
+  value.agents.defaults.model.primary = 'openai/gpt-6.1-sol';
   value.agents.defaults.model.fallbacks = ['openai/gpt-5.4'];
   assert.throws(() => inspectOpenClawConfigText(JSON.stringify(value)), /MODEL_CONFIG_INVALID/);
   assert.doesNotMatch(after, /(?:0[xX])?[0-9a-fA-F]{64}|(?:mk|sk)_[A-Za-z0-9_-]{8,}/);

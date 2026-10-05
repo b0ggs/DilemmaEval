@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "type": "oc1-native-commit-diagnostic-followup",
+  "scope": "M1 only; existing agent, no gameplay or signing",
+  "observations": [
+    {
+      "schema_version": 1,
+      "started_at": "2026-10-02T19:07:04.066Z",
+      "finished_at": "2026-10-02T19:07:36.489Z",
+      "status": "inspected",
+      "maximum_native_chats": 1,
+      "transactions": 0,
+      "telegram_messages": 0,
+      "public_hashes_verified": true,
+      "old_receipt": {
+        "schema_version": 1,
+        "public_stage_valid": true,
+        "receipt_present": false,
+        "receipt_valid": false
+      },
+      "fresh_commit_validated": false,
+      "chat_metadata": {
+        "http_status": 200,
+        "payload_shape_valid": true,
+        "provider_error_present": false,
+        "response_string": true,
+        "response_bytes": 114,
+        "json_valid": true,
+        "valid_response": false,
+        "identity_mismatch_fields": [
+          "request_id",
+          "seat_id",
+          "team",
+          "mode"
+        ]
+      },
+      "diagnostic_error": {
+        "code": "MARITIME_DIAGNOSTIC_RESPONSE_INVALID",
+        "diagnostic_code": "MARITIME_REPLY_PROTOCOL_INVALID"
+      },
+      "final_inventory": {
+        "observed_at": "2026-10-02T19:07:36.489Z",
+        "awake": 0,
+        "all_ten_sleeping": true
+      },
+      "sleep_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "report_sha256": "ea538a21b1624d60c17f3643bd7100679f0fe7e254fbacf128a2696319ee0873",
+      "operation_counts": {
+        "activation-settle": 1,
+        "active-readback": 1,
+        "chain-preflight": 1,
+        "final-inventory": 1,
+        "fresh-commit-chat": 1,
+        "fresh-commit-stage": 1,
+        "initial-inventory": 1,
+        "old-public-receipt": 1,
+        "public-hashes": 1,
+        "sleep": 1,
+        "sleep-readback": 1,
+        "start": 1
+      }
+    },
+    {
+      "schema_version": 1,
+      "started_at": "2026-10-02T19:14:24.928Z",
+      "finished_at": "2026-10-02T19:15:06.424Z",
+      "status": "inspected",
+      "maximum_native_chats": 1,
+      "transactions": 0,
+      "telegram_messages": 0,
+      "public_hashes_verified": true,
+      "old_receipt": {
+        "schema_version": 1,
+        "public_stage_valid": true,
+        "receipt_present": false,
+        "receipt_valid": false
+      },
+      "fresh_commit_validated": true,
+      "chat_metadata": {
+        "http_status": 200,
+        "payload_shape_valid": true,
+        "provider_error_present": false,
+        "response_string": true,
+        "response_bytes": 374,
+        "json_valid": true,
+        "field_types": {
+          "schema_version": "number",
+          "type": "string",
+          "status": "string"
+        },
+        "known_status": "ready",
+        "error_categories": [
+          "stdin_missing"
+        ],
+        "valid_response": true,
+        "identity_mismatch_fields": []
+      },
+      "final_inventory": {
+        "observed_at": "2026-10-02T19:15:06.424Z",
+        "awake": 0,
+        "all_ten_sleeping": true
+      },
+      "sleep_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "report_sha256": "d33b719bfa757f034328fd3aa6b003ac5e04278794d92ef50a68a3f1f2645ab1",
+      "operation_counts": {
+        "activation-settle": 1,
+        "active-readback": 1,
+        "chain-preflight": 1,
+        "final-inventory": 1,
+        "fresh-commit-chat": 1,
+        "fresh-commit-stage": 1,
+        "initial-inventory": 1,
+        "old-public-receipt": 1,
+        "public-hashes": 1,
+        "sleep": 1,
+        "sleep-readback": 1,
+        "start": 1
+      }
+    },
+    {
+      "schema_version": 1,
+      "started_at": "2026-10-02T19:35:28.414Z",
+      "finished_at": "2026-10-02T19:35:47.643Z",
+      "status": "inspected",
+      "maximum_native_chats": 0,
+      "transactions": 0,
+      "telegram_messages": 0,
+      "public_hashes_verified": true,
+      "independent_receipt_audit": {
+        "schema_version": 1,
+        "candidate_receipts": 1,
+        "valid_commit_receipts": 1,
+        "exact_native_path_proven": true
+      },
+      "final_inventory": {
+        "observed_at": "2026-10-02T19:35:47.643Z",
+        "awake": 0,
+        "all_ten_sleeping": true
+      },
+      "sleep_confirmed": true,
+      "sleep_readback_confirmed": true,
+      "report_sha256": "e41d3829eff844e7db4e481802bdf932f628a02c1e0ecc1f330fed537c516d66",
+      "operation_counts": {
+        "activation-settle": 1,
+        "active-readback": 1,
+        "final-inventory": 1,
+        "initial-inventory": 1,
+        "public-hashes": 1,
+        "public-receipt-audit": 1,
+        "sleep": 1,
+        "sleep-readback": 1,
+        "start": 1
+      }
+    }
+  ],
+  "conclusion": {
+    "original_failed_receipt_absent": true,
+    "later_native_commit_path_independently_verified": true,
+    "earlier_failure_cause_identified": false,
+    "all_ten_readiness_proven": false,
+    "coordinator_selected_choice": false
+  }
+}

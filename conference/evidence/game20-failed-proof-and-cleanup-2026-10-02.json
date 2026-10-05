@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "failed-5v5-proof-and-bounded-cleanup",
+  "recorded_at": "2026-10-03T01:25:14.617Z",
+  "chain_id": 84532,
+  "game_id": "20",
+  "source_checkpoint_at_launch": "8cd8a6e",
+  "latest_source_checkpoint": "b45d29e",
+  "m3_complete": false,
+  "healthy_play_proof": false,
+  "original_cause_determined": false,
+  "creation_transaction": "0x2095871d64de211cc4caae0abddcdd9692072daad65c399904588713135efb91",
+  "original_creation_cutoff_at": "2026-10-03T00:30:08.230Z",
+  "original_proof_hard_stop_at": "2026-10-03T01:05:08.230Z",
+  "original_window_extended": false,
+  "confirmed_before_stop": {
+    "joins": 10,
+    "round1_native_discussions": 10,
+    "round1_commits": 10,
+    "round1_reveals_observed": 0
+  },
+  "stopped_at": "2026-10-03T00:38:58.839Z",
+  "failure_code": "PROOF_AGENT_OPERATION_UNCERTAIN",
+  "reveal_outcomes": [
+    {
+      "seat_id": "hs-1",
+      "request_id": "conference:a7730bfdd4ca2ae23fca31901ce20b6c",
+      "status": "ambiguous",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": null,
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "hs-2",
+      "request_id": "conference:e54301ee74ce20d1a3ac680067fd6125",
+      "status": "cancelled-after-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_TIMEOUT",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "hs-3",
+      "request_id": "conference:00b261f69da1b054fca7819fd92dfd7a",
+      "status": "cancelled-after-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_TIMEOUT",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "hs-4",
+      "request_id": "conference:cea234572aceb8f6e54bce15735ba897",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "hs-5",
+      "request_id": "conference:047c544f9ca3c52009a42386d4b23bca",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "oc-1",
+      "request_id": "conference:8ab8390041680640b7f4425e0472cd73",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "oc-2",
+      "request_id": "conference:d71dfeca4974fe605c56d80dc1dcbdec",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "oc-3",
+      "request_id": "conference:d1c26b0db6b95aa3c31ce040b4c014a1",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "oc-4",
+      "request_id": "conference:0932e2bbbe22579e7089435d3cf3a6d3",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    },
+    {
+      "seat_id": "oc-5",
+      "request_id": "conference:b0a8d7c7fbf97081bc446f1ba9f55b55",
+      "status": "rejected-before-submit",
+      "error_code": "MARITIME_OPERATION_FAILED",
+      "transport_code": "MARITIME_DISPATCH_EXPIRED",
+      "diagnostic_code": null,
+      "transaction_hash": null
+    }
+  ],
+  "original_requests_replayed": false,
+  "chain_cleanup": {
+    "finished_at": "2026-10-03T01:14:20.870Z",
+    "accepted_advances": 5,
+    "active_game_id": "0",
+    "outcome": "completed",
+    "defaulted_actions": 30,
+    "defaulted_rounds": [
+      1,
+      2,
+      3
+    ],
+    "terminal_receipt": {
+      "transaction_hash": "0x82a59af38c9f1a105c49a4a73e894c95227db6ebf3721bfe5ece24414c9d6903",
+      "block_number": "47610875",
+      "block_hash": "0xdeab08f46b21bd96e0a8bdc3bf13dde3c8f72370a662425c1524e3dd5ee1726f",
+      "status": 1
+    }
+  },
+  "telegram_cleanup": {
+    "finished_at": "2026-10-03T01:18:17.996Z",
+    "sent": 40,
+    "pending": 0,
+    "inflight": 0,
+    "uncertain": 0,
+    "rejected": 0,
+    "own_room_native_messages": {
+      "openclaw": 5,
+      "hermes": 5
+    },
+    "pin_verification": [
+      {
+        "team": "openclaw",
+        "chat_id": "-1004378812354",
+        "message_id": 3,
+        "text_sha256": "19bd77332619f9d844ee3fc82b44ff66eb3b021ec7dd993987ad8d3b2a8d7939"
+      },
+      {
+        "team": "hermes",
+        "chat_id": "-1004202252236",
+        "message_id": 3,
+        "text_sha256": "19bd77332619f9d844ee3fc82b44ff66eb3b021ec7dd993987ad8d3b2a8d7939"
+      }
+    ],
+    "failed_proof_notices": [
+      {
+        "team": "openclaw",
+        "status": "sent",
+        "chat_id": "-1004378812354",
+        "message_id": 75,
+        "text_sha256": "d8050a3e7c1463b853358bda72f955ee904ff812ff7f2d83ae604b16d9575a5b"
+      },
+      {
+        "team": "hermes",
+        "status": "sent",
+        "chat_id": "-1004202252236",
+        "message_id": 77,
+        "text_sha256": "d8050a3e7c1463b853358bda72f955ee904ff812ff7f2d83ae604b16d9575a5b"
+      }
+    ],
+    "prior_game19_evidence_and_uncertain_sends_preserved": true
+  },
+  "independent_audit": {
+    "verified_at": "2026-10-03T01:23:36.517Z",
+    "proof_complete": false,
+    "issues": [
+      "PROOF_DEFAULTED_ACTIONS",
+      "SCOREBOARD_CANONICAL_PROOF_REQUIRED"
+    ],
+    "defaulted_count": 30,
+    "early_rejection_counters_are_unprocessed": true
+  },
+  "current_activation_observation": {
+    "finished_at": "2026-10-03T01:07:40.702Z",
+    "seat_id": "hs-1",
+    "step": "activation",
+    "http_status": 402,
+    "transport_code": "MARITIME_HTTP_402",
+    "original_cause_determined": false,
+    "native_diagnostic_ran": false,
+    "execution_permits": 0,
+    "transaction_signing": 0,
+    "readiness_certified": false,
+    "all_ten_sleeping": true,
+    "original_evidence_preserved": true,
+    "official_status_reference": "https://maritime.sh/docs/limits",
+    "exact_account_billing_state_established": false
+  },
+  "final_observation": {
+    "observed_at": "2026-10-03T01:25:14.617Z",
+    "active_game_id": "0",
+    "all_ten_sleeping": true,
+    "account_awake": 0,
+    "operator_stopped": true,
+    "owner_records_confirmed": 67,
+    "all_eleven_latest_pending_nonces_equal": true,
+    "unpaid_awards": 10,
+    "award_wei_each": "98010000000000",
+    "settlement_complete": false,
+    "original_proof_evidence_unchanged": true,
+    "reveal_uncertainty_resolved": false
+  },
+  "metadata_checkpoint_validation": {
+    "runner_pass": 566,
+    "runner_fail": 0,
+    "runner_cancelled": 0,
+    "runner_skipped": 0,
+    "runner_duration_ms": 818102.030588,
+    "unchanged_shared_site_pass_reused": 199,
+    "independent_review_passed": true,
+    "targeted_transport_pass": 3,
+    "targeted_readiness_pass": 1,
+    "secret_scan_clean": true,
+    "exact_source_test_files_committed": 4
+  },
+  "private_artifact_sha256": {
+    "proof/proof-run.json": "cd785c85e6e57c5bbb4a02bfbee3f66d03ead39067d836220db054d6356e2a57",
+    "proof/launch-once.json": "bdf5f32286e132b3fec72ef5e6944521b71b782797a0913f0c19a3e4be8572be",
+    "proof/runtime/coordinator/records.json": "e7e21b15142354565c57d5e772c8a0f3e32f3c3c3053b981d582c48bc32248f5",
+    "scope.json": "cf7331d25b6e7b935e830b33c213c13b5b0f13ef521fd1af8ffeb73bcdfdd217",
+    "chain-cleanup-game20-20261002/final.json": "a056458b1e4706fa59990b19a94da3b3ddc9d429292c7dd1d013dcca3634d561",
+    "telegram-cleanup-game20-20261002/final.json": "f7c059d03167f1bd8b4e6303fd0909f656f337d3fa595d193597acb7b5af985e",
+    "independent-audit.json": "2e9ae5209fbe97d645913c72593062fc2a046b2984db12790f328378509bd76a",
+    "final-observation.json": "cfbec1cec1a41e6b9f21eaa3765cbbe14afbb93c59019b9b712f84ce058e430e",
+    "hs1-path-diagnostic-20261002/path-diagnostic-report.json": "3425522c636c2b88fdbd919166dcb26ebc1a284129dbeefbc28ef626fb74c575"
+  },
+  "next_action": "Restore existing Maritime account activation; claim Game20 awards through the reviewed fresh-readiness native helper, then fresh gates for one new independently audited proof. No replay, new agents, paid capacity, funding or model/rule changes authorized."
+}

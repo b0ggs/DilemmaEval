@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "milestone": "M2",
+  "completed": false,
+  "implementation_checkpoint": "2950f110b996d923511571de04bd80b99df45c68",
+  "reviewed_handoff_checkpoint": "cff2cdef8eb041d25282da1b5705915d33057960",
+  "chain_observed_at": "2026-10-02T17:42:10.036Z",
+  "chain_id": 84532,
+  "block_number": "47597311",
+  "block_hash": "0x7c504248b11ca3c7b8051802861546d57604e04cb70f6d3ba27a54dca738461f",
+  "active_game_id": "0",
+  "defaults": {
+    "entryFeeWei": "100000000000000",
+    "creatorFeeBps": "100",
+    "causeFeeBps": "100",
+    "joinDurationSeconds": "300",
+    "commitDurationBlocks": "300",
+    "revealDurationBlocks": "180",
+    "minPlayers": "10",
+    "maxPlayers": "10",
+    "maxCauses": "2"
+  },
+  "admitted_seats": 10,
+  "whitelisted_seat_causes": 10,
+  "receipt_count": 47,
+  "all_receipts_canonical_and_identity_matched": true,
+  "all_receipt_statuses_match_preserved_status": true,
+  "nonce_observations": [
+    {
+      "seat_id": "owner",
+      "latest": 456,
+      "pending": 456,
+      "equal": true
+    },
+    {
+      "seat_id": "hs-1",
+      "latest": 29,
+      "pending": 29,
+      "equal": true
+    },
+    {
+      "seat_id": "hs-2",
+      "latest": 6,
+      "pending": 6,
+      "equal": true
+    },
+    {
+      "seat_id": "hs-3",
+      "latest": 6,
+      "pending": 6,
+      "equal": true
+    },
+    {
+      "seat_id": "hs-4",
+      "latest": 6,
+      "pending": 6,
+      "equal": true
+    },
+    {
+      "seat_id": "hs-5",
+      "latest": 5,
+      "pending": 5,
+      "equal": true
+    },
+    {
+      "seat_id": "oc-1",
+      "latest": 51,
+      "pending": 51,
+      "equal": true
+    },
+    {
+      "seat_id": "oc-2",
+      "latest": 19,
+      "pending": 19,
+      "equal": true
+    },
+    {
+      "seat_id": "oc-3",
+      "latest": 6,
+      "pending": 6,
+      "equal": true
+    },
+    {
+      "seat_id": "oc-4",
+      "latest": 3,
+      "pending": 3,
+      "equal": true
+    },
+    {
+      "seat_id": "oc-5",
+      "latest": 3,
+      "pending": 3,
+      "equal": true
+    }
+  ],
+  "previous_broadcast_receipt": {
+    "hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e",
+    "persisted_stage": "broadcast",
+    "persisted_status": "accepted",
+    "nonce": 455,
+    "receipt_status": 1,
+    "receipt_block": 47294677,
+    "receipt_block_hash": "0x69333fd093167d985eb8ed1f5f49ac8d0f1d4e0d6aa1adbdf08c07a483e97046",
+    "canonical_confirmed": true,
+    "identity_matches": true,
+    "method": "advancePhase",
+    "intent_game_id": "17",
+    "transaction_game_id": "17",
+    "events": [
+      {
+        "name": "GameCancelled",
+        "game_id": "17"
+      }
+    ]
+  },
+  "owner_reconciliation": {
+    "schema_version": 1,
+    "reconciled_at": "2026-10-02T17:45:26.479Z",
+    "local_journal_updated": true,
+    "external_mutations": 0,
+    "signing_credentials_loaded": false,
+    "transactions_submitted": 0,
+    "before_sha256": "63675cc58a80155f9017597a36367d0f0bc2b377b94d4dae04f8095ff5241126",
+    "after_sha256": "3e45413f9d017edb8646771298df57035187454e34ca2d2ba450362038ea2c57",
+    "record_count": 47,
+    "confirmed_count": 47,
+    "updated_transaction_hash": "0xeaa67e4f912731243009069bdeeaa3f1b1581805fe3a4cad49c9e6d43d95e79e",
+    "updated_nonce": 455,
+    "changed_fields": [
+      "stage"
+    ],
+    "old_stage": "broadcast",
+    "new_stage": "confirmed",
+    "owner_lock_released": true,
+    "ready_for_game": false
+  },
+  "telegram": {
+    "schema_version": 1,
+    "observed_at": "2026-10-02T17:45:42.161Z",
+    "read_only": true,
+    "methods": [
+      "getMe",
+      "getChat",
+      "getChatMember"
+    ],
+    "messages_sent": 0,
+    "pins_edited": 0,
+    "pins": [
+      {
+        "team": "openclaw",
+        "chat_id": "-1004378812354",
+        "chat_identity_matches": true,
+        "bot_administrator": true,
+        "bot_can_pin": true,
+        "spectators_read_only": true,
+        "message_id": 3,
+        "pin_authored_by_bot": true,
+        "pinned_chat_matches": true,
+        "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+        "historical_pin_id_matches": true,
+        "historical_pin_text_matches": true
+      },
+      {
+        "team": "hermes",
+        "chat_id": "-1004202252236",
+        "chat_identity_matches": true,
+        "bot_administrator": true,
+        "bot_can_pin": true,
+        "spectators_read_only": true,
+        "message_id": 3,
+        "pin_authored_by_bot": true,
+        "pinned_chat_matches": true,
+        "text_sha256": "dfe8897636abe4079dd1c4be78e406e3a29dba8743fba3f7b1cbe20f0ec46ca5",
+        "historical_pin_id_matches": true,
+        "historical_pin_text_matches": true
+      }
+    ],
+    "historical_series_id": "five-v-five-mini-20260925",
+    "historical_first_game_id": "17",
+    "scoreboard_ledger_located": false,
+    "matching_outbox_located": false,
+    "ready_for_game": false
+  },
+  "local_state_observation": {
+    "matching_scoreboard_ledger_found": false,
+    "matching_team_room_outbox_found": false,
+    "historical_series_id": "five-v-five-mini-20260925",
+    "historical_first_game_id": "17",
+    "older_shared_room_outbox_candidates": 4,
+    "older_candidates_match_current_rooms": false,
+    "older_uncertain_delivery_count": 1,
+    "older_outboxes_modified": false,
+    "prepared_proof_files_absent": true,
+    "missing_state_recreated": false
+  },
+  "source_evidence_sha256": {
+    "chain-observation.json": "61f528dbe3a12cba7483aee0a3ee3a542264451789ed146dc057afceb80f37a9",
+    "owner-reconciliation.json": "7985299a87c308732fedb20107e4cef98e2db69124f278c3f083e0b2ed9c756b",
+    "telegram-observation.json": "7d0679afd8578d1e37327142ded78a269c21eca35edf471acb0adc32f5ca22e2"
+  },
+  "old_unknown_runtime_journal_unchanged": true,
+  "remote_mutations": 0,
+  "model_calls": 0,
+  "signing_credentials_loaded": false,
+  "transactions_submitted": 0,
+  "telegram_messages_sent": 0,
+  "readiness_certificate_created": false,
+  "ready_for_game": false,
+  "remaining_blockers": [
+    "M1 hs-2 unknown runtime exec remains unresolved; reviewed start-only inspection is unauthorized.",
+    "M2 matching scoreboard ledger and team-room outbox are missing from inspected preserved locations; historical pins cannot recreate delivery history.",
+    "M1 full diagnostic and two verification-pass timing remains unproven within the existing 600-second evidence lifetime.",
+    "M3 requires fresh M1/M2 gates and separate bounded game authorization."
+  ]
+}

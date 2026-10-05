@@ -162,7 +162,7 @@ function controlledEvidence(config, now=Date.parse('2026-09-25T18:00:00.000Z')) 
       wallet_identity_verified:true,persistent_storage_verified:true,tool_execution_verified:true,
       gameplay_command:['node',`/volume/${seat.seat_id}/player-cli.mjs`,`/volume/${seat.seat_id}/seat.json`],
       artifact_sha256:'ab'.repeat(32),activation_generation:index,final_agent_status:'sleeping',sleep_confirmed:true,
-      lifecycle_ambiguous:false,model_profile:{model_endpoint:'https://api.maritime.sh/api/llm/v1',model:'gpt-5.4-mini',
+      lifecycle_ambiguous:false,model_profile:{model_endpoint:'https://chatgpt.com/backend-api/codex',model:'gpt-6.1-sol',
         reasoning_effort:'low',max_output_tokens:2048,automatic_fallback:false},
       diagnostics:{gameplay_input:diagnostic(seat,'gameplay-input',index),commit_input:diagnostic(seat,'commit-input',index)},
       persistent_bundles_verified:false,model_profile_verified:true,spectator_access_blocked:false}))};

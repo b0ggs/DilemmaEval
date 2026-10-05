@@ -36,8 +36,8 @@ async function fixture(t) {
     gameplay_command: ['node', `/volume/${seat.seat_id}/player-cli.mjs`, `/volume/${seat.seat_id}/seat.json`],
     artifact_sha256: 'ab'.repeat(32), activation_generation: index + 1, runtime_instance_fingerprint: 'cd'.repeat(32),
     diagnostic_generations: { gameplay_input: index + 1, commit_input: index + 1 }, final_agent_status: 'sleeping',
-    sleep_confirmed: true, lifecycle_ambiguous: false, model_profile: { model_endpoint: 'https://api.maritime.sh/api/llm/v1',
-      model: 'gpt-5.4-mini', reasoning_effort: 'low', max_output_tokens: 2048, automatic_fallback: false },
+    sleep_confirmed: true, lifecycle_ambiguous: false, model_profile: { model_endpoint: 'https://chatgpt.com/backend-api/codex',
+      model: 'gpt-6.1-sol', reasoning_effort: 'low', max_output_tokens: 2048, automatic_fallback: false },
     diagnostics: { gameplay_input: response(seat, index, 'gameplay-input'), commit_input: response(seat, index, 'commit-input') } }));
   const journal = { schema_version: 1, producer_version: 2, diagnostic_run_id: runId, status: 'complete', all_seats_sleeping: true,
     operations: source.roster.map((seat, index) => ({ kind: 'activation-intent', sequence: index + 1, seat_id: seat.seat_id, status: 'complete' })) };

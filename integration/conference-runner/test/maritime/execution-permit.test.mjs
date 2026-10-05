@@ -14,7 +14,7 @@ import {buildExecutionPermit,buildExecutionPermitStageCommand,executionPermitFin
 import {RUNTIME_INSTANCE_COMMAND} from '../../src/maritime/readiness-run.mjs';
 import {config as baseline,operations,poke} from './fixtures.mjs';
 
-const model={model_endpoint:'https://api.maritime.sh/api/llm/v1',model:'gpt-5.4-mini',reasoning_effort:'low',
+const model={model_endpoint:'https://chatgpt.com/backend-api/codex',model:'gpt-6.1-sol',reasoning_effort:'low',
   max_output_tokens:2048,automatic_fallback:false};
 const instance='ab'.repeat(32),cold='cd'.repeat(32);
 const walletKey=`0x${'1'.repeat(64)}`;
@@ -31,7 +31,6 @@ async function fixture(t,{harness='openclaw',age=1000}={}) {
   const settings=JSON.parse(artifact.files.find(file=>file.path===artifact.gameplay_command[2]).content);
   if(harness==='openclaw') {
     const route=JSON.parse(updateOpenClawConfigText('{}'));
-    route.models={providers:{openai:{baseUrl:model.model_endpoint}}};
     await fs.mkdir(dirname(settings.openclaw_config_path),{recursive:true});
     await fs.writeFile(settings.openclaw_config_path,JSON.stringify(route));
   }
