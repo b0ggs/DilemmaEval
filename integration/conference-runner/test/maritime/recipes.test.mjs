@@ -12,7 +12,7 @@ test('both harness recipes target summed confirmed team awards with player decis
     assert.match(instructions, /Make your own Share, Steal, or Catch decision using the supplied same-team discussion/);
     assert.match(instructions, /coordinator never chooses/);
     assert.match(instructions, /only your assigned player wallet/);
-    assert.match(instructions, /concrete strategic consideration.*at most 200 characters.*phase deadline/);
+    assert.match(instructions, /concrete strategic consideration.*phase deadline.*succinct in ASD-STE100 format/);
     assert.match(instructions, /exact protocol JSON/);
     assert.match(instructions, /Never print.*commit salts.*private bundle contents.*unrevealed choices/);
     assert.match(instructions, /Never fetch the public spectator feed, Telegram rooms, or opposing-team messages/);

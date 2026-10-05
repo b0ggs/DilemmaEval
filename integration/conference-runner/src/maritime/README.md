@@ -70,7 +70,7 @@ gameplay; the installed CLI inspection and actual transactions remain required.
 pass. The latter maps an accepted message to the existing TeamLogStore format
 only; its `commit` tag never authorizes a transaction. Both request protocols
 reject opposing-team messages and coordinator-provided move material.
-Responses preserve accepted agent wording, with a 200-character limit.
+Responses preserve accepted agent wording without a character limit. Prompts ask for messages succinct in ASD-STE100 format; this guidance does not gate gameplay.
 
 ## Operator installation
 

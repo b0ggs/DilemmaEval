@@ -5,6 +5,7 @@ import { Interface } from 'ethers';
 import { auditControlledProof } from '../src/proof-audit.mjs';
 import { GAME_ABI } from '../src/chain/abi.mjs';
 import { FROZEN_NETWORK } from '../../game-bridge/src/index.js';
+import { formatAgentMessages } from '../src/telegram/index.mjs';
 
 const abi = new Interface([...GAME_ABI,
   'event Committed(uint256 indexed gameId,uint32 indexed round,address indexed wallet,bytes32 commitment)',
@@ -91,6 +92,42 @@ function replaceEvent(f, name, replacement) {
   const original = f.logs[index];
   f.logs[index] = replacement(original);
   for (const receipt of f.receipts.values()) receipt.logs = f.logs.filter(item => item.transactionHash === receipt.hash);
+}
+
+function multipartDiscussion(f) {
+  const seat = f.config.roster[0];
+  const parts = formatAgentMessages({ team: seat.team, seat_id: seat.seat_id,
+    game_id: '9', round: 1, sequence: 1, request_id: 'fixture-discussion',
+    message: `${PRIVATE_TEXT} 🦀\n`.repeat(150) }, seat.team, f.config);
+  assert.ok(parts.length > 2);
+  const entries = parts.map((part, index) => ({ ...sent(
+    `message:${seat.team}:9:1${index === 0 ? '' : `:part:${index + 1}`}`, seat.team, part.text, 200 + index),
+    message_part: part.message_part, message_parts: part.message_parts }));
+  f.outbox.entries.splice(0, 1, ...entries);
+  return entries;
+}
+
+test('proof accepts complete multipart discussion and counts logical messages', async () => {
+  const f = fixture();
+  const parts = multipartDiscussion(f);
+  const audit = await auditControlledProof(f);
+  assert.equal(audit.proof_complete, true, JSON.stringify(audit));
+  assert.equal(audit.discussion_message_count, f.config.roster.length);
+  assert.deepEqual(audit.seats[0].discussion_message_ids, parts.map(part => part.message_id));
+  assert.equal(JSON.stringify(audit).includes(PRIVATE_TEXT), false);
+});
+
+for (const defect of ['missing-part', 'wrong-count', 'wrong-label']) {
+  test(`proof rejects ${defect} in multipart discussion`, async () => {
+    const f = fixture();
+    const parts = multipartDiscussion(f);
+    if (defect === 'missing-part') f.outbox.entries.splice(1, 1);
+    if (defect === 'wrong-count') parts[1].message_parts += 1;
+    if (defect === 'wrong-label') { parts[1].text = parts[1].text.replace('Part 2/', 'Part 1/'); parts[1].digest = hash(parts[1].text); }
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, false);
+    assert.ok(audit.issues.includes('PROOF_DISCUSSION_UNVERIFIED'));
+  });
 }
 
 test('audits actual confirmed per-seat events and delivered discussion without exposing content', async () => {

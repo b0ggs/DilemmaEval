@@ -36,7 +36,7 @@ export function buildPublicState({config,state={},now=Date.now()}) {
     game_id:String(snapshot.game_id),round:small(snapshot.round),phase:snapshot.phase,alive_count:small(snapshot.alive_count),committed_count:small(snapshot.committed_count),revealed_count:small(snapshot.revealed_count),
     clock:snapshot.clock&&['block','timestamp'].includes(snapshot.clock.unit)?{unit:snapshot.clock.unit,current:wei(snapshot.clock.current),deadline:wei(snapshot.clock.deadline)}:null
   }:null;
-  const messages=Object.fromEntries(teams.map(team=>[team,(state.messages?.[team]??[]).filter(m=>config.roster.some(s=>s.seat_id===m.seat_id&&s.team===team)&&typeof m.message==='string'&&m.message.length<=200).slice(-20).map(m=>({seat_id:m.seat_id,game_id:String(m.game_id),round:small(m.round),message:m.message,received_at:time(m.received_at)}))]));
+  const messages=Object.fromEntries(teams.map(team=>[team,(state.messages?.[team]??[]).filter(m=>config.roster.some(s=>s.seat_id===m.seat_id&&s.team===team)&&typeof m.message==='string').slice(-20).map(m=>({seat_id:m.seat_id,game_id:String(m.game_id),round:small(m.round),message:m.message,received_at:time(m.received_at)}))]));
   // Export fixed issue codes, never raw adapter errors, endpoint URLs or request content.
   const safeIssues=new Set(['chain-unavailable','agent-unavailable','telegram-unavailable','scheduling-blocked','stale-state']);
   const issues=[];

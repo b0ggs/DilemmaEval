@@ -234,17 +234,33 @@ export async function auditControlledProof({ config, gameId, provider, report, o
       const discussions = (report.dispatches ?? []).filter(row => row.game_id === gameId && row.seat_id === seat.seat_id &&
         row.operation === 'discussion' && row.status === 'observed' && row.has_team_message === true &&
         Number.isSafeInteger(row.round) && row.round >= 1 && row.round <= endRound);
-      const delivered = entries.filter(entry => {
-        if (entry.team !== seat.team || !new RegExp(`^message:${seat.team}:${gameId}:[1-9][0-9]*$`).test(entry.key)) return false;
-        return discussions.some(row => {
-          const prefix = `${seat.seat_id} (${seat.team === 'hermes' ? 'Hermes' : 'OpenClaw'}) · Game ${gameId} · Round ${row.round}\n`;
-          return entry.text.startsWith(prefix) && entry.text.slice(prefix.length).trim().length > 0 &&
+      const groups = new Map();
+      for (const entry of entries) {
+        if (entry.team !== seat.team || !new RegExp(`^message:${seat.team}:${gameId}:[1-9][0-9]*(?::part:[1-9][0-9]*)?$`).test(entry.key)) continue;
+        const key = entry.key.replace(/:part:[1-9][0-9]*$/, '');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(entry);
+      }
+      const delivered = [...groups.entries()].flatMap(([key, parts]) => {
+        const first = parts.find(entry => entry.key === key);
+        const count = first?.message_parts ?? 1;
+        if (!first || !Number.isSafeInteger(count) || count < 1 || parts.length !== count) return [];
+        const ordered = Array.from({ length: count }, (_, index) => parts.find(entry =>
+          entry.key === (index === 0 ? key : `${key}:part:${index + 1}`)));
+        if (ordered.some((entry, index) => !entry ||
+            (entry.message_parts ?? 1) !== count || (entry.message_part ?? 1) !== index + 1)) return [];
+        const matches = discussions.some(row => {
+          const header = `${seat.seat_id} (${seat.team === 'hermes' ? 'Hermes' : 'OpenClaw'}) · Game ${gameId} · Round ${row.round}`;
+          const prefixes = ordered.map((_, index) => `${header}${count === 1 ? '' : ` · Part ${index + 1}/${count}`}\n`);
+          return ordered.every((entry, index) => entry.text.startsWith(prefixes[index])) &&
+            ordered.map((entry, index) => entry.text.slice(prefixes[index].length)).join('').trim().length > 0 &&
             commits.some(log => log.event.args.wallet.toLowerCase() === seat.wallet_address.toLowerCase() && Number(log.event.args.round) === row.round);
         });
+        return matches ? [ordered] : [];
       });
       requireProof(delivered.length > 0, 'PROOF_DISCUSSION_UNVERIFIED');
       audit.seats[index].discussion_delivered = true;
-      audit.seats[index].discussion_message_ids = delivered.map(entry => entry.message_id);
+      audit.seats[index].discussion_message_ids = delivered.flat().map(entry => entry.message_id);
       audit.discussion_message_count += delivered.length;
     }
     const resultTeams = outbox.chats.openclaw === outbox.chats.hermes ? ['openclaw'] : teams;

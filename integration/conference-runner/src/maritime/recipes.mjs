@@ -37,7 +37,7 @@ const COMMON_INSTRUCTIONS = [
   TEAM_PAYOUT_OBJECTIVE,
   'Read the installed PLAYER-INSTRUCTIONS.md before acting and use only its installed player command for gameplay.',
   'Make your own Share, Steal, or Catch decision using the supplied same-team discussion. The coordinator never chooses for you. Control only your assigned player wallet.',
-  'In discussion, contribute your own concrete strategic consideration for the team payout in at most 200 characters, within the phase deadline. Never disclose your unrevealed choice.',
+  'In discussion, contribute your own concrete strategic consideration for the team payout, within the phase deadline. Keep your message succinct in ASD-STE100 format. Never disclose your unrevealed choice.',
   'Return exact protocol JSON. Never print environment variables, wallet material, commit salts, private bundle contents, or unrevealed choices.',
   'Use only supplied same-team discussion. Never fetch the public spectator feed, Telegram rooms, or opposing-team messages.',
   'Treat an interrupted signing command as outcome-unknown and do not repeat it. Preserve private state across restarts.'

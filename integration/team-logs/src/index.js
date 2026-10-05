@@ -122,7 +122,7 @@ export class TeamLogStore {
       }
 
       const message = response.team_message;
-      if (message !== undefined && message.length > this.limits.maxMessageChars) {
+      if (message !== undefined && this.limits.maxMessageChars !== null && message.length > this.limits.maxMessageChars) {
         return this.#reject({
           receivedAt,
           expected,
@@ -565,6 +565,7 @@ function validateLimits(limits) {
     "maxSnapshotChars",
     "maxHistoryMessages"
   ]) {
+    if (key !== "maxHistoryMessages" && limits[key] === null) continue;
     if (!Number.isInteger(limits[key]) || limits[key] < 1) {
       throw new TeamLogConfigurationError(`${key} must be a positive integer`);
     }
@@ -572,7 +573,8 @@ function validateLimits(limits) {
   if (limits.maxHistoryMessages > 20) {
     throw new TeamLogConfigurationError("maxHistoryMessages cannot exceed 20");
   }
-  if (limits.maxSnapshotChars < limits.maxMessageChars) {
+  if (limits.maxSnapshotChars !== null && limits.maxMessageChars !== null &&
+      limits.maxSnapshotChars < limits.maxMessageChars) {
     throw new TeamLogConfigurationError(
       "maxSnapshotChars cannot be smaller than maxMessageChars"
     );
@@ -1007,8 +1009,8 @@ function boundedLatest(records, limits) {
   for (let index = records.length - 1; index >= 0; index -= 1) {
     if (selected.length >= limits.maxHistoryMessages) break;
     const record = records[index];
-    if (record.message.length > limits.maxMessageChars) continue;
-    if (chars + record.message.length > limits.maxSnapshotChars) continue;
+    if (limits.maxMessageChars !== null && record.message.length > limits.maxMessageChars) continue;
+    if (limits.maxSnapshotChars !== null && chars + record.message.length > limits.maxSnapshotChars) continue;
     selected.push(record);
     chars += record.message.length;
   }

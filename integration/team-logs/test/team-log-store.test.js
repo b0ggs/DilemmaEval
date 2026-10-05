@@ -324,6 +324,21 @@ test("rejects malformed, identity mismatch, stale, wrong team, and oversized res
   assert.ok(ledger.every((entry) => entry.accepted === false));
 });
 
+test("disabled character limits preserve long messages through persistence and snapshots", async () => {
+  const limits = { maxMessageChars: null, maxSnapshotChars: null };
+  const { store, root } = await fixture({ limits });
+  const message = "  Keep the team payout safe. 🦀\n".repeat(500);
+  assert.equal((await store.acceptResponse(response(expected(), { team_message: message }), expected())).accepted, true);
+  const restarted = new TeamLogStore({ runtimeRoot: root, gameId: "12", seats, limits });
+  await restarted.initialize();
+  for (const log of [store, restarted]) {
+    const snapshot = await log.buildSnapshot({ seat_id: "oc-2", team: "openclaw" });
+    assert.equal(snapshot.messages[0].message, message);
+    assert.deepEqual((await log.buildSnapshot({ seat_id: "hs-1", team: "hermes" })).messages, []);
+  }
+  assert.equal((await jsonl(store.paths.openclaw))[0].message, message);
+});
+
 test("snapshot cutoff selects latest bounded history in ascending order", async () => {
   const { store } = await fixture({
     limits: {

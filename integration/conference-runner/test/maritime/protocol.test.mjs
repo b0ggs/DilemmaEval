@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDiscussionRequest, validateDiscussionResponse, discussionToLogResponse,
+import { validateDiscussionRequest, validateDiscussionResponse, validateGameplayResponse, discussionToLogResponse,
   validateRuntimeDiagnosticRequest, validateRuntimeDiagnosticInput,
   validateRuntimeDiagnosticResponse } from '../../src/maritime/index.mjs';
-import { config, roster, discussion, discussionReply } from './fixtures.mjs';
+import { config, roster, discussion, discussionReply, poke, reply } from './fixtures.mjs';
 
 const diagnostic = (mode = 'gameplay-input') => ({ schema_version: 1, type: 'runtime-diagnostic',
   request_id: `diagnostic:${mode}`, seat_id: roster[0].seat_id, team: roster[0].team, mode,
@@ -24,12 +24,28 @@ test('explicit discussion validates and maps only for team-log ingestion', () =>
   assert.equal(log.type, undefined); assert.equal(log.transaction_hash, undefined);
 });
 
-test('discussion rejects transaction, mismatched identity, secrets and excess text', () => {
+test('discussion rejects transaction, mismatched identity and secrets', () => {
   const request = discussion();
   for (const extra of [{ transaction_hash: `0x${'a'.repeat(64)}` }, { status: 'submitted' },
-    { seat_id: 'oc-2' }, { team: 'hermes' }, { team_message: 'x'.repeat(201) },
+    { seat_id: 'oc-2' }, { team: 'hermes' }, { team_message: null },
     { team_message: `salt=${'a'.repeat(64)}` }]) {
     assert.throws(() => validateDiscussionResponse(discussionReply(request, extra), request));
+  }
+});
+
+test('discussion and gameplay preserve long agent messages without a character cap', () => {
+  for (const message of ['x'.repeat(201), '🙂'.repeat(10000)]) {
+    const request = discussion();
+    const response = discussionReply(request, { team_message: message });
+    assert.equal(validateDiscussionResponse(response, request).team_message, message);
+    assert.equal(discussionToLogResponse(response, request).team_message, message);
+    const gameplay = poke();
+    assert.equal(validateGameplayResponse(reply(gameplay, { team_message: message }), gameplay).team_message, message);
+    request.team_chat = { through_sequence: 1, messages: [{ schema_version: 1,
+      game_id: request.game_id, round: request.round, phase: 'commit', team: request.team,
+      seat_id: request.seat_id, sequence: 1, received_at: '2026-09-24T12:00:00Z',
+      request_id: 'prior-discussion', message }] };
+    assert.equal(validateDiscussionRequest(request), request);
   }
 });
 

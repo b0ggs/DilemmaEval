@@ -86,6 +86,15 @@ test('public projection excludes old games, deduplicates receipts and separates 
   assert.deepEqual(state.health.issues,['chain-unavailable']);
 });
 
+test('public projection preserves accepted long discussion text', async () => {
+  const config = await fixtureConfig();
+  const seat = config.roster[0];
+  const message = 'Keep the team payout safe. 🦀\n'.repeat(500);
+  const state = buildPublicState({config,state:{ messages:{ [seat.team]: [{seat_id:seat.seat_id,
+    team:seat.team,game_id:'1',round:1,message,received_at:new Date().toISOString()}] } }});
+  assert.equal(state.messages[seat.team][0].message,message);
+});
+
 test('configuration pins chain and roster identity, permits a controlled shared room, and separates signers',async()=>{
   const c=await fixtureConfig();assert.equal(validateConfig(c).roster.length,3);
   for(const mutate of [x=>x.chain_id=8453,x=>x.roster[1].wallet_address=x.roster[0].wallet_address,x=>x.roster[1].agent_id=x.roster[0].agent_id,x=>x.roster[0].team='hermes',x=>x.owner_private_key='hidden']){

@@ -202,7 +202,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     if (!logs.has(gameId)) {
       const pending = (async () => {
         const log = new TeamLogStore({ runtimeRoot: runtimeDir, gameId, seats: config.roster,
-          limits: { maxMessageChars: 200 }, clock: () => new Date(now()) });
+          limits: { maxMessageChars: null, maxSnapshotChars: null }, clock: () => new Date(now()) });
         await log.initialize();
         return log;
       })();
@@ -360,7 +360,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     const teamChat = await log.buildSnapshot(seat);
     const request = action === 'discussion' ? {
       schema_version: 1, type: 'discussion', request_id: requestId, game_id: snapshot.game_id, round: snapshot.round,
-      phase: 'commit', seat_id: seat.seat_id, team: seat.team, chain_state: snapshot, team_chat: teamChat, max_message_chars: 200
+      phase: 'commit', seat_id: seat.seat_id, team: seat.team, chain_state: snapshot, team_chat: teamChat
     } : {
       request_id: requestId, game_id: snapshot.game_id, round: snapshot.round, phase: action, seat_id: seat.seat_id, team: seat.team,
       chain_state: snapshot, team_chat: teamChat, requested_action: action, response_schema_version: 1

@@ -165,7 +165,7 @@ Use two groups and initially **one bot posting to both**, with explicit agent-na
 
 Make spectators read-only. Telegram mirrors accepted team messages; agents do not use it as a message bus. Restrict agent tooling from fetching either public spectator feed or the opposing logs, and verify those restrictions. Publishing both teams' plans publicly means delivery isolation alone cannot prevent leakage if agents retain unrestricted browsing.
 
-Keep messages short (target 200 characters) and preserve the agent's words. Ask agents to fit the limit; do not rewrite statements or silently truncate their meaning. Post queued messages with a small gap when helpful, but include game/round labels and do not delay a completed result behind a large chat backlog.
+Ask agents to keep messages succinct in ASD-STE100 format and preserve their words. There is no discussion character limit. Split longer Telegram deliveries into labeled parts without rewriting or truncating the accepted text. Post queued messages with a small gap when helpful, but include game/round labels and do not delay a completed result behind a large chat backlog.
 
 Dealer output includes game/round, Share/Steal/Catch choices, separately identified defaults, eliminations, remaining players, and a result transaction link. “Catch” is an action; “caught stealing” is an outcome. At game end, show actual awards and whether payout has been claimed.
 

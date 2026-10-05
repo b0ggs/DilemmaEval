@@ -139,6 +139,24 @@ test('discussion is concurrent for three seats and commits see fresh same-team m
   assert.equal(f.runner.getState().messages.openclaw.length, 2);
 });
 
+test('long discussion does not block commits or disappear from same-team context after restart', async t => {
+  const message = 'Consider the team payout. 🦀\n'.repeat(500);
+  const f = await fixture(t, { dispatch: ({ request, response }) => response(request,
+    request.type === 'discussion' ? { team_message: message } : { status: 'submitted', transaction_hash: hash(600) }) });
+  await f.runner.tick();
+  assert.equal(f.dispatches.filter(row => row.request.requested_action === 'commit').length, roster.length);
+  for (const { request } of f.dispatches) {
+    assert.equal(Object.hasOwn(request, 'max_message_chars'), false);
+    if (request.type === 'discussion') continue;
+    assert.ok(request.team_chat.messages.every(row => row.message === message && row.team === request.team));
+  }
+  await f.restart();
+  const state = f.runner.getState();
+  assert.deepEqual(state.health, []);
+  assert.equal(state.messages.openclaw[0].message, message);
+  assert.equal(state.messages.hermes[0].message, message);
+});
+
 for (const failure of ['timeout', 'missing', 'empty', 'skipped', 'error']) {
   test(`incomplete ${failure} discussion blocks all commits, including after restart`, async t => {
     const f = await fixture(t, { config: { agent_timeout_ms: 25 }, dispatch: ({ request, response }) => {

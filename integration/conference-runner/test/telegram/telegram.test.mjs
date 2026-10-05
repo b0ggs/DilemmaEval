@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createTelegramMirror, formatDealerEvent, verifyTelegramGroups } from '../../src/telegram/index.mjs';
+import { createTelegramMirror, formatDealerEvent, formatAgentMessages, verifyTelegramGroups } from '../../src/telegram/index.mjs';
 
 const wallets = ['1', '2', '3'].map((digit) => `0x${digit.repeat(40)}`);
 const tx = `0x${'a'.repeat(64)}`;
@@ -227,14 +227,43 @@ test('mismatched destinations and run scopes fail closed on recovery', async (t)
   await assert.rejects(createTelegramMirror({ ...f.options, config: { ...config, telegram: { ...config.telegram, openclaw: { chat_id: '-100333' } } } }).flush(), /SCOPE_MISMATCH/);
 });
 
-test('team identity, conflicting delivery IDs, and oversize messages fail without truncation', async (t) => {
+test('team identity and conflicting delivery IDs fail without truncation', async (t) => {
   const f = await fixture(t, async () => response({ ok: true, result: { message_id: 1 } }));
   await assert.rejects(f.mirror.publish({ messages: { hermes: [message()] } }), /TEAM_MISMATCH/);
-  await assert.rejects(f.mirror.publish({ messages: { openclaw: [message({ message: 'x'.repeat(4096) })] } }), /TOO_LONG/);
   await f.mirror.publish({ messages: { openclaw: [message()] } });
   await assert.rejects(f.mirror.publish({ messages: { openclaw: [message({ message: 'different words' })] } }), /ID_CONFLICT/);
   await assert.rejects(f.mirror.publish({ messages: { openclaw: [message({ sequence: 2 }), message({ message: 'conflicting old ID' })] } }), /ID_CONFLICT/);
   assert.equal((await f.mirror.health()).pending, 0);
+});
+
+test('long Unicode messages split for Telegram, preserve all words, and deduplicate after restart', async t => {
+  const sends = [];
+  const debugConfig = { ...config, purpose: 'debug' };
+  const f = await fixture(t, async (_, request) => {
+    sends.push(JSON.parse(request.body));
+    return response({ ok: true, result: { message_id: sends.length } });
+  }, { config: debugConfig });
+  const original = message({ message: '  Consider the team payout. 🦀\n'.repeat(500) });
+  const parts = formatAgentMessages(original, 'openclaw', debugConfig);
+  assert.ok(parts.length > 2);
+  await f.mirror.publish({ messages: { openclaw: [original] } });
+  for (const _ of parts) { f.advance(); await f.mirror.flush(); }
+  assert.deepEqual(sends.map(send => send.text), parts.map(part => part.text));
+  const bodies = sends.map(send => send.text.slice(send.text.indexOf('\n') + 1));
+  assert.equal(bodies.join(''), original.message);
+  for (const [index, send] of sends.entries()) {
+    assert.ok(send.text.length <= 4096);
+    assert.match(send.text, new RegExp(`^\\[DEBUG\\].*Part ${index + 1}/${parts.length}\\n`));
+    assert.doesNotMatch(bodies[index], /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    assert.equal(send.chat_id, '-100111');
+  }
+  await createTelegramMirror(f.options).publish({ messages: { openclaw: [original] } });
+  assert.equal(sends.length, parts.length);
+  const outbox = JSON.parse(await fs.readFile(path.join(f.runtimeDir, 'telegram/outbox.json'), 'utf8'));
+  assert.equal(outbox.entries[0].key, 'message:openclaw:3:1');
+  assert.equal(outbox.entries[1].key, 'message:openclaw:3:1:part:2');
+  assert.ok(outbox.entries.every(entry => entry.status === 'sent' && entry.message_parts === parts.length));
+  await assert.rejects(f.mirror.publish({ messages: { openclaw: [{...original, message: original.message + ' Changed.'}] } }), /ID_CONFLICT/);
 });
 
 test('Dealer distinguishes defaulted Share, Catch, eliminations and remaining players', () => {

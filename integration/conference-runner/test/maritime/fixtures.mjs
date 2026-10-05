@@ -18,7 +18,7 @@ export function poke(phase = 'commit', row = roster[0]) {
 }
 export function discussion(row = roster[0]) {
   const { requested_action, response_schema_version, ...rest } = poke('commit', row);
-  return { schema_version: 1, type: 'discussion', ...rest, request_id: `discussion:${row.seat_id}`, max_message_chars: 200 };
+  return { schema_version: 1, type: 'discussion', ...rest, request_id: `discussion:${row.seat_id}` };
 }
 export function reply(request, extra = {}) {
   return { schema_version: 1, request_id: request.request_id, game_id: request.game_id,

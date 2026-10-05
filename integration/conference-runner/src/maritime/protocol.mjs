@@ -2,7 +2,7 @@ import {
   assertNoSensitiveMaterial, assertResponseIdentity, validateAgentResponse, validatePoke
 } from '../../../maritime-transport/src/validation.mjs';
 
-const REQUEST_KEYS = ['schema_version', 'type', 'request_id', 'game_id', 'round', 'phase', 'seat_id', 'team', 'chain_state', 'team_chat', 'max_message_chars'];
+const REQUEST_KEYS = ['schema_version', 'type', 'request_id', 'game_id', 'round', 'phase', 'seat_id', 'team', 'chain_state', 'team_chat'];
 const RESPONSE_KEYS = ['schema_version', 'type', 'request_id', 'game_id', 'round', 'phase', 'seat_id', 'team', 'status'];
 const DIAGNOSTIC_REQUEST_KEYS = ['schema_version', 'type', 'request_id', 'seat_id', 'team', 'mode', 'chain_state'];
 const DIAGNOSTIC_CHAIN_KEYS = ['chain_id', 'game_address', 'confirmed_block_number', 'confirmed_block_hash'];
@@ -92,8 +92,8 @@ function rejectDecisionMaterial(value) {
   }
 }
 
-function assertMessage(message, maximum = 200) {
-  if (typeof message !== 'string' || Array.from(message).length > maximum ||
+function assertMessage(message) {
+  if (typeof message !== 'string' ||
       /\b(?:reveal[ _-]?)?salt\b\s*[:=]/i.test(message)) {
     throw new TypeError('TEAM_MESSAGE_INVALID');
   }
@@ -112,7 +112,7 @@ function discussionPoke(request) {
 export function validateDiscussionRequest(request) {
   exact(request, REQUEST_KEYS);
   if (request.schema_version !== 1 || request.type !== 'discussion' ||
-      request.phase !== 'commit' || request.max_message_chars !== 200) {
+      request.phase !== 'commit') {
     throw new TypeError('DISCUSSION_REQUEST_INVALID');
   }
   assertNoSensitiveMaterial(request);

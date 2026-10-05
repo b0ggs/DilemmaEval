@@ -303,8 +303,8 @@ test('discussion schema failures preserve the owned failed check through the out
     [{ ...valid, unexpected: 'untrusted reply detail' }, 'MARITIME_REPLY_INVALID_ENVELOPE'],
     [{ ...valid, type: 'gameplay-response' }, 'MARITIME_REPLY_DISCUSSION_INVALID'],
     [{ ...valid, status: 'skipped' }, 'MARITIME_REPLY_DISCUSSION_INVALID'],
-    [{ ...valid, team_message: 'x'.repeat(201) }, 'MARITIME_REPLY_TEAM_MESSAGE_TOO_LONG'],
-    [{ ...valid, team_message: '🙂'.repeat(201) }, 'MARITIME_REPLY_TEAM_MESSAGE_TOO_LONG'],
+    [{ ...valid, team_message: null }, 'MARITIME_REPLY_PROTOCOL_INVALID'],
+    [{ ...valid, team_message: 'salt=fixture' }, 'MARITIME_REPLY_TEAM_MESSAGE_INVALID'],
     [{ ...valid, request_id: 'stale-request' }, 'MARITIME_REPLY_IDENTITY_MISMATCH']
   ]) {
     const report = { dispatches: [] };
@@ -320,6 +320,16 @@ test('discussion schema failures preserve the owned failed check through the out
     assert.equal(outcome.status, 'ambiguous');
     assert.equal(JSON.stringify(outcome).includes('untrusted reply detail'), false);
   }
+});
+
+test('transport returns long discussion verbatim instead of quarantining it for length', async () => {
+  const request = discussion();
+  const message = 'Consider the team payout. 🦀\n'.repeat(500);
+  const adapter = createMaritimeAdapter({ config, apiKey: 'fixture-credential',
+    fetchImpl: async () => jsonResponse({ response: JSON.stringify(discussionReply(request, { team_message: message })) }) });
+  const response = await adapter.dispatch({ seat: roster[0], request });
+  assert.equal(response.status, 'observed');
+  assert.equal(response.team_message, message);
 });
 
 function seatFromUrl(configuration, url) {
@@ -353,8 +363,9 @@ test('every gameplay and discussion prompt carries the team goal and exact same-
       assert.deepEqual(JSON.parse(envelope), original);
       assert.deepEqual(request, original);
       if (request.type === 'discussion') {
-        assert.match(instructions, /substantive team_message \(at most 200 characters\).*concrete strategic consideration/);
-        assert.match(instructions, /Draft no more than 140 ASCII characters.*Verify the character count with your terminal/);
+        assert.match(instructions, /substantive team_message.*concrete strategic consideration/);
+        assert.match(instructions, /succinct in ASD-STE100 format/);
+        assert.doesNotMatch(instructions, /\d+ (?:ASCII )?characters|character count/);
         assert.match(instructions, /phase deadline; do not disclose a private commit choice or secret/);
         assert.match(instructions, /Do not run a gameplay transaction/);
         assert.match(instructions, /Return exact JSON.*type:"discussion-response".*status:"observed",team_message/);

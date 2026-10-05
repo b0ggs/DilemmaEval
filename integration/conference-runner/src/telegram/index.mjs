@@ -101,7 +101,7 @@ export function formatDealerEvent(event, config) {
   return text;
 }
 
-function formatAgentMessage(message, team, config) {
+export function formatAgentMessages(message, team, config) {
   ensure(message && message.team === team, 'MESSAGE_TEAM_MISMATCH');
   const seat = config.roster.find((candidate) => candidate.seat_id === message.seat_id);
   ensure(seat?.team === team, 'MESSAGE_SEAT_MISMATCH');
@@ -110,10 +110,24 @@ function formatAgentMessage(message, team, config) {
   ensure(Number.isSafeInteger(message.sequence) && message.sequence > 0, 'INVALID_MESSAGE_SEQUENCE');
   ensure(typeof message.request_id === 'string' && message.request_id.length > 0, 'INVALID_MESSAGE_REQUEST');
   ensure(typeof message.message === 'string' && message.message.length > 0, 'INVALID_MESSAGE_TEXT');
-  const text = `${config.purpose === 'debug' ? '[DEBUG] ' : ''}${seat.seat_id} (${team === 'openclaw' ? 'OpenClaw' : 'Hermes'}) · Game ${message.game_id} · Round ${message.round}\n${message.message}`;
-  // Accepted words are preserved, including whitespace and punctuation. Never silently truncate.
-  ensure(text.length <= MAX_TEXT_LENGTH, 'AGENT_MESSAGE_TOO_LONG');
-  return text;
+  const header = `${config.purpose === 'debug' ? '[DEBUG] ' : ''}${seat.seat_id} (${team === 'openclaw' ? 'OpenClaw' : 'Hermes'}) · Game ${message.game_id} · Round ${message.round}`;
+  const text = `${header}\n${message.message}`;
+  if (text.length <= MAX_TEXT_LENGTH) return [{ text }];
+  // Telegram limits each wire message. Split delivery, never accepted agent text.
+  // Reserve enough header space even for the maximum possible part count.
+  const digits = String(message.message.length).length;
+  const capacity = MAX_TEXT_LENGTH - header.length - ' · Part /\n'.length - 2 * digits;
+  ensure(capacity >= 2, 'INVALID_MESSAGE_HEADER');
+  const chunks = []; let chunk = '';
+  for (const character of message.message) {
+    if (chunk.length + character.length > capacity) { chunks.push(chunk); chunk = ''; }
+    chunk += character;
+  }
+  if (chunk) chunks.push(chunk);
+  return chunks.map((body, index) => ({
+    text: `${header} · Part ${index + 1}/${chunks.length}\n${body}`,
+    message_part: index + 1, message_parts: chunks.length,
+  }));
 }
 
 /** A timeout covers both response headers and body, including non-cooperative injected transports. */
@@ -304,10 +318,13 @@ export function createTelegramMirror({ config, runtimeDir, token, fetchImpl = gl
         }
         for (const team of TEAMS) {
           ensure(Array.isArray(messages[team] ?? []), 'INVALID_TEAM_MESSAGES');
-          for (const message of messages[team] ?? []) additions.push({
-            key: `message:${team}:${message.game_id}:${message.sequence}`,
-            team, text: formatAgentMessage(message, team, config), priority: 3,
-          });
+          for (const message of messages[team] ?? []) {
+            const key = `message:${team}:${message.game_id}:${message.sequence}`;
+            for (const [index, part] of formatAgentMessages(message, team, config).entries()) additions.push({
+              key: index === 0 ? key : `${key}:part:${index + 1}`,
+              team, ...part, priority: 3,
+            });
+          }
         }
         const existing = new Map(state.entries.map((entry) => [entry.key, entry]));
         const staged = [];
