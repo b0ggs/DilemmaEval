@@ -285,6 +285,71 @@ test('lost authoritative phase reads abort discussion and block commits', async 
   assert.equal(f.advances.length, 0);
 });
 
+for (const action of ['commit', 'reveal']) {
+  test(`all ${action}s landing allows outstanding replies to finish before advance`, async t => {
+    let release;
+    const replies = new Promise(resolve => { release = resolve; });
+    let f;
+    f = await fixture(t, {
+      config: { agent_timeout_ms: 5000 },
+      snapshot: action === 'reveal' ? { phase: 'reveal', committed_count: 3 } : {},
+      dispatch: async ({ request, response }) => {
+        if (request.type === 'discussion') return response(request);
+        const player = f.snapshot.players.find(player => player.wallet_address === roster.find(seat => seat.seat_id === request.seat_id).wallet_address);
+        player[action === 'commit' ? 'committed' : 'revealed'] = true;
+        f.setSnapshot({ [action === 'commit' ? 'committed_count' : 'revealed_count']: f.snapshot.players.filter(player => player[action === 'commit' ? 'committed' : 'revealed']).length });
+        await replies;
+        return response(request);
+      }
+    });
+    if (action === 'reveal') f.snapshot.players.forEach(player => { player.committed = true; });
+    const read = f.dependencies.chain.readSnapshot;
+    let observedComplete = false;
+    f.dependencies.chain.readSnapshot = async args => {
+      const snapshot = await read(args);
+      if (!observedComplete && snapshot[action === 'commit' ? 'committed_count' : 'revealed_count'] === 3) {
+        observedComplete = true;
+        // Let the watcher process the completed chain predicate before replies
+        // return. The former shared watcher aborted every outstanding call here.
+        setTimeout(release, 25);
+      }
+      return snapshot;
+    };
+    await f.runner.tick();
+    assert.equal(observedComplete, true);
+    const calls = f.dispatches.filter(call => call.request.requested_action === action);
+    assert.equal(calls.length, 3);
+    assert.ok(calls.every(call => !call.signal.aborted));
+    assert.equal(f.runner.getState().health.some(issue => issue.code === 'AGENT_ACTION_UNCERTAIN'), false);
+    const records = await createDurableStore({ directory: path.join(f.runtimeDir, 'coordinator') }).entries('dispatch:');
+    const accepted = records.filter(({ value }) => value.action === action);
+    assert.equal(accepted.length, 3);
+    assert.ok(accepted.every(({ value }) => ['acknowledged', 'chain-confirmed'].includes(value.state) && value.status === 'observed'));
+    assert.equal(f.advances.length, 1);
+  });
+}
+
+test('an actual reveal deadline still aborts in-flight replies and retains uncertainty', async t => {
+  let f;
+  f = await fixture(t, {
+    config: { agent_timeout_ms: 5000 },
+    snapshot: { phase: 'reveal', committed_count: 3 },
+    dispatch: () => {
+      f.setSnapshot({ block_number: '121', block_hash: hash(121), clock: { unit: 'block', current: '121', deadline: '120' } });
+      return new Promise(() => {});
+    }
+  });
+  f.snapshot.players.forEach(player => { player.committed = true; });
+  await f.runner.tick();
+  assert.equal(f.dispatches.length, 3);
+  assert.ok(f.dispatches.every(call => call.signal.aborted));
+  const records = await createDurableStore({ directory: path.join(f.runtimeDir, 'coordinator') }).entries('dispatch:');
+  assert.ok(records.every(({ value }) => value.state === 'unknown'));
+  assert.ok(records.every(({ value }) => value.dispatch_diagnostics.failure.timeout_source === 'phase_abort'));
+  assert.ok(records.every(({ value }) => value.dispatch_diagnostics.failure.timeout_ms === undefined));
+  assert.equal(f.advances.length, 1);
+});
+
 test('runner propagates one absolute deadline, aborts it, and bounds an adapter that ignores abort', async (t) => {
   const f = await fixture(t, {
     config: { agent_timeout_ms: 25 },

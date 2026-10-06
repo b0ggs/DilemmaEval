@@ -88,7 +88,9 @@ function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal
     abort = () => {
       if (cleaning) return;
       if (controller.signal.aborted) return;
-      diagnostics.failure(timeout, { source: phaseSignal?.aborted ? 'phase_abort' : 'action_allowance', timeoutMs: milliseconds });
+      const phaseAborted = phaseSignal?.aborted === true;
+      diagnostics.failure(timeout, { source: phaseAborted ? 'phase_abort' : 'action_allowance',
+        ...(phaseAborted ? {} : { timeoutMs: milliseconds }) });
       timeout.dispatch_diagnostics = diagnostics.snapshot();
       controller.abort();
       // An abort-aware adapter can now report whether work expired before any
@@ -600,7 +602,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     if (result.status === 'advance-requested') await refresh();
   }
 
-  function watchDiscussionPhase(initial) {
+  function watchDiscussionPhase(initial, { stopWhenAllActed = true } = {}) {
     const controller = new AbortController();
     let stopped = false;
     let timer;
@@ -612,7 +614,9 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
         // Use the authoritative block clock, not an estimated seconds-per-block
         // deadline. One watcher covers every active or queued discussion seat.
         if (current.game_id !== initial.game_id || current.round !== initial.round || current.phase !== initial.phase ||
-            current.clock?.deadline !== initial.clock.deadline || evaluateChainSnapshot(coreSnapshot(current)).eligible) {
+            current.clock?.deadline !== initial.clock.deadline ||
+            BigInt(current.clock.current) > BigInt(current.clock.deadline) ||
+            stopWhenAllActed && evaluateChainSnapshot(coreSnapshot(current)).eligible) {
           controller.abort();
         }
       } catch (error) {
@@ -663,7 +667,10 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
   }
 
   async function phaseDispatch(snapshot, seats, action) {
-    const phase = watchDiscussionPhase(snapshot);
+    // All commits/reveals landing makes advance eligible, but their chat jobs
+    // may still be returning receipts. Drain those bounded replies and cleanup
+    // before advancing; actual expiry or a changed phase still cancels work.
+    const phase = watchDiscussionPhase(snapshot, { stopWhenAllActed: false });
     try { await Promise.all(seats.map(seat => dispatch(seat, snapshot, action, phase.signal))); }
     finally { phase.stop(); }
     if (phase.failure) throw phase.failure;

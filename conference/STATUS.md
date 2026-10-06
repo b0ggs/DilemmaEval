@@ -15,8 +15,25 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
 - Current: Game 25 is confirmed and running in debug-game-5-refresh-1. All ten
   joins and round-1 discussions/commits/reveals completed successfully by
-  12:38 UTC. Round 1 resolved with zero defaults; five players survived and
-  round 2 started. No gameplay errors. Every join
+  12:38 UTC. Round 1 resolved with zero defaults; five players survived.
+  Round-2 hs-2/hs-3 commits landed but chat was aborted by the coordinator's
+  phase_abort signal after about 51s of action, leaving unknown job completion
+  and two quarantines. Three healthy seats continue; no signing replay.
+  New diagnostics retain chat / AGENT_TIMEOUT / phase_abort as the first failure.
+  Cause established: phaseDispatch reuses the discussion watcher, whose
+  all-required-acted predicate aborts chat before late successful replies return.
+  Narrow coordinator correction now drains replies when all moves have landed;
+  actual deadline/game/round/phase changes still abort, and pre-submit guards
+  remain. Runner tests pass 33/33, including commit/reveal reply races and actual
+  deadline expiry; original new-test assertions corrected for acknowledged
+  records becoming chain-confirmed during refresh. Private verified log:
+  /private/tmp/dilemma-phase-completion-runner-verified-20261006.log.
+  Actual controlled-wrapper checks pass 4/4; focused guard/timer checks pass 4/4
+  after omitting a timer budget from phase-abort records (there is no elapsed
+  180s timer in that case). Logs: /private/tmp/dilemma-phase-completion-wrappers-20261006.log
+  and /private/tmp/dilemma-phase-abort-diagnostics-20261006.log.
+  Game 25 uses its original loaded code; the correction needs the next game.
+  Every join
   confirmed sleep; live diagnostics separate second-wave queue/action/cleanup
   times (oc-1: 54s/53s/7s). The user authorized this
   game on October 6. Its first startup
@@ -151,4 +168,4 @@ A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults
 A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs-5 commit/hs-3 reveal timeouts; 64/64 DEBUG messages sent; terminal/awake 0/active 0/quarantine 0 confirmed; operator stopped. No team-message failures. User requested stop for a new-session audit.
 A4 / Game 24: completed in five rounds / 68 minutes, nine chain defaults, all_seats_acted=false. All ten joined/discussed. Four MARITIME_TIMEOUT quarantines: oc-4 round-1 commit, oc-1 round-3 reveal, hs-4/5 round-4 reveal. The latter reveals landed but completion remained unknown; hs-1/2/3 continued. Telegram pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stop and later inactive reads; operator stopped. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) and timeout-stage labels apply to the next attempt. User requested stop before internet loss; no new attempt.
 A5 / pre-creation startup stopped: user-authorized October 6; fresh launch preflight passed, operator/coordinator started 12:15 UTC. readEvents RPC_ERROR isolated to HTTP 413 on 1,000 blocks; 100 blocks succeeds. Fixed pagination and safe request-size cause; 27/27 chain regressions, no installed-source changes/reinstall. No game/fuse/wake/signing call; counters remain 0 today / 4 total. Old report and cleanup in debug-game-5; resume in a fresh directory. Prelaunch counter read also corrected for historical at/started_at date fields before launch.
-A5 / Game 25 running: debug-game-5-refresh-1 and matching inputs prepared; operator/coordinator started 12:24 UTC. Runtime initialization passed with fixed pagination; one creation accepted and Game 25 confirmed by 12:26 UTC. All ten joins and round-1 discussions/commits/reveals succeeded; round 1 resolved with zero defaults by 12:38 UTC, five players surviving into round 2. No gameplay errors. First live game with ef01ced wrapper corrections and 03e30c8 diagnostics; original unsent startup remains archived in place.
+A5 / Game 25 running: debug-game-5-refresh-1 and matching inputs prepared; operator/coordinator started 12:24 UTC. All ten joins and round-1 discussions/commits/reveals succeeded; round 1 resolved with zero defaults. Round 2: hs-2/hs-3 commits landed, but all-committed watcher cancelled their unfinished chat and retained quarantine; two defaulted reveals. Three healthy seats continue in round 3, five players still alive on-chain. First live game with ef01ced wrappers / 03e30c8 diagnostics; exact phase_abort cause isolated and correction verified locally (33 runner + 4 wrapper + 4 timer tests). Original unsent RPC startup preserved in debug-game-5; its pagination fix is already live.
