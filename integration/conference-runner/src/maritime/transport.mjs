@@ -48,6 +48,7 @@ const NATIVE_RECEIPT_CODES = new Set([
     .map(code => `OPENCLAW_RECEIPT_REFUSED_${code.toUpperCase().replaceAll('-', '_')}`)
 ]);
 const CONTINUITY_FAILURE_CODES = new Set([
+  'MARITIME_PRE_CHAT_TIMEOUT', 'MARITIME_CHAT_TIMEOUT', 'MARITIME_COMPLETED_CLEANUP_TIMEOUT',
   'PERSISTENT_ROOT_CHANGED', 'INSTALL_DIRECTORY_FAILED', 'INSTALL_RUNTIME_FAILED',
   'INSTALL_EVIDENCE_INVALID', 'INSTALL_PUBLIC_ARTIFACT_FLUSH_FAILED',
   'OBSERVER_TRANSITION_FAILED', 'HERMES_OAUTH_POOL_UNVERIFIED', 'DEBUG_AGENT_PREPARATION_FAILED',
@@ -612,9 +613,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             }),
             getAgent: () => operation(() => getAgent())
           })),
-          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('CONTINUITY_TIMEOUT')), waitMs); }),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(
+            new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous: boundary.remotePostStarted })), waitMs); }),
           ...(boundary.signal ? [new Promise((_, reject) => {
-            onAbort = () => reject(new Error('CONTINUITY_TIMEOUT'));
+            onAbort = () => reject(new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous: boundary.remotePostStarted }));
             if (boundary.signal.aborted) onAbort();
             else boundary.signal.addEventListener('abort', onAbort, { once: true });
           })] : [])
@@ -898,6 +900,12 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           if (!await sleepAndRelease() && awakeLimit !== undefined) throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
           return structuredClone(result);
         } catch (error) {
+          const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
+          const diagnosticCode = safeMaritimeDiagnosticCode(error?.diagnostic_code);
+          if (transportCode === 'MARITIME_TIMEOUT' && (!diagnosticCode || diagnosticCode === 'MARITIME_TIMEOUT')) {
+            error.diagnostic_code = chatCompleted && cleanupStarted ? 'MARITIME_COMPLETED_CLEANUP_TIMEOUT'
+              : chatStarted ? 'MARITIME_CHAT_TIMEOUT' : 'MARITIME_PRE_CHAT_TIMEOUT';
+          }
           if ((!chatStarted && error?.code === 'MARITIME_DISPATCH_EXPIRED' || discussion && chatCompleted) && boundary.remotePostStarted &&
               !boundary.unknownRemoteWork && boundary.pending === 0 && !cleanupAttempted) {
             try { await sleepAndRelease(); } catch (cleanupError) {

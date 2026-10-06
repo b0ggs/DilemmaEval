@@ -85,6 +85,33 @@ async function fixture(t, options = {}) {
   return { directory, config: configuration, adapter, adapterOptions, quarantine, calls, chats, statuses, get maximum() { return maximum; } };
 }
 
+for (const stage of ['pre-chat', 'chat', 'completed-cleanup']) {
+  test(`timeout evidence names ${stage} without releasing unknown work or repeating chat`, async t => {
+    const f = await fixture(t, {
+      ...(stage === 'chat' ? { chat: () => new Promise(() => {}) } : {
+        inspection: () => new Promise(() => {}),
+        verify: async (_seat, count, { execute }) => {
+          if (count === (stage === 'pre-chat' ? 1 : 2)) await execute(['node', 'fixture-inspection']);
+        }
+      })
+    });
+    const adapter = createMaritimeAdapter({ ...f.adapterOptions, timeoutMs: 25, cleanupTimeoutMs: 25 });
+    const report = { dispatches: [] };
+    const journal = createProofDispatchJournal({ adapter, report, persist: async () => {},
+      stopController: new AbortController(), debug: true });
+    const request = poke('join', seats[0]);
+    await assert.rejects(journal.dispatch({ seat: seats[0], request }), error => {
+      assert.equal(error.transport_code ?? error.code, 'MARITIME_TIMEOUT');
+      assert.equal(error.diagnostic_code, `MARITIME_${stage.toUpperCase().replaceAll('-', '_')}_TIMEOUT`);
+      return true;
+    });
+    assert.equal(report.dispatches[0].diagnostic_code, `MARITIME_${stage.toUpperCase().replaceAll('-', '_')}_TIMEOUT`);
+    assert.equal(f.chats.length, stage === 'pre-chat' ? 0 : 1);
+    assert.equal(f.calls.filter(row => row.path.endsWith('/sleep')).length, 0);
+    assert.deepEqual(await f.quarantine.reservedAgentIds(), [seats[0].agent_id]);
+  });
+}
+
 for (const oversized of [false, true]) {
   test(`completed ${oversized ? 'oversized' : 'malformed'} discussion gets one deterministic repair without another wake`, async t => {
     const f = await fixture(t, { chat: ({ request, count }) => jsonResponse({ response: count === 1 ?

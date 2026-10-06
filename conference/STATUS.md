@@ -39,6 +39,10 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Clean full-suite rerun passed 656/656 (exit 0, 15m37s). Log:
   fix-batch-full-suite-clean.log in the v2 private root. Wrapper fixes are
   committed/pushed as ef01ced; no new agent-side changes or reinstall needed.
+- V2 failure reporting now labels pre-chat, chat and completed-cleanup timeouts,
+  including the continuity timer, without changing retries or quarantine.
+  Targeted checks pass 66/66 (fix-timeout-boundary-verified.log). This coordinator
+  reporting change follows the full checkpoint; rerun the full suite before proof.
 - Local policy: JSON retained, no character cap, ASD-STE100 guidance; long Telegram
   deliveries preserve text in labeled parts. Covered by the clean 656-test suite.
 - Updated JSON/ASD-STE100 protocol is deployed on all ten seats.
@@ -89,4 +93,4 @@ Games 21–23 cleaned up. Counted-draft fix to Game 23 creation: about 60 minute
 A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid; 56/56 DEBUG messages sent; terminal/awake 0/active 0 confirmed.
 A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults; 50/50 DEBUG messages sent; terminal/awake 0/active 0 confirmed. First post-fix failure.
 A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs-5 commit/hs-3 reveal timeouts; 64/64 DEBUG messages sent; terminal/awake 0/active 0/quarantine 0 confirmed; operator stopped. No team-message failures. User requested stop for a new-session audit.
-A4 / Game 24: running; all ten joined/discussed. oc-4 round-1 commit MARITIME_TIMEOUT, quarantined; other nine continue. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) were found after creation and apply to the next attempt. Cleanup pending.
+A4 / Game 24: round 4 running; all ten joined/discussed. oc-4 round-1 commit and oc-1 round-3 reveal MARITIME_TIMEOUT, quarantined; five Hermes continue. Three chain defaults through round 3. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) and timeout-stage labels apply to the next attempt. Cleanup pending.
