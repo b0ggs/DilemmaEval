@@ -42,7 +42,11 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   integration checks 98/98. Logs: fix-verified-regressions.log,
   fix-final-runner-tests.log and fix-integration-targeted.log in the v2 private root.
   Fresh 00:40 UTC preflight: active game 0, awake 0, owner nonce 508; every seat
-  admitted/funded. Next: commit, batch reinstall all ten, authorized debug game.
+  admitted/funded. Committed as 4adfeca after a clean staged secret scan.
+- All-ten reinstall in progress: hs-1/hs-2 installed, OAuth route verified and
+  sleeping; hs-3 started. Full suite in progress. Corrected one old exception
+  assertion for #03's fixed unsent response; permit regressions pass 10/10,
+  with zero signing calls on both preparation and final-guard rejection.
 - User stopped broader investigation; provide a broad audit prompt for a new session.
 - Local policy: JSON retained, no character cap, ASD-STE100 guidance; long Telegram
   deliveries preserve text in labeled parts. Targeted tests 198/198; full suite predates this change.
@@ -61,7 +65,7 @@ gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram ro
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
 October 5 counters under this authorization: creations 3/10 (total 3/30),
-additional wakes 26/60, owner/operator gas 0.00002619/0.07 ETH.
+additional wakes 29/60 (all-ten reinstall in progress), owner/operator gas 0.00002619/0.07 ETH.
 Games 21–23 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
 
 ## Run map

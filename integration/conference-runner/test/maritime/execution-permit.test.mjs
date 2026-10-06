@@ -216,7 +216,11 @@ test('runtime is checked again before prepare_commit and before final submission
           game:f.config.game_address,gameId:f.request.game_id,round:f.request.round,wallet:f.seat.wallet_address,
           choice:options.choice,salt:`0x${'b'.repeat(64)}`,commitment:`0x${'c'.repeat(64)}`}));
         return {exit_code:0,error:null};}}})});
-    await assert.rejects(runtime.execute({request:f.request,choice:'share'}),/PERMIT_INVALID/);
+    const result=await runtime.execute({request:f.request,choice:'share'});
+    assert.equal(result.status,'error');assert.equal(result.error.code,'PLAYER_EXECUTION_PERMIT_INVALID');
+    const [name]=await fs.readdir(join(f.settings.state_directory,'requests'));
+    const journal=JSON.parse(await fs.readFile(join(f.settings.state_directory,'requests',name),'utf8'));
+    assert.equal(journal.stage,changeAt===2?'preparing':'unsent');assert.equal(journal.submission_state,'unsent');
     assert.equal(prepares,changeAt===2?0:1);assert.equal(submits,0);assert.equal(checks,changeAt);
   }
 });
