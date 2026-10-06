@@ -101,9 +101,11 @@ export function createChainReader({ config, provider = makeProvider(config.rpc_u
     if (start > end) return [];
     return checkedRead(block, async () => {
       const logs = [];
-      // Public Base RPCs impose small getLogs ranges. Keep retries with the caller.
-      for (let first = start; first <= end; first += 1000) {
-        logs.push(...await provider.getLogs({ address, fromBlock: first, toBlock: Math.min(first + 999, end) }));
+      // The live Base RPC rejects 1,000-block reads with HTTP 413. A prepared
+      // run can need that much catch-up; use the verified 100-block range.
+      // Keep retries with the caller and retain one canonical read boundary.
+      for (let first = start; first <= end; first += 100) {
+        logs.push(...await provider.getLogs({ address, fromBlock: first, toBlock: Math.min(first + 99, end) }));
       }
       const parsed = logs.filter((log) => !log.removed && log.address.toLowerCase() === address.toLowerCase()).map((log) => {
         try { return { log, event: iface.parseLog(log) }; } catch { return null; }

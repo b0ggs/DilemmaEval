@@ -13,14 +13,19 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   Historical full checkpoints: 625/625 and 631/631; debug fixtures passed.
 - Step 5: Games 21–23 completed with defaults; Telegram and terminal cleanup
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
-- Current: local logging changes complete and pushed as 03e30c8. The user now
-  authorizes preparation up to launch, with no new game until their instruction.
-  Fresh preflight, both non-signing smoke checks and fresh debug preparation
-  passed. Ready to launch the next debug game; waiting for the user's instruction.
+- Current: the user authorized the debug game on October 6. Its first startup
+  stopped before creation: readEvents queried 1,000 blocks accumulated since
+  preparation, and the live RPC rejected it with HTTP 413 / -32614. No fuse was
+  used, game created, agent woken or transaction sent. Operator stopped.
+  Event reads now use verified 100-block pages; fixed reason RPC_REQUEST_TOO_LARGE
+  retains this cause. Targeted chain tests pass 27/27 (private log:
+  /private/tmp/dilemma-rpc-range-targeted-20261006.log); the real 1,094-block
+  backlog now reads successfully. Active 0 / awake 0 confirmed. Preparing a fresh directory
+  for the same authorized creation; old startup and inputs remain preserved.
 - October 5 shutdown checkpoint: Game 24 terminal; active game 0, account awake 0
   and quarantine 0 confirmed. Coordinator, tests and isolated operator stopped.
-- Next, only after the user starts a game: verify coordinator corrections and
-  logging in the freshly prepared debug attempt, then continue
+- Next: monitor A5, verify coordinator corrections and logging, and confirm
+  terminal/active 0/awake 0 cleanup. Then continue
   V2 step 6. Six fix_issue.MD corrections are implemented/deployed;
   live verification and final proof remain. Deferred findings remain out of scope.
 - October 6 prelaunch checkpoint, 11:45 UTC: active game 0, account awake 0,
@@ -99,9 +104,9 @@ additional wakes 36/60 (all-ten reinstall complete), owner/operator gas
 0.000035722944/0.07 ETH through Game 24, reconciled from canonical receipts.
 Games 21–24 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
 October 6 logging work used zero creations, additional wakes or owner gas.
-October 6 prelaunch preparation: creations 0/10 (total 4/30), additional wakes
-2/60, owner gas 0/0.07 ETH. Both smoke wakes were recorded before waking in the
-private additional-wakes.json ledger; both seats are back asleep.
+October 6: creations 0/10 (total 4/30); the stopped startup sent no creation.
+The next authorized creation will be 1/10 (total 5/30). Additional wakes 2/60;
+owner gas 0/0.07 ETH. Both smoke wakes were counted before waking and cleaned up.
 
 ## Run map
 
@@ -136,3 +141,4 @@ A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid
 A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults; 50/50 DEBUG messages sent; terminal/awake 0/active 0 confirmed. First post-fix failure.
 A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs-5 commit/hs-3 reveal timeouts; 64/64 DEBUG messages sent; terminal/awake 0/active 0/quarantine 0 confirmed; operator stopped. No team-message failures. User requested stop for a new-session audit.
 A4 / Game 24: completed in five rounds / 68 minutes, nine chain defaults, all_seats_acted=false. All ten joined/discussed. Four MARITIME_TIMEOUT quarantines: oc-4 round-1 commit, oc-1 round-3 reveal, hs-4/5 round-4 reveal. The latter reveals landed but completion remained unknown; hs-1/2/3 continued. Telegram pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stop and later inactive reads; operator stopped. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) and timeout-stage labels apply to the next attempt. User requested stop before internet loss; no new attempt.
+A5 / pre-creation startup stopped: user-authorized October 6; fresh launch preflight passed, operator/coordinator started 12:15 UTC. readEvents RPC_ERROR isolated to HTTP 413 on 1,000 blocks; 100 blocks succeeds. Fixed pagination and safe request-size cause; 27/27 chain regressions, no installed-source changes/reinstall. No game/fuse/wake/signing call; counters remain 0 today / 4 total. Old report and cleanup in debug-game-5; resume in a fresh directory. Prelaunch counter read also corrected for historical at/started_at date fields before launch.

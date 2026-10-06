@@ -10,6 +10,7 @@ import { Interface, Wallet, Transaction } from 'ethers';
 import { GAME_ABI, CONFIG_FIELDS } from '../../src/chain/abi.mjs';
 import { createChainReader, createIsolatedSigner, createLauncherClient, createPhaseExecutorClient, createSignerServer } from '../../src/chain/index.mjs';
 import { PINNED_DEPLOYMENT, assertSignerDeployment, assertSignerEnvironment, prepareSignerDirectory } from '../../src/chain/guards.mjs';
+import { chainFailureCode, safeChainDiagnostic } from '../../src/chain/diagnostics.mjs';
 
 const iface = new Interface([...GAME_ABI, 'function identityRegistry() view returns(address)']);
 const addresses = { game: '0x1111111111111111111111111111111111111111', auth: '0x2222222222222222222222222222222222222222', owner: '0x3333333333333333333333333333333333333333', registry: '0x5555555555555555555555555555555555555555', player: '0x4444444444444444444444444444444444444444' };
@@ -159,6 +160,35 @@ test('completed event retains zero awards so scoreboard can verify every player'
   provider.logs = [event('GameEnded', [1, 1, 2, 0, 0], 0)];
   const events = await createChainReader({ config, provider }).readEvents({ fromBlock: '10', toBlock: '100' });
   assert.deepEqual(events[0].data.awards, [{ wallet_address: addresses.player, award_wei: '0' }]);
+});
+
+test('delayed preparation catches up through an RPC with a 100-block log limit without losing boundary events', async () => {
+  const { provider, calls } = fixture();
+  provider.getBlockNumber = async () => 1002;
+  const blocks = [1, 100, 101, 200, 201, 1000, 1001, 1002];
+  provider.logs = blocks.map((block, index) => event('GameCreated', [index + 1, 200, 1000, 3, 3, 2], index, block));
+  const getLogs = provider.getLogs.bind(provider);
+  provider.getLogs = async filter => {
+    if (filter.toBlock - filter.fromBlock + 1 > 100) {
+      throw Object.assign(new Error('SECRET_PROVIDER_ERROR'), { code: 'SERVER_ERROR', response: { statusCode: 413 } });
+    }
+    return getLogs(filter);
+  };
+  const events = await createChainReader({ config, provider }).readEvents({ fromBlock: '1', toBlock: '5000' });
+  assert.deepEqual(events.map(entry => entry.block_number), blocks.slice(0, -1).map(String));
+  assert.equal(new Set(events.map(entry => entry.id)).size, events.length);
+  const ranges = calls.filter(call => call.filter).map(call => call.filter);
+  assert.equal(ranges[0].fromBlock, 1);
+  assert.equal(ranges.at(-1).toBlock, 1001);
+  for (let index = 1; index < ranges.length; index++) assert.equal(ranges[index].fromBlock, ranges[index - 1].toBlock + 1);
+});
+
+test('RPC request-size rejection has a fixed safe reason without retaining provider prose', () => {
+  const error = Object.assign(new Error('SECRET_PROVIDER_URL'), { code: 'SERVER_ERROR', response: { statusCode: 413 } });
+  assert.equal(chainFailureCode(error), 'RPC_REQUEST_TOO_LARGE');
+  const diagnostic = safeChainDiagnostic({ stage: 'readEvents', code: chainFailureCode(error), elapsed_ms: 185, message: error.message });
+  assert.deepEqual(diagnostic, { stage: 'readEvents', code: 'RPC_REQUEST_TOO_LARGE', elapsed_ms: 185 });
+  assert.equal(JSON.stringify(diagnostic).includes('SECRET_'), false);
 });
 
 test('cancelled game refunds remain separate from player awards', async () => {
