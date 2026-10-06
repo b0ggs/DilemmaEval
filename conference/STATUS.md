@@ -13,15 +13,23 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   Historical full checkpoints: 625/625 and 631/631; debug fixtures passed.
 - Step 5: Games 21–23 completed with defaults; Telegram and terminal cleanup
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
-- Current: the user authorized the debug game on October 6. Its first startup
+- Current: Game 25 is confirmed and running in debug-game-5-refresh-1. All ten
+  joins and round-1 discussions/commits/reveals completed successfully by
+  12:38 UTC. Round 1 resolved with zero defaults; five players survived and
+  round 2 started. No gameplay errors. Every join
+  confirmed sleep; live diagnostics separate second-wave queue/action/cleanup
+  times (oc-1: 54s/53s/7s). The user authorized this
+  game on October 6. Its first startup
   stopped before creation: readEvents queried 1,000 blocks accumulated since
   preparation, and the live RPC rejected it with HTTP 413 / -32614. No fuse was
   used, game created, agent woken or transaction sent. Operator stopped.
   Event reads now use verified 100-block pages; fixed reason RPC_REQUEST_TOO_LARGE
   retains this cause. Targeted chain tests pass 27/27 (private log:
   /private/tmp/dilemma-rpc-range-targeted-20261006.log); the real 1,094-block
-  backlog now reads successfully. Active 0 / awake 0 confirmed. Preparing a fresh directory
-  for the same authorized creation; old startup and inputs remain preserved.
+  backlog now reads successfully. Active 0 / awake 0 confirmed. Fix pushed as
+  50f62af. Fresh debug-game-5-refresh-1 preparation passed; operator/coordinator
+  restarted at 12:24 UTC, runtime initialization passed and creation guards are
+  running. Old startup and inputs remain preserved.
 - October 5 shutdown checkpoint: Game 24 terminal; active game 0, account awake 0
   and quarantine 0 confirmed. Coordinator, tests and isolated operator stopped.
 - Next: monitor A5, verify coordinator corrections and logging, and confirm
@@ -104,9 +112,10 @@ additional wakes 36/60 (all-ten reinstall complete), owner/operator gas
 0.000035722944/0.07 ETH through Game 24, reconciled from canonical receipts.
 Games 21–24 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
 October 6 logging work used zero creations, additional wakes or owner gas.
-October 6: creations 0/10 (total 4/30); the stopped startup sent no creation.
-The next authorized creation will be 1/10 (total 5/30). Additional wakes 2/60;
-owner gas 0/0.07 ETH. Both smoke wakes were counted before waking and cleaned up.
+October 6: creations 1/10 (total 5/30), Game 25 confirmed; the earlier stopped
+startup sent no creation. Additional wakes 2/60; owner gas was 0/0.07 ETH before
+Game 25 and will be reconciled from its receipts at cleanup. Both smoke wakes
+were counted before waking and cleaned up.
 
 ## Run map
 
@@ -142,3 +151,4 @@ A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults
 A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs-5 commit/hs-3 reveal timeouts; 64/64 DEBUG messages sent; terminal/awake 0/active 0/quarantine 0 confirmed; operator stopped. No team-message failures. User requested stop for a new-session audit.
 A4 / Game 24: completed in five rounds / 68 minutes, nine chain defaults, all_seats_acted=false. All ten joined/discussed. Four MARITIME_TIMEOUT quarantines: oc-4 round-1 commit, oc-1 round-3 reveal, hs-4/5 round-4 reveal. The latter reveals landed but completion remained unknown; hs-1/2/3 continued. Telegram pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stop and later inactive reads; operator stopped. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) and timeout-stage labels apply to the next attempt. User requested stop before internet loss; no new attempt.
 A5 / pre-creation startup stopped: user-authorized October 6; fresh launch preflight passed, operator/coordinator started 12:15 UTC. readEvents RPC_ERROR isolated to HTTP 413 on 1,000 blocks; 100 blocks succeeds. Fixed pagination and safe request-size cause; 27/27 chain regressions, no installed-source changes/reinstall. No game/fuse/wake/signing call; counters remain 0 today / 4 total. Old report and cleanup in debug-game-5; resume in a fresh directory. Prelaunch counter read also corrected for historical at/started_at date fields before launch.
+A5 / Game 25 running: debug-game-5-refresh-1 and matching inputs prepared; operator/coordinator started 12:24 UTC. Runtime initialization passed with fixed pagination; one creation accepted and Game 25 confirmed by 12:26 UTC. All ten joins and round-1 discussions/commits/reveals succeeded; round 1 resolved with zero defaults by 12:38 UTC, five players surviving into round 2. No gameplay errors. First live game with ef01ced wrapper corrections and 03e30c8 diagnostics; original unsent startup remains archived in place.
