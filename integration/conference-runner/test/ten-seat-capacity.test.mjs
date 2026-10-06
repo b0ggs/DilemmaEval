@@ -35,6 +35,13 @@ async function setup({ unrelated = [], inventory, chat, sleep, timeoutMs = 1000 
   const fetchImpl = async (url, options) => {
     const pathname = new URL(url).pathname;
     if (options.method === 'GET') {
+      if (pathname !== '/api/agents') {
+        const seat = config.roster.find(row => row.agent_id === pathname.split('/')[3]);
+        assert.ok(seat);
+        assert.equal(status.get(seat.agent_id), 'sleeping');
+        calls.push({ kind: 'sleep-confirmed', seat_id: seat.seat_id });
+        return jsonResponse({ id: seat.agent_id, framework: seat.harness, status: 'sleeping' });
+      }
       assert.equal(pathname, '/api/agents');
       calls.push({ kind: 'inventory' });
       const rows = [...status].map(([id, state]) => ({ id, status: state }));
@@ -89,7 +96,6 @@ async function setup({ unrelated = [], inventory, chat, sleep, timeoutMs = 1000 
       const result = custom ?? jsonResponse({ status: 'sleeping' });
       if (result.status === 200 && (await result.clone().json()).status === 'sleeping') {
         status.set(seat.agent_id, 'sleeping');
-        calls.push({ kind: 'sleep-confirmed', seat_id: seat.seat_id });
       }
       return result;
     }
@@ -215,10 +221,10 @@ test('ten-seat timeout, ignored abort and explicit chat rejection retain the fiv
   }
 });
 
-test('ten-seat explicit sleep rejection preserves the validated result and blocks rotation and fresh requests', async () => {
+test('ten-seat explicit sleep rejection reports failed cleanup and blocks rotation and fresh requests', async () => {
   const f = await setup({ sleep: () => new Response('{}', { status: 400 }) });
   const outcomes = await f.burst(Date.now() + 100);
-  assert.ok(outcomes.slice(0, 5).every(outcome => outcome.status === 'fulfilled'));
+  assert.ok(outcomes.slice(0, 5).every(outcome => outcome.status === 'rejected' && outcome.reason.code === 'MARITIME_HTTP_400'));
   outcomes.slice(5).forEach(assertExpired);
   assert.equal(count(f, 'sleep'), 5);
   assert.equal(count(f, 'sleep-confirmed'), 0);

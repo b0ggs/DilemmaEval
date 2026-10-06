@@ -4,6 +4,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createConferenceRunner } from './runner/index.mjs';
 import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './maritime/transport.mjs';
+import { validateGameplayResponse } from './maritime/protocol.mjs';
 import { createGuardedLauncher, validatePreparedProof } from './proof-control.mjs';
 import { createProofDispatchJournal, writeProofReport } from '../../../conference/operations/saved-helpers/proof-dispatch-journal.mjs';
 
@@ -160,7 +161,7 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
 
   // In-flight operations may return after a sibling fails. Keep their actual
   // outcomes until the absolute deadline, when unresolved outcomes are ambiguous.
-  async function boundedCall(callback, code, { mutation = false, allowStopped = false } = {}) {
+  async function boundedCall(callback, code, { mutation = false, allowStopped = false, agentRequest } = {}) {
     if (!allowStopped) assertOpen();
     if (deadlineController.signal.aborted) throw fixedError(report.failure?.code ?? 'PROOF_HARD_DEADLINE', mutation);
     let onAbort;
@@ -176,25 +177,35 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
         const diagnosticCode = safeMaritimeDiagnosticCode(error?.diagnostic_code);
         if (transportCode) wrapped.transport_code = transportCode;
         if (diagnosticCode) wrapped.diagnostic_code = diagnosticCode;
+        if (agentRequest && error?.cleanup_confirmed === true && error.completed_request_id === agentRequest.request_id) {
+          wrapped.completed_request_id = agentRequest.request_id;
+          wrapped.cleanup_confirmed = true;
+        }
+        if (agentRequest && error?.recovered_response) {
+          try { wrapped.recovered_response = validateGameplayResponse(error.recovered_response, agentRequest); }
+          catch { /* Never forward a malformed or mismatched recovery response. */ }
+        }
         throw wrapped;
       }), aborted]);
     } finally { deadlineController.signal.removeEventListener('abort', onAbort); }
   }
 
   const journal = createProofDispatchJournal({ report, persist, stopController, now: clock, debug,
-    adapter: { dispatch: async args => {
+    adapter: { capacityManaged: agents.capacityManaged === true, dispatch: async args => {
       // Confirmation can first arrive inside tick's refresh, before play sends
       // its first request and before the outer loop receives that tick's state.
       observeConfirmedGame(runner.getState());
       assertOpen();
       if (!creationStarted || !report.game_id || args.request?.game_id !== report.game_id) throw fixedError('PROOF_GAME_IDENTITY_UNVERIFIED');
-      const deadlineAt = Math.min(args.deadline_at_ms, options.hardStopAtMs);
+      const deadlineAt = Number.isSafeInteger(args.deadline_at_ms)
+        ? Math.min(args.deadline_at_ms, options.hardStopAtMs) : options.hardStopAtMs;
       if (clock() >= deadlineAt) throw fixedError('MARITIME_DISPATCH_EXPIRED');
       return boundedCall(() => { assertOpen(); return agents.dispatch({ ...args, deadline_at_ms: deadlineAt,
+        ...(args.on_admitted ? { on_admitted: async () => Math.min(await args.on_admitted(), options.hardStopAtMs) } : {}),
         signal: AbortSignal.any([stopController.signal, deadlineController.signal, ...(signal ? [signal] : []), ...(args.signal ? [args.signal] : [])])
-      }); }, 'PROOF_AGENT_OPERATION_FAILED', { mutation: true });
+      }); }, 'PROOF_AGENT_OPERATION_FAILED', { mutation: true, agentRequest: args.request });
     } } });
-  const trackedAgents = { dispatch: args => {
+  const trackedAgents = { capacityManaged: journal.capacityManaged, dispatch: args => {
     const task = journal.dispatch(args);
     pendingDispatches.add(task);
     task.then(() => pendingDispatches.delete(task), () => pendingDispatches.delete(task));

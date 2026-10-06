@@ -20,18 +20,8 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Initial live diagnostics passed on oc-1/hs-1 with observers disabled and awake 0.
 - Step 5: Games 21/23 completed; all ten acted; four/three defaults; Telegram correct.
 - Cleanup 21:06 UTC: active game 0, awake 0, quarantine empty, operator stopped.
-- Current: resumed at the user's request; implementing fix_issue.MD's six active
-  corrections before continuing V2. Targeted regression checks are in progress;
-  no new live game has started. Deferred audit findings remain out of scope.
-- Broad read-only audit completed; 74 targeted local tests passed and ten local
-  reproductions confirmed defects. At the user's request, findings and proposed
-  corrections are recorded in [fix_issue.MD](../fix_issue.MD). Three independent
-  sub-auditors verified the latest feedback against code, tests, saved games,
-  and local reproductions. Document shortened; deferred findings retain linked
-  evidence; #03 now reporting-only, #07 timing claims corrected, proof discussion
-  policy retained, and running-job quarantine verification explicit. Only
-  documentation changed; no code fixes or live operations performed.
-- Final document review: clarified deterministic discussion retry conversation IDs; retained the completed local reproduction evidence and proposed-fix status. No implementation or live operations.
+- Current: verify fix_issue.MD's six implemented corrections in debug, then
+  continue V2 step 6. Deferred findings remain out of scope.
 - Approved fix_issue.MD batch implemented locally: completed-discussion cleanup/
   one re-ask/verified public hashes (#02), serialized UTF-8 context budget (#11),
   action clock after admission and separate bounded cleanup (#07), read-only
@@ -43,14 +33,20 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   fix-final-runner-tests.log and fix-integration-targeted.log in the v2 private root.
   Fresh 00:40 UTC preflight: active game 0, awake 0, owner nonce 508; every seat
   admitted/funded. Committed as 4adfeca after a clean staged secret scan.
-- All-ten reinstall in progress: hs-1/hs-2 installed, OAuth route verified and
-  sleeping; hs-3 started. Full suite in progress. Corrected one old exception
-  assertion for #03's fixed unsent response; permit regressions pass 10/10,
-  with zero signing calls on both preparation and final-guard rejection.
-- User stopped broader investigation; provide a broad audit prompt for a new session.
+- All-ten reinstall complete: updated artifacts, OAuth-only routes and disabled
+  observers verified on every seat; account awake 0.
+  Corrected one old exception assertion for #03's fixed unsent response in
+  acb02d4; permit regressions pass 10/10, with zero signing calls on both
+  preparation and final-guard rejection. Both fix commits are pushed.
+- First batch full suite: 650/654. Four old expectations/fixtures corrected
+  (unsent guard response and confirmed sleep readback/failure reporting).
+  Live assembly also needed to forward capacity admission/cleanup callbacks and
+  validated completion/recovery metadata through proof-run's wrappers. Coordinator
+  fixes pass 2/2 live-wrapper regressions; transport/capacity pass 55/55. Clean
+  full-suite rerun starts with these corrections; no new agent-side changes.
 - Local policy: JSON retained, no character cap, ASD-STE100 guidance; long Telegram
   deliveries preserve text in labeled parts. Targeted tests 198/198; full suite predates this change.
-- New agent-side protocol is not deployed: reinstall all ten before another game.
+- Updated JSON/ASD-STE100 protocol is deployed on all ten seats.
 - Game 23 used the prior 140-character draft/count prompt and 200-character validator.
 - Step 2d: OC1 production diagnosis names `OPENCLAW_RECEIPT_FILES` during
   activation; per-call provenance unresolved. Observer disabled again; OAuth-only
@@ -64,8 +60,8 @@ Standing D1 authorization persists across sessions/compaction until revoked:
 gas at most 0.07 ETH/day; existing balances, ten agents and existing Telegram rooms.
 Ask if a wallet cannot cover another game plus cleanup. Claims include Game 20.
 
-October 5 counters under this authorization: creations 3/10 (total 3/30),
-additional wakes 29/60 (all-ten reinstall in progress), owner/operator gas 0.00002619/0.07 ETH.
+October 5 counters under this authorization: creations 4/10 (total 4/30),
+additional wakes 36/60 (all-ten reinstall complete), owner/operator gas 0.00002619/0.07 ETH.
 Games 21–23 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
 
 ## Run map
@@ -100,3 +96,4 @@ Games 21–23 cleaned up. Counted-draft fix to Game 23 creation: about 60 minute
 A1 / Game 21: all ten acted; four defaults; hs-1/3/4 discussion protocol-invalid; 56/56 DEBUG messages sent; terminal/awake 0/active 0 confirmed.
 A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults; 50/50 DEBUG messages sent; terminal/awake 0/active 0 confirmed. First post-fix failure.
 A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs-5 commit/hs-3 reveal timeouts; 64/64 DEBUG messages sent; terminal/awake 0/active 0/quarantine 0 confirmed; operator stopped. No team-message failures. User requested stop for a new-session audit.
+A4 / Game 24: running; all ten joins confirmed, no health issues. Uses the six-fix deployment; live wrapper timing/metadata corrections were found after creation and apply to the next attempt. Cleanup pending.

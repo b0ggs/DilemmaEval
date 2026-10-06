@@ -17,14 +17,14 @@ import { GAME_ABI } from '../src/chain/abi.mjs';
 const hash = value => `0x${BigInt(value).toString(16).padStart(64, '0')}`;
 const json = (filename, value) => writeFile(filename, JSON.stringify(value));
 
-async function fixture(t, { cancelled = false, hardStopOffset = 60000, adapterTimeout = 1000, debug = false } = {}) {
+async function fixture(t, { cancelled = false, hardStopOffset = 60000, adapterTimeout = 1000, agentTimeout = 10000, debug = false } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'proof-run-fixture-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   let time = Date.parse('2026-10-02T18:00:00Z');
   const now = () => time;
   const config = await fixtureConfig({ now: time, teamSizes: { openclaw: 5, hermes: 5 } });
   config.telegram.openclaw.chat_id = '-100111'; config.telegram.hermes.chat_id = '-100222';
-  config.agent_timeout_ms = 10000; config.adapter_timeout_ms = adapterTimeout; config.spectator_timeout_ms = 1000;
+  config.agent_timeout_ms = agentTimeout; config.adapter_timeout_ms = adapterTimeout; config.spectator_timeout_ms = 1000;
   const defaults = { entryFeeWei: '100000000000000', creatorFeeBps: '100', causeFeeBps: '100',
     joinDurationSeconds: '60', commitDurationBlocks: '60', revealDurationBlocks: '40', minPlayers: '10', maxPlayers: '10', maxCauses: '2' };
   const runId = '00000000-0000-4000-8000-000000000111';
@@ -82,6 +82,71 @@ async function fixture(t, { cancelled = false, hardStopOffset = 60000, adapterTi
       flush: async () => ({ ok: true, pending: 0, inflight: 0 }) } };
   return { root, config, evidence, options, adapters, dependencies, counts, advanceClock: amount => { time += amount; } };
 }
+
+test('controlled live wrappers preserve capacity admission and cleanup allowances for both waves', async t => {
+  const f = await fixture(t, { debug: true, agentTimeout: 1000 });
+  let occupied = 0, maximum = 0, joined = 0;
+  const queued = [];
+  f.dependencies.agents = { capacityManaged: true, dispatch: async args => {
+    if (occupied >= 5) await new Promise(resolve => queued.push(resolve));
+    else occupied++;
+    maximum = Math.max(maximum, occupied);
+    try {
+      assert.equal(typeof args.on_admitted, 'function');
+      assert.equal(typeof args.on_cleanup, 'function');
+      assert.equal(args.deadline_at_ms, f.options.hardStopAtMs, 'queue is bounded by phase and hard stop');
+      const deadline = await args.on_admitted();
+      assert.ok(Number.isSafeInteger(deadline));
+      assert.ok(deadline <= f.options.hardStopAtMs);
+      const result = await f.adapters.agents.dispatch(args);
+      args.on_cleanup(3000);
+      if (args.request.requested_action === 'join') { joined++; await delay(1100); }
+      assert.equal(args.signal.aborted, false, 'known-completed cleanup outlives the action timer');
+      return result;
+    } finally {
+      if (queued.length) queued.shift()();
+      else occupied--;
+    }
+  } };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(report.status, 'debug-complete', JSON.stringify(report));
+  assert.equal(joined, 10);
+  assert.equal(maximum, 5);
+  assert.equal(occupied, 0);
+  assert.ok(report.dispatches.every(row => !['ambiguous', 'rejected-before-submit'].includes(row.status)));
+});
+
+test('controlled live wrapper preserves matching completed-discussion cleanup and validated lost-reply recovery', async t => {
+  const f = await fixture(t, { debug: true });
+  const seatId = f.config.roster[0].seat_id;
+  let failedDiscussion = 0, recoveredReveal = 0;
+  f.dependencies.agents.dispatch = async args => {
+    if (args.seat.seat_id === seatId && args.request.type === 'discussion') {
+      failedDiscussion++;
+      throw Object.assign(new Error('MARITIME_AGENT_RESPONSE_INVALID'), { code: 'MARITIME_AGENT_RESPONSE_INVALID',
+        ambiguous: false, cleanup_confirmed: true, completed_request_id: args.request.request_id });
+    }
+    const response = await f.adapters.agents.dispatch(args);
+    if (args.seat.seat_id === seatId && args.request.requested_action === 'reveal') {
+      recoveredReveal++;
+      throw Object.assign(new Error('MARITIME_HTTP_502'), { code: 'MARITIME_HTTP_502', ambiguous: true,
+        recovered_response: response });
+    }
+    return response;
+  };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(report.status, 'debug-complete', JSON.stringify(report));
+  assert.equal(failedDiscussion, 1); assert.equal(recoveredReveal, 1);
+  const discussion = report.dispatches.find(row => row.seat_id === seatId && row.operation === 'discussion');
+  assert.equal(discussion.status, 'agent-error'); assert.equal(discussion.cleanup_confirmed, true);
+  const reveal = report.dispatches.find(row => row.seat_id === seatId && row.operation === 'reveal');
+  assert.equal(reveal.status, 'ambiguous'); assert.equal(reveal.action_recovered, true);
+  assert.equal(reveal.lifecycle_state, 'unknown');
+  assert.match(reveal.transaction_hash, /^0x[0-9a-f]{64}$/);
+  const persisted = JSON.parse(await readFile(path.join(f.options.directory, 'runtime/coordinator/records.json')));
+  const record = persisted.entries.find(row => row.value.seat_id === seatId && row.value.action === 'reveal').value;
+  assert.equal(record.state, 'chain-confirmed'); assert.equal(record.lifecycle_state, 'unknown');
+});
 
 test('real prepare, creation guard and runner produce one ten-seat completed candidate with claims and sanitized durable report', async t => {
   const f = await fixture(t);
