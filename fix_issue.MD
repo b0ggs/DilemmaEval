@@ -1,8 +1,8 @@
 # Conference fixes for the 5v5 demo
 
 Audit/revision date: October 5, 2026. Branch: codex/converge-demo-2026-09-25.
-Status: active code batch implemented; targeted checks pass. All-ten reinstall,
-live debug verification and final V2 proof remain. Outcomes are in conference/STATUS.md.
+Status: active code batch implemented; targeted checks and all-ten reinstall complete.
+Live debug verification and final V2 proof remain. Outcomes are in conference/STATUS.md.
 
 **[AGENTS.md](AGENTS.md) hard limits apply.** The approved
 [v2 decisions](conference/FAST-ITERATION-IMPLEMENTATION-v2.md) govern conflicts.
