@@ -13,15 +13,30 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   Historical full checkpoints: 625/625 and 631/631; debug fixtures passed.
 - Step 5: Games 21–23 completed with defaults; Telegram and terminal cleanup
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
-- Current: local logging changes complete. The user explicitly requires waiting
-  for their instruction before another game. No game, agent wake, claim or live
-  configuration action was performed for this change.
+- Current: local logging changes complete and pushed as 03e30c8. The user now
+  authorizes preparation up to launch, with no new game until their instruction.
+  Fresh preflight, both non-signing smoke checks and fresh debug preparation
+  passed. Ready to launch the next debug game; waiting for the user's instruction.
 - October 5 shutdown checkpoint: Game 24 terminal; active game 0, account awake 0
   and quarantine 0 confirmed. Coordinator, tests and isolated operator stopped.
-- Next, only after the user starts a game: refresh live state/counters and verify
-  coordinator corrections and logging in a fresh debug attempt, then continue
+- Next, only after the user starts a game: verify coordinator corrections and
+  logging in the freshly prepared debug attempt, then continue
   V2 step 6. Six fix_issue.MD corrections are implemented/deployed;
   live verification and final proof remain. Deferred findings remain out of scope.
+- October 6 prelaunch checkpoint, 11:45 UTC: active game 0, account awake 0,
+  quarantine 0, all 11 latest/pending nonces equal, all seats admitted/funded,
+  owner journal resolved and Telegram room access verified. Owner balance
+  0.1462 ETH; minimum seat balance 0.01919 ETH against the existing 0.00161 ETH
+  readiness floor. OpenClaw oc-1 and Hermes hs-1 passed all nine non-signing
+  runtime checks in 58s/46s, with model/route/artifact checks and confirmed sleep.
+  Existing targeted logging verification remains 183/183; no source changes.
+  Fresh debug-game-5 preparation and metadata validation completed; creation
+  fuse unused. No game creation, claim, transaction or running operator.
+  Inputs/results: debug-game-5-inputs/{prelaunch-preflight,smoke,invocation,ready}.json
+  in the v2 private root. Launch cutoff 2026-10-06T12:22:00.045Z (08:22 EDT),
+  hard stop 20:38 UTC, derived from contract timing as before. Refresh live
+  checks before launch; if preparation expires, preserve it and prepare a fresh
+  directory. Starting the isolated operator remains part of the launch command.
 - Approved fix_issue.MD batch implemented locally: completed-discussion cleanup/
   one re-ask/verified public hashes (#02), serialized UTF-8 context budget (#11),
   action clock after admission and separate bounded cleanup (#07), read-only
@@ -80,10 +95,13 @@ Standing D1–D4 authorization in AGENTS.md persists until revoked. Caps:
 10 creations/day, 30 total; 60 additional wakes/day; 0.07 ETH owner gas/day.
 
 October 5 counters under this authorization: creations 4/10 (total 4/30),
-additional wakes 36/60 (all-ten reinstall complete), owner/operator gas 0.00002619/0.07 ETH
-through Game 23; Game 24 gas will be reconciled at cleanup.
+additional wakes 36/60 (all-ten reinstall complete), owner/operator gas
+0.000035722944/0.07 ETH through Game 24, reconciled from canonical receipts.
 Games 21–24 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
 October 6 logging work used zero creations, additional wakes or owner gas.
+October 6 prelaunch preparation: creations 0/10 (total 4/30), additional wakes
+2/60, owner gas 0/0.07 ETH. Both smoke wakes were recorded before waking in the
+private additional-wakes.json ledger; both seats are back asleep.
 
 ## Run map
 
