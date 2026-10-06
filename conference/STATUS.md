@@ -15,7 +15,12 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
 - Current: Debug Game 26 running under explicit user approval. Operator 57068
   and coordinator 57092 started at 14:17 UTC; creation confirmed, all ten join
-  requests underway at 14:19 UTC. No errors recorded at this checkpoint.
+  requests underway at 14:19 UTC. All ten joined on-chain. hs-4's join reply
+  failed JSON validation, then read-only recovery hit the 180s action allowance;
+  remote work remains unknown and the seat is quarantined. hs-5's round-1 reveal
+  hit the same JSON-validation/recovery timeout and is also quarantined. Round 1
+  resolved with one default. At 14:46 UTC, seven available round-2 seats submitted
+  commits; no additional primary failures. Wait for deadline and continue cleanup.
   Uses d75edbd with unchanged timing. User-reported weekly usage before launch:
   53%, for comparison after the game. Inputs/reports: debug-game-6-inputs and
   debug-game-6 in the v2 private root. Monitor errors and finish terminal cleanup.
@@ -68,6 +73,11 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   current full suite, Game 20 claims, fresh proof diagnostics/continuity and
   normal proof-run/proof-audit. Six fix_issue.MD corrections are implemented/
   deployed; final proof remains. Deferred findings remain out of scope.
+- User requested [DETERMINISTIC-AGENT-OPERATIONS-PLAN.md](DETERMINISTIC-AGENT-OPERATIONS-PLAN.md)
+  during Game 26. Proposed only: code-owned JSON/metadata, direct mechanical
+  handlers, native agent-local decision/message tools, explicit operation
+  completion and saved-result recovery. No implementation changes or deployment;
+  await an instruction to implement. Game 26 continues under its existing approval.
 - October 6 prelaunch checkpoint, 11:45 UTC: active game 0, account awake 0,
   quarantine 0, all 11 latest/pending nonces equal, all seats admitted/funded,
   owner journal resolved and Telegram room access verified. Owner balance
@@ -186,4 +196,4 @@ A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs
 A4 / Game 24: completed in five rounds / 68 minutes, nine chain defaults, all_seats_acted=false. All ten joined/discussed. Four MARITIME_TIMEOUT quarantines: oc-4 round-1 commit, oc-1 round-3 reveal, hs-4/5 round-4 reveal. The latter reveals landed but completion remained unknown; hs-1/2/3 continued. Telegram pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stop and later inactive reads; operator stopped. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) and timeout-stage labels apply to the next attempt. User requested stop before internet loss; no new attempt.
 A5 / pre-creation startup stopped: user-authorized October 6; fresh launch preflight passed, operator/coordinator started 12:15 UTC. readEvents RPC_ERROR isolated to HTTP 413 on 1,000 blocks; 100 blocks succeeds. Fixed pagination and safe request-size cause; 27/27 chain regressions, no installed-source changes/reinstall. No game/fuse/wake/signing call; counters remain 0 today / 4 total. Old report and cleanup in debug-game-5; resume in a fresh directory. Prelaunch counter read also corrected for historical at/started_at date fields before launch.
 A5 / Game 25 complete: four rounds / 44m04s on-chain, all ten acted, six defaults (0/2/2/2). Round-2 hs-2/hs-3 commits landed but all-committed watcher aborted late chat, retaining two quarantines; three healthy seats continued through round 4. hs-1 malformed round-3 reply recovered once without signing replay. 55/55 DEBUG messages sent, pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stops and later inactive reads; coordinator/operator stopped, owner journal reconciled. Exact phase_abort cause corrected and pushed as d75edbd (33 runner + 4 wrapper + 4 timer checks); not loaded into this game, requires fresh verification. Reports in debug-game-5-refresh-1. Degraded debug result, not a passed proof.
-A6 / Game 26 running: explicitly approved October 6; preparation and launch checks passed, stopped hs-2/hs-3 passed non-signing checks and slept (two counted wakes). Operator/coordinator started 14:17 UTC, creation confirmed and ten join requests underway 14:19 UTC. Uses d75edbd, current timing unchanged. No errors at launch checkpoint. User weekly usage baseline 53%. Inputs/results in debug-game-6-inputs and debug-game-6.
+A6 / Game 26 running: explicitly approved October 6; preparation and launch checks passed, stopped hs-2/hs-3 passed non-signing checks and slept (two counted wakes). Operator/coordinator started 14:17 UTC, all ten joined on-chain. hs-4 join and hs-5 round-1 reveal replies MARITIME_REPLY_INVALID_JSON; recovery hit the 180s action allowance, leaving unknown work/quarantine. Round 1 resolved with one default; seven available round-2 seats committed by 14:46 UTC, no other primary failures. Uses d75edbd, current timing unchanged. User weekly usage baseline 53%. Requested deterministic-operations plan written, not implemented. Inputs/results in debug-game-6-inputs and debug-game-6.
