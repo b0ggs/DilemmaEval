@@ -75,35 +75,41 @@ export function createDebugContinuity({ config, artifacts, hardStopAtMs, now = D
     if (!Number.isSafeInteger(at) || at >= Math.min(deadline, hardStopAtMs)) fail('READINESS_DEADLINE_EXPIRED');
     return at;
   };
-  async function inspect({ seat, execute, getAgent }, deadline = hardStopAtMs) {
+  async function inspect({ seat, execute, getAgent, on_check: onCheck = () => {} }, deadline = hardStopAtMs) {
     time(deadline);
     const binding = bindings.get(seat?.seat_id);
     if (!binding || !same(binding.seat, seat) || typeof execute !== 'function' || typeof getAgent !== 'function') fail('DEBUG_CONTINUITY_INVALID');
     const { artifact } = binding;
     const run = async (command, code) => { time(deadline); const value = result(await execute(structuredClone(command)), code); time(deadline); return value; };
     const agent = async () => {
+      onCheck('identity');
       const live = await getAgent();
       if (live?.id !== seat.agent_id || live.framework !== seat.harness || live.status !== 'active') fail('READINESS_LIFECYCLE_UNCONFIRMED');
     };
     await agent();
+    onCheck('artifact_integrity');
     await verifyPublicArtifactIntegrity(artifact, execute);
     const modulePath = posix.join(posix.dirname(artifact.gameplay_command[1]), 'execution-permit.mjs');
     const fingerprintCommand = ['node', '--input-type=module', '-e',
       "import {pathToFileURL} from 'node:url';const m=await import(pathToFileURL(process.argv[1]));process.stdout.write(JSON.stringify({fingerprint:await m.readRuntimeInstanceFingerprint()}));", modulePath];
     const fingerprint = async () => {
+      onCheck('fingerprint');
       const live = await run(fingerprintCommand, 'READINESS_MIXED_GENERATION');
       if (!exact(live, ['fingerprint']) || !HEX.test(live.fingerprint ?? '')) fail('READINESS_MIXED_GENERATION');
       return live.fingerprint;
     };
     const observed = await fingerprint();
+    onCheck('storage');
     const direct = await run(artifact.inspect_command, 'READINESS_INSPECTION_FAILED');
     if (direct.schema_version !== 1 || direct.seat_id !== seat.seat_id || direct.chain_id !== 84532 ||
         direct.wallet_address?.toLowerCase() !== seat.wallet_address.toLowerCase() ||
         direct.persistent_storage_writable !== true || direct.gameplay_execution_proven !== false) fail('READINESS_INSPECTION_FAILED');
+    onCheck('model');
     const model = await run(artifact.model_config_check_command, 'READINESS_MODEL_INVALID');
     if (model.schema_version !== 1 || model.seat_id !== seat.seat_id || model.harness !== seat.harness || model.configured !== true ||
         model.model !== MODEL.model || model.reasoning_effort !== MODEL.reasoning_effort || model.max_output_tokens !== MODEL.max_output_tokens ||
         model.automatic_fallback !== false || model.fallback_model !== null || model.response_metadata_required !== true) fail('READINESS_MODEL_INVALID');
+    onCheck('model_route');
     const route = await run(artifact.model_route_check_command, 'READINESS_MODEL_ROUTE_UNVERIFIED');
     if (!exact(route, ['schema_version', 'seat_id', 'model_route_verified']) || route.schema_version !== 1 ||
         route.seat_id !== seat.seat_id || route.model_route_verified !== true) fail('READINESS_MODEL_ROUTE_UNVERIFIED');
@@ -113,10 +119,10 @@ export function createDebugContinuity({ config, artifacts, hardStopAtMs, now = D
   }
   return Object.freeze({
     async verify(args) { await inspect(args); return { schema_version: 1, verified: true }; },
-    async prepareAction({ seat, request, execute, getAgent, deadlineAtMs }) {
+    async prepareAction({ seat, request, execute, getAgent, deadlineAtMs, on_check: onCheck = () => {} }) {
       if (!Number.isSafeInteger(deadlineAtMs)) fail('READINESS_DEADLINE_EXPIRED');
       const deadline = Math.min(deadlineAtMs, hardStopAtMs);
-      const { artifact, fingerprint } = await inspect({ seat, execute, getAgent }, deadline);
+      const { artifact, fingerprint } = await inspect({ seat, execute, getAgent, on_check: onCheck }, deadline);
       const at = time(deadline);
       const context = { schema_version: 2, producer_version: 2, purpose: 'debug', run_id: pinned.run_id,
         config_fingerprint: configFingerprint(pinned), continuity_policy: 'observed-runtime-continuity-v1',
@@ -128,6 +134,7 @@ export function createDebugContinuity({ config, artifacts, hardStopAtMs, now = D
           model_profile: MODEL, tool_execution_verified: true, lifecycle_ambiguous: false }] };
       const envelope = buildExecutionPermit({ config: pinned, evidence: context, artifact, request,
         expiresAtMs: Math.min(deadline, at + 300000), hardStopAtMs, nowMs: at });
+      onCheck('permit');
       const staged = await runStage(execute, buildExecutionPermitStageCommand({ artifact, permit: envelope }));
       if (staged.schema_version !== 1 || staged.staged !== true || staged.request_id !== request.request_id ||
           staged.permit_sha256 !== executionPermitFingerprint(envelope.permit)) fail('READINESS_PERMIT_UNVERIFIED');

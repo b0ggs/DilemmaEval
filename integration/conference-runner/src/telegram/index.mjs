@@ -133,7 +133,7 @@ export function formatAgentMessages(message, team, config) {
 /** A timeout covers both response headers and body, including non-cooperative injected transports. */
 async function request({ token, method, body, fetchImpl, timeoutMs = REQUEST_TIMEOUT_MS }) {
   const controller = new AbortController();
-  let timer;
+  let timer, timedOut = false, responseStarted = false;
   try {
     return await Promise.race([
       (async () => {
@@ -141,14 +141,16 @@ async function request({ token, method, body, fetchImpl, timeoutMs = REQUEST_TIM
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body), signal: controller.signal, redirect: 'error',
         });
+        responseStarted = true;
         const payload = await response.json();
         return { status: response.status, payload };
       })(),
-        new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('TELEGRAM_TIMEOUT')); }, timeoutMs); }),
+        new Promise((_, reject) => { timer = setTimeout(() => { timedOut = true; controller.abort(); reject(new Error('TELEGRAM_TIMEOUT')); }, timeoutMs); }),
     ]);
   } catch {
     // Fetch errors may contain the URL, which contains a bot token. Do not retain or expose them.
-    return { status: null, payload: null };
+    return { status: null, payload: null, diagnostic_code: timedOut ? 'TELEGRAM_TIMEOUT'
+      : responseStarted ? 'TELEGRAM_RESPONSE_INVALID' : 'TELEGRAM_NETWORK_ERROR' };
   } finally {
     clearTimeout(timer);
   }
@@ -283,7 +285,9 @@ export function createTelegramMirror({ config, runtimeDir, token, fetchImpl = gl
     }, fetchImpl })));
     for (let index = 0; index < selected.length; index += 1) {
       const { entry } = selected[index];
-      const { status, payload } = replies[index];
+      const { status, payload, diagnostic_code: diagnosticCode } = replies[index];
+      if (diagnosticCode) entry.diagnostic_code = diagnosticCode;
+      else delete entry.diagnostic_code;
       if (status >= 200 && status < 300 && payload?.ok === true && Number.isSafeInteger(payload.result?.message_id) && payload.result.message_id > 0 &&
           (payload.result.chat?.id === undefined || String(payload.result.chat.id) === selected[index].chatId)) {
         entry.status = 'sent'; entry.message_id = payload.result.message_id;
@@ -302,6 +306,8 @@ export function createTelegramMirror({ config, runtimeDir, token, fetchImpl = gl
       } else {
         entry.status = 'uncertain'; entry.reason = 'SEND_OUTCOME_UNKNOWN';
       }
+      if (entry.status !== 'sent' && Number.isInteger(status) && status >= 100 && status <= 599) entry.http_status = status;
+      else delete entry.http_status;
     }
     await persist();
     return summary();

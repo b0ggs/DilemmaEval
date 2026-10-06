@@ -90,7 +90,8 @@ for (const stage of ['pre-chat', 'chat', 'completed-cleanup']) {
     const f = await fixture(t, {
       ...(stage === 'chat' ? { chat: () => new Promise(() => {}) } : {
         inspection: () => new Promise(() => {}),
-        verify: async (_seat, count, { execute }) => {
+        verify: async (_seat, count, { execute, on_check: onCheck }) => {
+          onCheck('model_route');
           if (count === (stage === 'pre-chat' ? 1 : 2)) await execute(['node', 'fixture-inspection']);
         }
       })
@@ -106,6 +107,12 @@ for (const stage of ['pre-chat', 'chat', 'completed-cleanup']) {
       return true;
     });
     assert.equal(report.dispatches[0].diagnostic_code, `MARITIME_${stage.toUpperCase().replaceAll('-', '_')}_TIMEOUT`);
+    const evidence = report.dispatches[0].dispatch_diagnostics;
+    assert.equal(evidence.failure.stage, stage === 'pre-chat' ? 'runtime_verify' : stage === 'chat' ? 'chat' : 'final_verify');
+    assert.equal(evidence.failure.timeout_source, stage === 'chat' ? 'http_request' : 'runtime_verification');
+    if (stage !== 'chat') assert.equal(evidence.failure.check, 'model_route');
+    assert.ok(evidence.failure.timeout_ms > 0 && evidence.failure.elapsed_ms >= 0);
+    assert.equal(evidence.remote_work, 'unknown'); assert.equal(evidence.cleanup_confirmed, false);
     assert.equal(f.chats.length, stage === 'pre-chat' ? 0 : 1);
     assert.equal(f.calls.filter(row => row.path.endsWith('/sleep')).length, 0);
     assert.deepEqual(await f.quarantine.reservedAgentIds(), [seats[0].agent_id]);
@@ -166,17 +173,22 @@ test('five completed discussion failures release capacity after confirmed sleep 
 });
 
 test('real runner and transport admit a second wave after the first action allowance, with separate completed cleanup', async t => {
+  let release;
+  const allEnqueued = new Promise(resolve => { release = resolve; });
   const f = await fixture(t, { config: { agent_timeout_ms: 1000 },
     verify: (seat, count) => count === 2 ? delay(700) : undefined,
     read: (seat, status) => status === 'sleeping' ? delay(400) : undefined,
-    chat: async ({ request }) => { await delay(50); return jsonResponse({ response: JSON.stringify(reply(request)) }); } });
+    chat: async ({ request }) => { await allEnqueued; await delay(50); return jsonResponse({ response: JSON.stringify(reply(request)) }); } });
   const snapshot = { schema_version: 1, chain_id: 84532, game_address: f.config.game_address,
     game_id: '7', active_game_id: '7', round: 1, phase: 'reveal', outcome: null,
     block_number: '100', block_hash: `0x${'a'.repeat(64)}`, block_timestamp: '1000', alive_count: 10,
     committed_count: 10, revealed_count: 0, clock: { unit: 'block', current: '100', deadline: '999' },
     config: { entryFeeWei: '100', minPlayers: '10', maxPlayers: '10' },
     players: seats.map(seat => ({ wallet_address: seat.wallet_address, joined: true, alive: true, committed: true, revealed: false })) };
-  const runner = createConferenceRunner({ config: f.config, runtimeDir: join(f.directory, 'runner'), agents: f.adapter,
+  const report = { dispatches: [] };
+  const journal = createProofDispatchJournal({ adapter: f.adapter, report,
+    persist: async () => { if (report.dispatches.length === 10) release(); }, stopController: new AbortController(), debug: true });
+  const runner = createConferenceRunner({ config: f.config, runtimeDir: join(f.directory, 'runner'), agents: journal,
     chain: { readSnapshot: async () => snapshot, readEvents: async () => [] },
     launcher: { create: async () => assert.fail('no creation') }, phaseExecutor: { advance: async () => assert.fail('no advance') } });
   t.after(() => runner.close());
@@ -185,6 +197,71 @@ test('real runner and transport admit a second wave after the first action allow
   assert.equal(f.chats.length, 10); assert.equal(f.maximum, 5);
   assert.deepEqual(await f.quarantine.reservedAgentIds(), []);
   assert.deepEqual(runner.getState().health, []);
+  const secondWave = report.dispatches.map(row => row.dispatch_diagnostics).sort((a, b) => b.queue_ms - a.queue_ms)[0];
+  assert.ok(secondWave.queue_ms > 1000);
+  assert.ok(secondWave.action_ms < 1000 && secondWave.cleanup_ms >= 1000);
+  assert.equal(secondWave.cleanup_confirmed, true);
+});
+
+for (const step of ['sleep', 'sleep_confirm']) {
+  test(`completed chat records the exact ${step} timeout while retaining the seat`, async t => {
+    const f = await fixture(t, { ...(step === 'sleep' ? { sleep: () => new Promise(() => {}) }
+      : { read: (_seat, status) => status === 'sleeping' ? new Promise(() => {}) : undefined }) });
+    const adapter = createMaritimeAdapter({ ...f.adapterOptions, timeoutMs: 100, cleanupTimeoutMs: 25 });
+    const report = { dispatches: [] };
+    const journal = createProofDispatchJournal({ adapter, report, persist: async () => {}, stopController: new AbortController(), debug: true });
+    await assert.rejects(journal.dispatch({ seat: seats[0], request: poke('join', seats[0]) }));
+    const evidence = report.dispatches[0].dispatch_diagnostics;
+    assert.equal(evidence.failure.stage, step);
+    assert.equal(evidence.failure.timeout_source, 'http_request');
+    assert.equal(evidence.cleanup_confirmed, false);
+    assert.equal(evidence.remote_work, step === 'sleep' ? 'unknown' : 'completed');
+    assert.deepEqual(await f.quarantine.reservedAgentIds(), [seats[0].agent_id]);
+    assert.equal(f.chats.length, 1);
+  });
+}
+
+test('cleanup failure preserves the original invalid reply and excludes rejected text and provider prose', async t => {
+  const f = await fixture(t, { chat: () => jsonResponse({ response: '{SECRET_REJECTED_REPLY' }),
+    sleep: () => { throw new Error('SECRET_PROVIDER_BODY'); } });
+  const report = { dispatches: [] };
+  const journal = createProofDispatchJournal({ adapter: f.adapter, report, persist: async () => {}, stopController: new AbortController(), debug: true });
+  await assert.rejects(journal.dispatch({ seat: seats[0], request: discussion(seats[0]) }));
+  const evidence = report.dispatches[0].dispatch_diagnostics;
+  assert.equal(evidence.failure.stage, 'reply_validation');
+  assert.equal(evidence.failure.code, 'MARITIME_REPLY_INVALID_JSON');
+  assert.equal(evidence.cleanup_failure.stage, 'sleep');
+  assert.equal(evidence.cleanup_failure.code, 'MARITIME_NETWORK_OUTCOME_UNKNOWN');
+  assert.equal(JSON.stringify(report).includes('SECRET_'), false);
+  assert.equal(f.chats.length, 2);
+});
+
+test('outer action timer retains the active stage even when the adapter never returns', async t => {
+  const f = await fixture(t, { config: { agent_timeout_ms: 25 } });
+  const snapshot = { schema_version: 1, chain_id: 84532, game_address: f.config.game_address,
+    game_id: '7', active_game_id: '7', round: 1, phase: 'reveal', outcome: null,
+    block_number: '100', block_hash: `0x${'a'.repeat(64)}`, block_timestamp: '1000',
+    alive_count: 1, committed_count: 1, revealed_count: 0, clock: { unit: 'block', current: '100', deadline: '999' },
+    config: { entryFeeWei: '100', minPlayers: '10', maxPlayers: '10' },
+    players: seats.map((seat, i) => ({ wallet_address: seat.wallet_address, joined: true, alive: i === 0, committed: i === 0, revealed: false })) };
+  const report = { dispatches: [] };
+  const journal = createProofDispatchJournal({ adapter: { capacityManaged: true, dispatch: async args => {
+    await args.on_admitted(); args.diagnostics.stage('chat'); args.diagnostics.remoteWork('unknown');
+    return new Promise(() => {});
+  } }, report, persist: async () => {}, stopController: new AbortController(), debug: true });
+  const runtimeDir = join(f.directory, 'outer-timer');
+  const runner = createConferenceRunner({ config: f.config, runtimeDir, agents: journal,
+    chain: { readSnapshot: async () => snapshot, readEvents: async () => [] },
+    launcher: { create: async () => assert.fail('no creation') }, phaseExecutor: { advance: async () => assert.fail('no advance') } });
+  t.after(() => runner.close());
+  await runner.tick();
+  assert.equal(report.dispatches.length, 1);
+  assert.equal(report.dispatches[0].dispatch_diagnostics.failure.stage, 'chat');
+  assert.equal(report.dispatches[0].dispatch_diagnostics.failure.timeout_source, 'action_allowance');
+  const records = JSON.parse(await fs.readFile(join(runtimeDir, 'coordinator/records.json'), 'utf8'));
+  const unknown = records.entries.find(row => row.value.action === 'reveal').value;
+  assert.equal(unknown.state, 'unknown');
+  assert.equal(unknown.dispatch_diagnostics.failure.stage, 'chat');
 });
 
 for (const failure of ['502', 'timeout']) {

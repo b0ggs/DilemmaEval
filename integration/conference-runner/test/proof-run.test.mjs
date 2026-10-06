@@ -343,12 +343,29 @@ test('one ambiguous join preserves nine late outcomes and stops without another 
   assert.ok(!JSON.stringify(report).includes('provider-secret'));
 });
 
+test('chain-read timeout records the failed operation without retaining RPC prose', async t => {
+  const f = await fixture(t);
+  const original = f.options.chain.readSnapshot;
+  let reads = 0;
+  f.options.chain.readSnapshot = async (...args) => {
+    if (++reads === 1) return original(...args);
+    throw Object.assign(new Error('SECRET_RPC_URL'), { code: 'TIMEOUT' });
+  };
+  const report = await runControlledProof(f.dependencies);
+  assert.equal(report.status, 'stopped');
+  assert.equal(report.chain_failure.stage, 'readSnapshot');
+  assert.equal(report.chain_failure.code, 'RPC_TIMEOUT');
+  assert.equal(f.counts().creates, 0);
+  assert.equal(JSON.stringify(report).includes('SECRET_'), false);
+});
+
 test('fixed proof wrappers retain only native transport metadata in reports and durable unknown records', async t => {
   const f = await fixture(t);
   const secret = 'fixture-private-transport-detail';
   let started = 0, release;
   const allStarted = new Promise(resolve => { release = resolve; });
-  f.dependencies.agents.dispatch = async ({ seat }) => {
+  f.dependencies.agents.dispatch = async ({ seat, diagnostics }) => {
+    diagnostics.stage('runtime_verify', 'model_route');
     started++; if (started === 10) release(); await allStarted;
     const metadata = seat.seat_id === 'oc-1'
       ? { code: 'MARITIME_HTTP_502', diagnostic_code: 'MARITIME_REPLY_PROVIDER_ERROR' }
@@ -371,6 +388,9 @@ test('fixed proof wrappers retain only native transport metadata in reports and 
     assert.equal(row.error_code, 'MARITIME_OPERATION_FAILED', 'fixed wrapper classification is unchanged');
     assert.equal(saved.state, 'unknown');
     assert.equal(saved.error_code, undefined, 'metadata does not reclassify the wrapper error');
+    assert.equal(row.dispatch_diagnostics.failure.stage, 'runtime_verify');
+    assert.equal(row.dispatch_diagnostics.failure.check, 'model_route');
+    assert.equal(saved.dispatch_diagnostics.failure.check, 'model_route');
     const transport = row.seat_id === 'oc-1' ? 'MARITIME_HTTP_502' : row.seat_id === 'oc-2' ? 'MARITIME_TIMEOUT' : undefined;
     const diagnostic = row.seat_id === 'oc-1' ? 'MARITIME_REPLY_PROVIDER_ERROR' : undefined;
     assert.equal(row.transport_code, transport); assert.equal(saved.transport_code, transport);

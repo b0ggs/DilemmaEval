@@ -1,6 +1,6 @@
 # Conference status
 
-Updated October 5, 2026. Branch: `codex/converge-demo-2026-09-25`.
+Updated October 6, 2026. Branch: `codex/converge-demo-2026-09-25`.
 The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final.
 
 ## State and next action
@@ -13,11 +13,14 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   Historical full checkpoints: 625/625 and 631/631; debug fixtures passed.
 - Step 5: Games 21–23 completed with defaults; Telegram and terminal cleanup
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
-- Current: stopped at the user's request before internet loss. Game 24 is terminal;
-  fresh active game 0, account awake 0 and quarantine 0 confirmed. Coordinator,
-  tests and isolated operator are stopped. No further game launched.
-- Next: verify the coordinator wrapper corrections in a fresh debug attempt, then
-  continue V2 step 6. Six fix_issue.MD corrections are implemented/deployed;
+- Current: local logging changes complete. The user explicitly requires waiting
+  for their instruction before another game. No game, agent wake, claim or live
+  configuration action was performed for this change.
+- October 5 shutdown checkpoint: Game 24 terminal; active game 0, account awake 0
+  and quarantine 0 confirmed. Coordinator, tests and isolated operator stopped.
+- Next, only after the user starts a game: refresh live state/counters and verify
+  coordinator corrections and logging in a fresh debug attempt, then continue
+  V2 step 6. Six fix_issue.MD corrections are implemented/deployed;
   live verification and final proof remain. Deferred findings remain out of scope.
 - Approved fix_issue.MD batch implemented locally: completed-discussion cleanup/
   one re-ask/verified public hashes (#02), serialized UTF-8 context budget (#11),
@@ -49,6 +52,19 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   reporting change follows the full checkpoint. The final pre-proof full-suite
   run was interrupted at the user's stop request (fix-final-proof-full-suite.log);
   it has no completed result. Run it to completion before final proof.
+- Compact logging: existing dispatch records now include exact stage/check,
+  timeout source/budget, elapsed stage time and separate queue/action/cleanup
+  durations. First failure survives wrappers and later cleanup failures; unknown
+  remote work and confirmed sleep remain separate. Outer-timer evidence is retained
+  even when an adapter has not returned. Chain/owner records retain fixed operation
+  and reason codes; Telegram distinguishes timeout/network/invalid response and
+  records failed HTTP status. No per-call log stream, bodies or additional RPCs.
+- Logging verification: 179/179 targeted component tests and 4/4 actual controlled
+  wrapper tests. Logs: /private/tmp/dilemma-logging-final-targeted-20261006.log and
+  /private/tmp/dilemma-logging-wrappers-verified-20261006.log. Earlier runs exposed
+  old schema assertions, a direct-error metadata gap and a fixture enqueue-order
+  assumption; corrected. Coordinator-only; installed SOURCE_FILES are unchanged,
+  so no all-ten reinstall is required. Full suite remains due before final proof.
 - Local policy: JSON retained, no character cap, ASD-STE100 guidance; long Telegram
   deliveries preserve text in labeled parts. Covered by the clean 656-test suite.
 - Updated JSON/ASD-STE100 protocol is deployed on all ten seats.
@@ -67,6 +83,7 @@ October 5 counters under this authorization: creations 4/10 (total 4/30),
 additional wakes 36/60 (all-ten reinstall complete), owner/operator gas 0.00002619/0.07 ETH
 through Game 23; Game 24 gas will be reconciled at cleanup.
 Games 21–24 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
+October 6 logging work used zero creations, additional wakes or owner gas.
 
 ## Run map
 

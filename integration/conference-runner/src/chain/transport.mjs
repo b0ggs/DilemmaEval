@@ -1,9 +1,11 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
+import { chainFailureCode, safeChainDiagnostic } from './diagnostics.mjs';
 
 const statuses = new Set(['accepted', 'confirmed-revert', 'race-or-revert', 'rejected-before-submit']);
 function validateOutcome(value) {
-  if (!value || !statuses.has(value.status) || Object.keys(value).some((key) => !['status', 'reference'].includes(key))) throw new Error('INVALID_SIGNER_RESPONSE');
+  if (!value || !statuses.has(value.status) || Object.keys(value).some((key) => !['status', 'reference', 'diagnostic'].includes(key)) ||
+      value.diagnostic !== undefined && (!safeChainDiagnostic(value.diagnostic) || Object.keys(value.diagnostic).length !== 3)) throw new Error('INVALID_SIGNER_RESPONSE');
   if (value.reference && (value.reference.kind !== 'transaction-hash' || !/^0x[0-9a-fA-F]{64}$/.test(value.reference.value) || Object.keys(value.reference).length !== 2)) throw new Error('INVALID_SIGNER_REFERENCE');
   return value;
 }
@@ -13,6 +15,9 @@ function createClient({ url, token, fetchImpl = fetch }, operation) {
   if (endpoint.protocol !== 'https:' && !['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname)) throw new Error('SIGNER_HTTPS_REQUIRED');
   if (typeof token !== 'string' || token.length < 24) throw new Error('SIGNER_TOKEN_REQUIRED');
   return Object.freeze({ [operation]: async (intent, { signal } = {}) => {
+    const startedAt = Date.now();
+    let requestSignal;
+    const diagnostic = error => ({ stage: 'signer_request', code: chainFailureCode(error), elapsed_ms: Date.now() - startedAt });
     try {
       if (signal?.aborted) return { status: 'rejected-before-submit' };
       const wire = structuredClone(intent);
@@ -23,12 +28,13 @@ function createClient({ url, token, fetchImpl = fetch }, operation) {
         wire.not_after_ms = Math.min(wire.not_after_ms, current + 20_000);
         timeoutMs = wire.not_after_ms - current;
       }
-      const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
+      requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
       if (requestSignal.aborted) return { status: 'rejected-before-submit' };
       const response = await fetchImpl(new URL(`/${operation}`, endpoint), { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(wire), signal: requestSignal, redirect: 'error' });
-      if (!response.ok) return { status: 'race-or-revert' };
+      if (!response.ok) return { status: 'race-or-revert', diagnostic: diagnostic({ code: 'RPC_ERROR' }) };
       return validateOutcome(await response.json());
-    } catch { return { status: 'race-or-revert' }; }
+    } catch (error) { return { status: 'race-or-revert', diagnostic: diagnostic(signal?.aborted
+      ? { code: 'OPERATION_ABORTED' } : requestSignal?.aborted ? requestSignal.reason : error) }; }
   } });
 }
 export const createLauncherClient = (options) => createClient(options, 'create');
@@ -45,6 +51,7 @@ export function createSignerServer({ role, service, token }) {
     const operation = operations.get(request.url);
     if (request.method !== 'POST' || !operation) { response.writeHead(404).end(); return; }
     const controller = new AbortController();
+    const startedAt = Date.now();
     const abortRequest = () => controller.abort();
     const responseClosed = () => { if (!response.writableFinished) controller.abort(); };
     request.once('aborted', abortRequest);
@@ -56,10 +63,11 @@ export function createSignerServer({ role, service, token }) {
       const value = validateOutcome(await service[operation](JSON.parse(body), { signal: controller.signal }));
       if (response.destroyed) return;
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(value));
-    } catch {
+    } catch (error) {
       // A service exception may follow a broadcast or disk failure. Never imply
       // that retrying is safe merely because the HTTP request failed.
-      if (!response.destroyed) response.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'race-or-revert' }));
+      if (!response.destroyed) response.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'race-or-revert',
+        diagnostic: { stage: 'signer_request', code: chainFailureCode(error), elapsed_ms: Math.max(0, Date.now() - startedAt) } }));
     } finally {
       request.removeListener('aborted', abortRequest);
       response.removeListener?.('close', responseClosed);

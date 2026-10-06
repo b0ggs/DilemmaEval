@@ -12,6 +12,7 @@ import { fitPlayerRequestContext } from '../maritime/protocol.mjs';
 import { publicTransactionHashes } from '../../../maritime-transport/src/validation.mjs';
 import { createDurableStore } from './store.mjs';
 import { acquireRunnerLock } from './lock.mjs';
+import { createDispatchDiagnostics, safeDispatchDiagnostics } from '../dispatch-diagnostics.mjs';
 
 export { createDurableStore } from './store.mjs';
 
@@ -34,6 +35,7 @@ function bounded(operation, milliseconds, code) {
 
 function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal, capacityManaged = false, now = Date.now) {
   const controller = new AbortController();
+  const diagnostics = createDispatchDiagnostics({ now, safeCode: safeMaritimeDiagnosticCode });
   const timeout = Object.assign(new Error('AGENT_TIMEOUT'), { code: 'AGENT_TIMEOUT', ambiguous: true });
   let timer;
   let fallback;
@@ -45,6 +47,7 @@ function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal
     });
     if (admitted) throw new Error('AGENT_ADMISSION_REPEATED');
     admitted = true;
+    diagnostics.admitted();
     const deadline = now() + milliseconds;
     timer = setTimeout(abort, milliseconds);
     return deadline;
@@ -52,35 +55,48 @@ function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal
   const cleanup = milliseconds => {
     if (!capacityManaged || cleaning || !Number.isSafeInteger(milliseconds) || milliseconds < 1 || milliseconds > 30_000) return;
     cleaning = true;
+    diagnostics.cleanup();
     clearTimeout(timer); clearImmediate(fallback);
-    timer = setTimeout(() => { fallback = setImmediate(() => boundaryReject(timeout)); }, milliseconds);
+    timer = setTimeout(() => {
+      diagnostics.failure(timeout, { source: 'cleanup_allowance', timeoutMs: milliseconds });
+      timeout.dispatch_diagnostics = diagnostics.snapshot();
+      fallback = setImmediate(() => boundaryReject(timeout));
+    }, milliseconds);
   };
   let boundaryReject;
   const result = Promise.resolve().then(() => {
     if (controller.signal.aborted) throw Object.assign(new Error('MARITIME_DISPATCH_EXPIRED'), {
       code: 'MARITIME_DISPATCH_EXPIRED', ambiguous: false, retryable: true
     });
-    return operation({ deadline_at_ms: capacityManaged ? undefined : deadlineAtMs, signal: controller.signal,
+    return operation({ deadline_at_ms: capacityManaged ? undefined : deadlineAtMs, signal: controller.signal, diagnostics,
       ...(capacityManaged ? { on_admitted: admit, on_cleanup: cleanup } : {}) });
   }).then(
     (value) => {
       if (controller.signal.aborted && !cleaning) throw timeout;
       return value;
     },
-    (error) => { throw error; }
+    (error) => {
+      diagnostics.failure(error);
+      if (error && typeof error === 'object') {
+        try { error.dispatch_diagnostics = diagnostics.snapshot(); } catch { /* Preserve immutable errors. */ }
+      }
+      throw error;
+    }
   );
   const boundary = new Promise((_, reject) => {
     boundaryReject = reject;
     abort = () => {
       if (cleaning) return;
       if (controller.signal.aborted) return;
+      diagnostics.failure(timeout, { source: phaseSignal?.aborted ? 'phase_abort' : 'action_allowance', timeoutMs: milliseconds });
+      timeout.dispatch_diagnostics = diagnostics.snapshot();
       controller.abort();
       // An abort-aware adapter can now report whether work expired before any
       // remote mutation. Give that already-signalled rejection one event-loop
       // turn to settle, but never let an adapter that ignores abort hang a tick.
       fallback = setImmediate(() => reject(timeout));
     };
-    if (!capacityManaged) timer = setTimeout(abort, milliseconds);
+    if (!capacityManaged) { diagnostics.admitted(); timer = setTimeout(abort, milliseconds); }
     if (phaseSignal?.aborted) abort();
     else phaseSignal?.addEventListener('abort', abort, { once: true });
   });
@@ -472,6 +488,8 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       if (safe.status === 'error') flag('AGENT_REPORTED_ERROR', { seat_id: seat.seat_id, game_id: snapshot.game_id });
       return 'acknowledged';
     } catch (error) {
+      const diagnostics = safeDispatchDiagnostics(error?.dispatch_diagnostics, safeMaritimeDiagnosticCode);
+      if (diagnostics) record.dispatch_diagnostics = diagnostics;
       if (error?.cleanup_confirmed === true && error.completed_request_id === requestId) {
         await store.set(key, { ...record, state: 'failed-completed', completed_request_id: requestId,
           cleanup_confirmed: true, diagnostic_code: safeMaritimeDiagnosticCode(error.diagnostic_code),

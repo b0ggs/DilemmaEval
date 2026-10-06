@@ -5,13 +5,15 @@ import { Contract, getAddress, keccak256 } from 'ethers';
 import { GAME_ABI, CONFIG_FIELDS } from './abi.mjs';
 import { createChainReader, assertChainConfig, verifyBaseSepoliaRpc } from './reader.mjs';
 import { assertSignerDeployment, PINNED_DEPLOYMENT, prepareSignerDirectory } from './guards.mjs';
+import { chainFailureCode, safeChainDiagnostic } from './diagnostics.mjs';
 
 const decimal = /^(0|[1-9][0-9]*)$/;
 const hash = /^0x[0-9a-fA-F]{64}$/;
 const stable = (value) => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])])) : value;
 const fingerprint = (value) => createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 const ref = (record) => record.hash ? { reference: { kind: 'transaction-hash', value: record.hash } } : {};
-const result = (record) => ({ status: record.status, ...ref(record) });
+const result = (record) => ({ status: record.status, ...ref(record),
+  ...(safeChainDiagnostic(record.diagnostic) ? { diagnostic: safeChainDiagnostic(record.diagnostic) } : {}) });
 function exact(value, fields) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).sort().join(',') !== [...fields].sort().join(',')) throw new Error('INVALID_SIGNER_REQUEST');
 }
@@ -81,6 +83,7 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
   let tail = Promise.resolve();
   let closed = false;
   async function reconcile(record) {
+    const startedAt = now();
     await verifyBaseSepoliaRpc(provider);
     if (!record.hash) {
       // No broadcast is reachable before the hash has been durably saved.
@@ -94,6 +97,7 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
       const canonical = await provider.getBlock(receipt.blockNumber);
       if (canonical?.hash === receipt.blockHash && tip - receipt.blockNumber + 1 >= (config.confirmations ?? 2)) {
         record.status = Number(receipt.status) === 1 ? 'accepted' : 'confirmed-revert';
+        if (record.status === 'confirmed-revert') record.diagnostic ??= { stage: 'confirmation', code: 'TRANSACTION_REVERTED', elapsed_ms: Math.max(0, now() - startedAt) };
         record.stage = 'confirmed'; await persist(); return result(record);
       }
     }
@@ -129,9 +133,10 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
       journal.records[key] = { operation, intent, stage: 'reserved', status: 'rejected-before-submit' };
       await persist();
     }
-    const rejectCurrent = async () => {
+    const rejectCurrent = async (code = 'SIGNER_EXECUTION_EXPIRED') => {
       if (existing) return result(existing);
-      journal.records[key] = { operation, intent, stage: 'rejected', status: 'rejected-before-submit' };
+      journal.records[key] = { operation, intent, stage: 'rejected', status: 'rejected-before-submit',
+        diagnostic: { stage: 'signer_request', code, elapsed_ms: 0 } };
       await persist();
       return result(journal.records[key]);
     };
@@ -151,11 +156,15 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
       if (otherKey === key || other.stage === 'confirmed' || other.stage === 'rejected') continue;
       await reconcile(other);
       if (!permitted()) return rejectCurrent();
-      if (other.stage !== 'confirmed' && other.stage !== 'rejected') return rejectCurrent();
+      if (other.stage !== 'confirmed' && other.stage !== 'rejected') return rejectCurrent('SIGNER_UNRESOLVED_OPERATION');
     }
     const record = { operation, intent, stage: 'reserved', status: 'rejected-before-submit' };
     journal.records[key] = record;
     await persist(); // Intent precedes RPC estimation, signing, and broadcast.
+    const startedAt = now();
+    let diagnosticStage = 'preflight';
+    const diagnose = error => { record.diagnostic ??= {
+      stage: diagnosticStage, code: chainFailureCode(error), elapsed_ms: Math.max(0, now() - startedAt) }; };
     try {
       assertPermitted();
       const preflight = await reader.preflight();
@@ -171,6 +180,7 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
           tx = await contract.configureDefaults.populateTransaction(CONFIG_FIELDS.map((field) => configure[field]));
         } else tx = await contract.createGame.populateTransaction();
       } else {
+        diagnosticStage = 'phase_check';
         if (preflight.active_game_id !== intent.game_id) throw new Error('ACTIVE_GAME_CHANGED');
         const sourceBlock = await provider.getBlock(Number(intent.source_block_number));
         assertPermitted();
@@ -181,14 +191,17 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
         tx = await contract.advancePhase.populateTransaction(intent.game_id);
       }
       assertPermitted();
+      diagnosticStage = 'nonce_check';
       const [latestNonce, pendingNonce] = await Promise.all([provider.getTransactionCount(signerAddress, 'latest'), provider.getTransactionCount(signerAddress, 'pending')]);
       assertPermitted();
       if (latestNonce !== pendingNonce) throw new Error('UNTRACKED_PENDING_SIGNER_NONCE');
+      diagnosticStage = 'prepare_transaction';
       const populated = await signer.populateTransaction({ ...tx, chainId: 84532, value: 0n });
       assertPermitted();
       if (Number(populated.chainId) !== 84532 || getAddress(populated.to) !== getAddress(config.game_address) || BigInt(populated.value ?? 0) !== 0n || Number(populated.nonce) !== pendingNonce) throw new Error('UNSAFE_POPULATED_TRANSACTION');
       await verifyBaseSepoliaRpc(provider);
       assertPermitted();
+      diagnosticStage = 'sign';
       const raw = await signer.signTransaction(populated);
       record.nonce = Number(populated.nonce);
       record.hash = keccak256(raw);
@@ -196,16 +209,18 @@ export async function createIsolatedSigner({ role, config, provider, signer, dir
       // The raw transaction and key never enter coordinator state or this journal.
       await persist();
       try {
+        diagnosticStage = 'broadcast';
         assertPermitted();
         await verifyBaseSepoliaRpc(provider);
         assertPermitted();
         const broadcast = await provider.broadcastTransaction(raw);
         if (broadcast.hash.toLowerCase() !== record.hash.toLowerCase()) throw new Error('BROADCAST_HASH_MISMATCH');
         record.stage = 'broadcast'; record.status = 'accepted';
-      } catch { record.stage = 'uncertain'; record.status = 'race-or-revert'; }
+      } catch (error) { diagnose(error); record.stage = 'uncertain'; record.status = 'race-or-revert'; }
       await persist();
       return result(record);
-    } catch {
+    } catch (error) {
+      diagnose(error);
       // If a hash has been saved, a broadcast may have occurred. Never call it a safe retry.
       record.status = record.hash ? 'race-or-revert' : 'rejected-before-submit';
       record.stage = record.hash ? 'uncertain' : 'rejected';

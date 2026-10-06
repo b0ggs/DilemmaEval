@@ -150,6 +150,19 @@ test('network ambiguity never retries and never exposes raw provider errors', as
   assert.equal(health.ok, false);
   assert.ok(!JSON.stringify(health).includes('SECRET'));
   assert.ok(!(await fs.readFile(path.join(f.runtimeDir, 'telegram/outbox.json'), 'utf8')).includes('SECRET'));
+  const saved = JSON.parse(await fs.readFile(path.join(f.runtimeDir, 'telegram/outbox.json'), 'utf8'));
+  assert.equal(saved.entries[0].diagnostic_code, 'TELEGRAM_NETWORK_ERROR');
+});
+
+test('Telegram timeout is recorded separately from network errors without resending', async t => {
+  let calls = 0;
+  const f = await fixture(t, () => { calls++; return new Promise(() => {}); }, { requestTimeoutMs: 15 });
+  await f.mirror.publish({ messages: { openclaw: [message()] } });
+  const saved = JSON.parse(await fs.readFile(path.join(f.runtimeDir, 'telegram/outbox.json'), 'utf8'));
+  assert.equal(saved.entries[0].status, 'uncertain');
+  assert.equal(saved.entries[0].diagnostic_code, 'TELEGRAM_TIMEOUT');
+  f.advance(); await createTelegramMirror(f.options).flush();
+  assert.equal(calls, 1);
 });
 
 test('a crashed inflight send becomes uncertain; no resend on startup', async (t) => {

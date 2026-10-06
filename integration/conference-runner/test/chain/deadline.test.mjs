@@ -72,6 +72,32 @@ async function fixture(t, { active = false } = {}) {
   return { directory, config, provider, signer, counts, service, journal, setTime: value => { time = value; } };
 }
 
+test('owner failure records the nonce check without signing or exposing provider text', async t => {
+  const f = await fixture(t);
+  f.provider.getTransactionCount = async (_address, block) => block === 'pending' ? 1 : 0;
+  const outcome = await f.service.create({ action_id: 'create:logging-nonce', source_block_number: '100', not_after_ms: 2000 });
+  assert.equal(outcome.status, 'rejected-before-submit');
+  assert.equal(outcome.diagnostic.stage, 'nonce_check');
+  assert.equal(outcome.diagnostic.code, 'UNTRACKED_PENDING_SIGNER_NONCE');
+  assert.equal(f.counts.sign, 0); assert.equal(f.counts.broadcast, 0);
+  assert.deepEqual(Object.values((await f.journal()).records)[0].diagnostic, outcome.diagnostic);
+});
+
+test('owner RPC timeout retains a fixed cause and broadcast uncertainty, with no resend', async t => {
+  const f = await fixture(t);
+  f.provider.broadcastTransaction = async () => {
+    f.counts.broadcast++; throw Object.assign(new Error('SECRET_PROVIDER_URL'), { code: 'TIMEOUT' });
+  };
+  const intent = { action_id: 'create:logging-timeout', source_block_number: '100', not_after_ms: 2000 };
+  const outcome = await f.service.create(intent);
+  assert.equal(outcome.status, 'race-or-revert');
+  assert.equal(outcome.diagnostic.stage, 'broadcast'); assert.equal(outcome.diagnostic.code, 'RPC_TIMEOUT');
+  assert.equal(f.counts.sign, 1); assert.equal(f.counts.broadcast, 1);
+  await f.service.create(intent);
+  assert.equal(f.counts.sign, 1); assert.equal(f.counts.broadcast, 1);
+  assert.equal(JSON.stringify(await f.journal()).includes('SECRET_'), false);
+});
+
 test('bounded create and phase requests work before expiry without changing semantic action identity', async t => {
   const creation = await fixture(t);
   const intent = { action_id: 'create:bounded', source_block_number: '100', not_after_ms: 2000 };
@@ -246,7 +272,9 @@ test('actual HTTP caller abort propagates through clients to prevent late creati
     const response = client[operation](intent, { signal: controller.signal });
     try {
       await entered.promise; controller.abort();
-      assert.deepEqual(await response, { status: 'race-or-revert' });
+      const outcome = await response;
+      assert.equal(outcome.status, 'race-or-revert');
+      assert.equal(outcome.diagnostic.code, 'OPERATION_ABORTED');
       await aborted.promise;
     } finally { release.resolve(); }
     await finished.promise;

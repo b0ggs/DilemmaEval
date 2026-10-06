@@ -278,7 +278,11 @@ test('only a confirmed revert permits a fresh-block transaction retry; an unreso
 test('signer clients redact failures and refuse plaintext remote endpoints', async () => {
   assert.throws(() => createLauncherClient({ url: 'http://example.com', token: 'a'.repeat(24) }), /HTTPS/);
   const client = createPhaseExecutorClient({ url: 'http://localhost:8792', token: 'a'.repeat(24), fetchImpl: async () => { throw new Error('secret'); } });
-  assert.deepEqual(await client.advance(intentFor()), { status: 'race-or-revert' });
+  const outcome = await client.advance(intentFor());
+  assert.equal(outcome.status, 'race-or-revert');
+  assert.equal(outcome.diagnostic.code, 'OPERATION_FAILED');
+  assert.deepEqual(Object.keys(outcome.diagnostic).sort(), ['code', 'elapsed_ms', 'stage']);
+  assert.equal(JSON.stringify(outcome).includes('secret'), false);
 });
 
 test('signer defaults enforce the pinned deployment and reject cross-role signing environments', () => {
@@ -332,7 +336,9 @@ test('untracked pending signer nonce prevents a second writer from submitting', 
   provider.getTransactionCount = async (_wallet, blockTag) => blockTag === 'pending' ? 1 : 0;
   const service = await isolatedFixtureSigner({ role: 'phase-executor', config, provider, signer: signerFor(wallet), directory });
   t.after(() => service.close());
-  assert.deepEqual(await service.advance(intentFor()), { status: 'rejected-before-submit' });
+  const outcome = await service.advance(intentFor());
+  assert.equal(outcome.status, 'rejected-before-submit');
+  assert.equal(outcome.diagnostic.code, 'UNTRACKED_PENDING_SIGNER_NONCE');
   assert.equal(provider.broadcasts.length, 0);
 });
 
@@ -406,11 +412,13 @@ test('uncertain operator creation blocks advancement through the shared nonce jo
   assert.equal((await service.create({ action_id: 'launch:uncertain', source_block_number: '100' })).status, 'race-or-revert');
   provider.transactions.clear();
   state.active = 1n; state.current = 1n; state.ready = true;
-  assert.deepEqual(await service.advance(intentFor()), { status: 'rejected-before-submit' });
+  const blocked = await service.advance(intentFor());
+  assert.equal(blocked.status, 'rejected-before-submit');
+  assert.equal(blocked.diagnostic.code, 'SIGNER_UNRESOLVED_OPERATION');
   await service.close();
   const resumed = await isolatedFixtureSigner(options);
   t.after(() => resumed.close());
-  assert.deepEqual(await resumed.advance(intentFor()), { status: 'rejected-before-submit' });
+  assert.equal((await resumed.advance(intentFor())).status, 'rejected-before-submit');
   assert.equal(provider.broadcasts.length, 1);
 });
 

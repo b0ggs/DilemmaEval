@@ -5,6 +5,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createConferenceRunner } from './runner/index.mjs';
 import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from './maritime/transport.mjs';
 import { validateGameplayResponse } from './maritime/protocol.mjs';
+import { safeDispatchDiagnostics } from './dispatch-diagnostics.mjs';
+import { chainFailureCode, safeChainDiagnostic } from './chain/diagnostics.mjs';
 import { createGuardedLauncher, validatePreparedProof } from './proof-control.mjs';
 import { createProofDispatchJournal, writeProofReport } from '../../../conference/operations/saved-helpers/proof-dispatch-journal.mjs';
 
@@ -161,22 +163,32 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
 
   // In-flight operations may return after a sibling fails. Keep their actual
   // outcomes until the absolute deadline, when unresolved outcomes are ambiguous.
-  async function boundedCall(callback, code, { mutation = false, allowStopped = false, agentRequest } = {}) {
+  async function boundedCall(callback, code, { mutation = false, allowStopped = false, agentRequest, diagnostics } = {}) {
     if (!allowStopped) assertOpen();
     if (deadlineController.signal.aborted) throw fixedError(report.failure?.code ?? 'PROOF_HARD_DEADLINE', mutation);
     let onAbort;
     const aborted = new Promise((_, reject) => {
-      onAbort = () => reject(fixedError(report.failure?.code ?? 'PROOF_HARD_DEADLINE', mutation));
+      onAbort = () => {
+        const error = fixedError(report.failure?.code ?? 'PROOF_HARD_DEADLINE', mutation);
+        diagnostics?.failure(error, { source: 'hard_stop' });
+        if (diagnostics) error.dispatch_diagnostics = diagnostics.snapshot();
+        reject(error);
+      };
       deadlineController.signal.addEventListener('abort', onAbort, { once: true });
     });
     try {
       return await Promise.race([Promise.resolve().then(callback).catch(error => {
+        diagnostics?.failure(error);
         const known = error?.message === 'READINESS_REMOTE_GENERATION_UNATTESTED' ? error.message : code;
         const wrapped = fixedError(known, mutation && error?.ambiguous !== false);
         const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
         const diagnosticCode = safeMaritimeDiagnosticCode(error?.diagnostic_code);
         if (transportCode) wrapped.transport_code = transportCode;
         if (diagnosticCode) wrapped.diagnostic_code = diagnosticCode;
+        const dispatchDiagnostics = safeDispatchDiagnostics(error?.dispatch_diagnostics ?? diagnostics?.snapshot(), safeMaritimeDiagnosticCode);
+        if (dispatchDiagnostics) wrapped.dispatch_diagnostics = dispatchDiagnostics;
+        const chainDiagnostic = safeChainDiagnostic(error?.chain_diagnostic);
+        if (chainDiagnostic) wrapped.chain_diagnostic = chainDiagnostic;
         if (agentRequest && error?.cleanup_confirmed === true && error.completed_request_id === agentRequest.request_id) {
           wrapped.completed_request_id = agentRequest.request_id;
           wrapped.cleanup_confirmed = true;
@@ -203,7 +215,7 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
       return boundedCall(() => { assertOpen(); return agents.dispatch({ ...args, deadline_at_ms: deadlineAt,
         ...(args.on_admitted ? { on_admitted: async () => Math.min(await args.on_admitted(), options.hardStopAtMs) } : {}),
         signal: AbortSignal.any([stopController.signal, deadlineController.signal, ...(signal ? [signal] : []), ...(args.signal ? [args.signal] : [])])
-      }); }, 'PROOF_AGENT_OPERATION_FAILED', { mutation: true, agentRequest: args.request });
+      }); }, 'PROOF_AGENT_OPERATION_FAILED', { mutation: true, agentRequest: args.request, diagnostics: args.diagnostics });
     } } });
   const trackedAgents = { capacityManaged: journal.capacityManaged, dispatch: args => {
     const task = journal.dispatch(args);
@@ -212,7 +224,15 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
     return task;
   } };
   const safeChain = Object.fromEntries(['readSnapshot', 'readEvents', 'readBlockHash'].filter(method => typeof options.chain?.[method] === 'function')
-    .map(method => [method, (...args) => boundedCall(() => options.chain[method](...args), 'PROOF_CHAIN_READ_FAILED')]));
+    .map(method => [method, (...args) => boundedCall(async () => {
+      const startedAt = clock();
+      try { return await options.chain[method](...args); }
+      catch (error) {
+        const failure = fixedError('PROOF_CHAIN_READ_FAILED');
+        failure.chain_diagnostic = { stage: method, code: chainFailureCode(error), elapsed_ms: Math.max(0, clock() - startedAt) };
+        throw failure;
+      }
+    }, 'PROOF_CHAIN_READ_FAILED')]));
   const phaseRequests = new Set();
   const guardedPhase = { advance: intent => trackedEffect(async () => {
     observeConfirmedGame(runner.getState());
@@ -229,12 +249,18 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
         signal: AbortSignal.any([stopController.signal, deadlineController.signal, ...(signal ? [signal] : [])])
       }); }, 'PROOF_PHASE_UNCERTAIN', { mutation: true });
       row.status = result?.status === 'accepted' ? 'accepted' : result?.status === 'rejected-before-submit' ? 'rejected-before-submit' : 'ambiguous';
+      const diagnostic = safeChainDiagnostic(result?.diagnostic);
+      if (diagnostic) row.diagnostic = diagnostic;
       if (result?.reference?.kind === 'transaction-hash' && HASH.test(result.reference.value ?? '')) row.transaction_hash = result.reference.value.toLowerCase();
       if (row.status !== 'accepted') stop('PROOF_PHASE_UNCERTAIN');
       await persist();
       return { status: row.status === 'ambiguous' ? 'race-or-revert' : row.status,
         ...(row.transaction_hash ? { reference: { kind: 'transaction-hash', value: row.transaction_hash } } : {}) };
-    } catch { row.status = 'ambiguous'; stop('PROOF_PHASE_UNCERTAIN'); await persist(); throw fixedError('PROOF_PHASE_UNCERTAIN', true); }
+    } catch (error) {
+      row.status = 'ambiguous';
+      row.diagnostic = safeChainDiagnostic(error?.chain_diagnostic) ?? { stage: 'signer_request', code: chainFailureCode(error), elapsed_ms: 0 };
+      stop('PROOF_PHASE_UNCERTAIN'); await persist(); throw fixedError('PROOF_PHASE_UNCERTAIN', true);
+    }
   }) };
   const guardedSpectator = {
     publish: value => trackedEffect(() => boundedCall(() => spectator.publish(value), 'PROOF_SPECTATOR_UNCERTAIN', { mutation: true })),
@@ -317,6 +343,8 @@ export async function runControlledProof({ proofOptions, agents, launcher, phase
       await boundedCall(() => pause(Math.min(prepared.preparedConfig.poll_interval_ms, Math.max(1, options.hardStopAtMs - clock()))), 'PROOF_PAUSE_FAILED');
     }
   } catch (error) {
+    const chainDiagnostic = safeChainDiagnostic(error?.chain_diagnostic);
+    if (chainDiagnostic) report.chain_failure = chainDiagnostic;
     stop(error?.message === 'READINESS_REMOTE_GENERATION_UNATTESTED' ? error.message :
       ['PROOF_HARD_DEADLINE', 'PROOF_RUN_ABORTED'].includes(error?.code) ? error.code : 'PROOF_RUN_FAILED');
   } finally {

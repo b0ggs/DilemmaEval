@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { safePlayerErrorCode } from '../../../integration/conference-runner/src/maritime/diagnostics.mjs';
 import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../../../integration/conference-runner/src/maritime/transport.mjs';
+import { createDispatchDiagnostics } from '../../../integration/conference-runner/src/dispatch-diagnostics.mjs';
 
 const TERMINAL_STATUSES = new Set([
   'submitted',
@@ -144,10 +145,16 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
 
     const record = startedRecord(args, now);
     await mutateAndPersist(() => { report.dispatches.push(record); });
+    const diagnostics = args.diagnostics ?? createDispatchDiagnostics({ now, safeCode: safeMaritimeDiagnosticCode });
+    // Outer timers can expire before an abort-ignoring adapter returns. The
+    // existing report flush will retain this bounded evidence in the same row.
+    diagnostics.onFailure(() => { record.dispatch_diagnostics = diagnostics.snapshot(); });
 
     let response;
-    try { response = await adapter.dispatch(args); }
+    try { response = await adapter.dispatch({ ...args, diagnostics }); }
     catch (error) {
+      diagnostics.failure(error);
+      diagnostics.finish();
       const completedDiscussion = record.operation === 'discussion' && error?.cleanup_confirmed === true &&
         error.completed_request_id === record.request_id;
       const recovered = error?.recovered_response;
@@ -166,12 +173,14 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
         ...(transportCode ? { transport_code: transportCode } : {}),
         diagnostic_code: safeMaritimeDiagnosticCode(error?.diagnostic_code),
         has_team_message: false,
+        dispatch_diagnostics: diagnostics.snapshot(),
       });
       stopFor(record);
       throw error;
     }
 
     const status = responseOutcome(response);
+    diagnostics.finish();
     await finish(record, {
       status,
       transaction_hash: TRANSACTION_HASH.test(response?.transaction_hash ?? '')
@@ -181,6 +190,7 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
         ? safePlayerErrorCode(response?.error?.code)
         : status === 'ambiguous' ? 'MARITIME_OPERATION_FAILED' : null,
       has_team_message: typeof response?.team_message === 'string' && response.team_message.length > 0,
+      dispatch_diagnostics: diagnostics.snapshot(),
     });
     if (status === 'agent-error' || status === 'ambiguous') stopFor(record);
     return response;

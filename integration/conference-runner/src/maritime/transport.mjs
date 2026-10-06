@@ -7,6 +7,7 @@ import { assertPublicGameplayRequest, validateDiscussionRequest, validateDiscuss
 import { reconcileRoster, validateMaritimeRoster } from './roster.mjs';
 import { buildCompletedJournalReadCommand, verifyCompletedReceipt, verifyPublicTransactionReferences } from './reconcile.mjs';
 import { TEAM_PAYOUT_OBJECTIVE } from './recipes.mjs';
+import { createDispatchDiagnostics, safeDispatchDiagnostics } from '../dispatch-diagnostics.mjs';
 
 export const MARITIME_API_BASE = 'https://api.maritime.sh';
 export class MaritimeAdapterError extends Error {
@@ -48,6 +49,7 @@ const NATIVE_RECEIPT_CODES = new Set([
     .map(code => `OPENCLAW_RECEIPT_REFUSED_${code.toUpperCase().replaceAll('-', '_')}`)
 ]);
 const CONTINUITY_FAILURE_CODES = new Set([
+  'AGENT_TIMEOUT', 'PROOF_HARD_DEADLINE', 'PROOF_RUN_ABORTED',
   'MARITIME_PRE_CHAT_TIMEOUT', 'MARITIME_CHAT_TIMEOUT', 'MARITIME_COMPLETED_CLEANUP_TIMEOUT',
   'PERSISTENT_ROOT_CHANGED', 'INSTALL_DIRECTORY_FAILED', 'INSTALL_RUNTIME_FAILED',
   'INSTALL_EVIDENCE_INVALID', 'INSTALL_PUBLIC_ARTIFACT_FLUSH_FAILED',
@@ -72,8 +74,18 @@ export function withFailureMetadata(failure, error) {
   const diagnostic = safeMaritimeDiagnosticCode(error?.diagnostic_code, safeMaritimeDiagnosticCode(error?.code));
   if (transport !== null) failure.transport_code ??= transport;
   if (diagnostic !== null) failure.diagnostic_code ??= diagnostic;
+  const diagnostics = safeDispatchDiagnostics(error?.dispatch_diagnostics, safeMaritimeDiagnosticCode);
+  if (diagnostics) failure.dispatch_diagnostics ??= diagnostics;
+  if (['http_request', 'runtime_verification', 'deadline_signal'].includes(error?.timeout_source)) {
+    failure.timeout_source ??= error.timeout_source;
+    if (Number.isSafeInteger(error.timeout_ms) && error.timeout_ms >= 0) failure.timeout_ms ??= error.timeout_ms;
+  }
   return failure;
 }
+
+const timeoutFailure = (source, milliseconds, ambiguous) => Object.assign(
+  new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous }),
+  { timeout_source: source, ...(Number.isSafeInteger(milliseconds) ? { timeout_ms: milliseconds } : {}) });
 
 function replyValidationDiagnostic(error, candidate) {
   if (/^SENSITIVE_MATERIAL_REJECTED/.test(error?.message ?? '')) return 'MARITIME_REPLY_SECRET_REJECTED';
@@ -128,12 +140,12 @@ export async function maritimeRequest({ apiKey, fetchImpl = globalThis.fetch, pa
         catch { throw new MaritimeAdapterError('MARITIME_RESPONSE_INVALID', { ambiguous }); }
       })(),
       new Promise((_, reject) => {
-        timer = setTimeout(() => { controller.abort(); reject(new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous })); }, timeoutMs);
+        timer = setTimeout(() => { controller.abort(); reject(timeoutFailure('http_request', timeoutMs, ambiguous)); }, timeoutMs);
       }),
       ...(signal ? [new Promise((_, reject) => {
         rejectOnAbort = () => {
           controller.abort();
-          reject(new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous }));
+          reject(timeoutFailure('deadline_signal', undefined, ambiguous));
         };
         if (signal.aborted) rejectOnAbort();
         else signal.addEventListener('abort', rejectOnAbort, { once: true });
@@ -593,7 +605,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
       assertDispatchBoundary(boundary);
       return identity(agent, status, code);
     };
-    const verify = async (method = 'verify', extra = {}) => {
+    const verify = async (method = 'verify', extra = {}, verificationStage = 'runtime_verify') => {
+      boundary.diagnostics?.stage(verificationStage);
       let closed = false, pending = 0, timer, onAbort;
       const operation = async action => {
         if (closed) throw new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted });
@@ -604,6 +617,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         const waitMs = requestTimeout({ ...boundary, timeoutMs });
         const result = await Promise.race([
           Promise.resolve().then(() => continuity[method]({ seat: structuredClone(assigned), ...extra,
+            on_check: check => boundary.diagnostics?.stage(verificationStage, check),
             execute: command => operation(async () => {
               if (!Array.isArray(command) || !command.length || command.some(arg => typeof arg !== 'string' || !arg || arg.includes('\0')) ||
                   command.some(arg => ['--configure-model', '--configure-hermes-config', '--reload-env'].includes(arg))) {
@@ -614,9 +628,9 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             getAgent: () => operation(() => getAgent())
           })),
           new Promise((_, reject) => { timer = setTimeout(() => reject(
-            new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous: boundary.remotePostStarted })), waitMs); }),
+            timeoutFailure('runtime_verification', waitMs, boundary.remotePostStarted)), waitMs); }),
           ...(boundary.signal ? [new Promise((_, reject) => {
-            onAbort = () => reject(new MaritimeAdapterError('MARITIME_TIMEOUT', { ambiguous: boundary.remotePostStarted }));
+            onAbort = () => reject(timeoutFailure('deadline_signal', undefined, boundary.remotePostStarted));
             if (boundary.signal.aborted) onAbort();
             else boundary.signal.addEventListener('abort', onAbort, { once: true });
           })] : [])
@@ -627,6 +641,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           throw new Error('CONTINUITY_RESULT_INVALID');
         }
       } catch (error) {
+        boundary.diagnostics?.failure(error);
         throw withFailureMetadata(new MaritimeAdapterError('MARITIME_RUNTIME_CONTINUITY_FAILED', { ambiguous: boundary.remotePostStarted }), error);
       } finally {
         closed = true;
@@ -636,16 +651,20 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
     };
     return {
       async start() {
+        boundary.diagnostics?.stage('wake');
         identity(await post({ path: `${agentPath}/start` }), 'active', 'MARITIME_START_UNCONFIRMED');
         await dispatchDelay(wakeDelayMs, boundary);
+        boundary.diagnostics?.stage('wake_confirm');
         await getAgent();
         await verify();
       },
-      verify: () => verify(),
+      verify: stage => verify('verify', {}, stage),
       prepareAction: request => verify('prepareAction', { request: structuredClone(request), deadlineAtMs: boundary.deadlineAtMs }),
       async sleep() {
         try {
+          boundary.diagnostics?.stage('sleep');
           identity(await post({ path: `${agentPath}/sleep` }), 'sleeping', 'MARITIME_SLEEP_UNCONFIRMED');
+          boundary.diagnostics?.stage('sleep_confirm');
           await getAgent('sleeping', 'MARITIME_SLEEP_UNCONFIRMED');
         } catch (error) {
           throw withFailureMetadata(new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true }), error);
@@ -667,7 +686,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
       return reconcileRoster({ roster, agents, maxAgents });
     },
     async dispatch({ seat, request, deadline_at_ms: deadlineAtMs, signal, on_admitted: onAdmitted,
-      on_cleanup: onCleanup, on_pre_submit: onPreSubmit } = {}) {
+      on_cleanup: onCleanup, on_pre_submit: onPreSubmit,
+      diagnostics = createDispatchDiagnostics({ safeCode: safeMaritimeDiagnosticCode }) } = {}) {
       const assigned = roster.find(row => row.seat_id === seat?.seat_id);
       if (!assigned || ['agent_id', 'team', 'harness', 'maritime_agent'].some(key => assigned[key] !== seat[key]) ||
           assigned.wallet_address.toLowerCase() !== seat.wallet_address?.toLowerCase() ||
@@ -703,11 +723,12 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
         throw new MaritimeAdapterError('MARITIME_RUNTIME_COMMAND_REQUIRED');
       }
       busy.add(assigned.seat_id);
-      const boundary = { deadlineAtMs, signal, remotePostStarted: false, pending: 0, unknownRemoteWork: false };
+      const boundary = { deadlineAtMs, signal, remotePostStarted: false, pending: 0, unknownRemoteWork: false, diagnostics };
       let cleanupStarted = false;
       const beginCleanup = () => {
         if (cleanupStarted) return;
         cleanupStarted = true;
+        diagnostics.cleanup();
         onCleanup?.(cleanupTimeoutMs);
         boundary.deadlineAtMs = Date.now() + cleanupTimeoutMs;
         boundary.signal = undefined; // Action/phase cancellation cannot cancel known-completed cleanup.
@@ -715,6 +736,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
       const post = async ({ path, body }) => {
         const stageTimeoutMs = requestTimeout({ ...boundary, timeoutMs });
         boundary.remotePostStarted = true;
+        diagnostics.remoteWork('unknown');
         boundary.pending++;
         try {
           const result = await maritimeRequest({ apiKey, fetchImpl, timeoutMs: stageTimeoutMs, signal: boundary.signal,
@@ -723,6 +745,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           return result;
         } catch (error) {
           if (error?.ambiguous) boundary.unknownRemoteWork = true;
+          diagnostics.failure(error);
           throw error;
         } finally { boundary.pending--; }
       };
@@ -738,11 +761,13 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           beginCleanup();
           if (certified) await certified.sleep();
           else if (awakeLimit !== undefined) {
+            diagnostics.stage('sleep');
             const agentPath = `/api/agents/${encodeURIComponent(assigned.agent_id)}`;
             const sleeping = await post({ path: `${agentPath}/sleep` });
             if (String(sleeping?.status ?? '').toLowerCase() !== 'sleeping') {
               throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
             }
+            diagnostics.stage('sleep_confirm');
             const read = await maritimeRequest({ apiKey, fetchImpl, path: agentPath,
               timeoutMs: requestTimeout({ ...boundary, timeoutMs }), signal: boundary.signal });
             if (read?.id !== assigned.agent_id || read.framework !== assigned.harness || read.status !== 'sleeping') {
@@ -752,6 +777,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           if (debug && quarantined) { await quarantine.complete(assigned, snapshot.request_id); quarantined = false; }
           if (leaseAcquired) { releaseLease(); leaseAcquired = false; }
           cleanupConfirmed = true;
+          diagnostics.sleepConfirmed();
+          diagnostics.remoteWork('completed');
           return true;
         };
         try {
@@ -762,6 +789,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             leaseAcquired = true;
           }
           if (onAdmitted) boundary.deadlineAtMs = await onAdmitted();
+          diagnostics.admitted();
           assertDispatchBoundary(boundary);
           if (debug) {
             await quarantine.begin(assigned, snapshot.request_id); quarantined = true;
@@ -771,6 +799,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
             await certified.start();
             if (!discussion) await certified.prepareAction(snapshot);
           } else if (awakeLimit !== undefined) {
+            diagnostics.stage('wake');
             // Maritime snapshots retain the encrypted control-plane value but
             // a restored process does not receive it until reload-env.
             await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/reload-env` });
@@ -788,6 +817,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           let staged;
           if (!discussion && binding) {
+            diagnostics.stage('request_stage');
             staged = buildPublicRequestArtifact(snapshot, binding, assigned.harness);
             for (let attempt = 0; attempt < (certified ? 1 : 2); attempt++) {
               try {
@@ -807,8 +837,10 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           const recoverInvalid = async invalid => {
             if (discussion || !['join', 'commit', 'reveal'].includes(snapshot.requested_action) || !binding) throw invalid;
+            diagnostics.failure(invalid);
             let recovered;
             try {
+              diagnostics.stage('recovery');
               const read = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/exec`,
                 body: { command: buildCompletedJournalReadCommand({ binding, request: snapshot, config }), timeout: 30 } });
               if (read?.exitCode !== 0 || typeof read.stdout !== 'string' || Buffer.byteLength(read.stdout) > 16_384 ||
@@ -827,6 +859,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           await onPreSubmit?.();
           assertDispatchBoundary(boundary);
           chatStarted = true;
+          diagnostics.stage('chat');
           try {
             payload = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/chat`,
               body: { message: buildAgentPrompt(snapshot, binding, staged?.path), conversation_id: conversationId } });
@@ -840,6 +873,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           let result;
           for (let replyAttempt = 0; ; replyAttempt++) {
+            diagnostics.stage('reply_validation');
             const responseText = payload?.response;
             chatCompleted = Boolean(payload && !payload.error && typeof responseText === 'string' && responseText.length &&
               Object.keys(payload).every(key => ['response', 'error'].includes(key)));
@@ -885,6 +919,7 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
               const oversized = error.diagnostic_code === 'MARITIME_REPLY_TOO_LARGE';
               chatCompleted = false;
               const corrective = 'Return only the exact discussion-response JSON for this request. Include one nonempty team_message. Keep your message succinct in ASD-STE100 format. Do not sign or run a gameplay command. Do not include keys, salts or credentials.';
+              diagnostics.stage('chat');
               payload = await post({ path: `/api/agents/${encodeURIComponent(assigned.agent_id)}/chat`, body: {
                 message: `${corrective}\n${buildAgentPrompt(snapshot, binding, staged?.path)}`,
                 conversation_id: oversized ? `${conversationId}:discussion-retry-1` : conversationId
@@ -895,11 +930,12 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           // use their own finite allowance; unknown inspection jobs still block release.
           beginCleanup();
           if (certified) {
-            await certified.verify();
+            await certified.verify('final_verify');
           }
           if (!await sleepAndRelease() && awakeLimit !== undefined) throw new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true });
           return structuredClone(result);
         } catch (error) {
+          diagnostics.failure(error);
           const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
           const diagnosticCode = safeMaritimeDiagnosticCode(error?.diagnostic_code);
           if (transportCode === 'MARITIME_TIMEOUT' && (!diagnosticCode || diagnosticCode === 'MARITIME_TIMEOUT')) {
@@ -909,6 +945,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           if ((!chatStarted && error?.code === 'MARITIME_DISPATCH_EXPIRED' || discussion && chatCompleted) && boundary.remotePostStarted &&
               !boundary.unknownRemoteWork && boundary.pending === 0 && !cleanupAttempted) {
             try { await sleepAndRelease(); } catch (cleanupError) {
+              diagnostics.failure(cleanupError, { secondary: true });
+              cleanupError.dispatch_diagnostics = diagnostics.snapshot();
               throw withFailureMetadata(new MaritimeAdapterError('MARITIME_SLEEP_UNCONFIRMED', { ambiguous: true }), error);
             }
           }
@@ -930,6 +968,9 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           }
           throw error;
         } finally {
+          if (boundary.remotePostStarted) diagnostics.remoteWork(cleanupConfirmed ||
+            chatCompleted && !boundary.unknownRemoteWork && boundary.pending === 0 ? 'completed' : 'unknown');
+          diagnostics.finish();
           if (debug && leaseAcquired) retainedLeases.set(assigned.seat_id, { requestId: snapshot.request_id, release: releaseLease });
           busy.delete(assigned.seat_id);
         }
@@ -943,7 +984,8 @@ export function createMaritimeAdapter({ config, apiKey, runtimeEvidence, fetchIm
           attempts.delete(key);
         }
       });
-      return structuredClone(await promise);
+      try { return structuredClone(await promise); }
+      catch (error) { error.dispatch_diagnostics = diagnostics.snapshot(); throw error; }
     },
     async diagnose({ seat, request, deadline_at_ms: deadlineAtMs, signal } = {}) {
       const assigned = roster.find(row => row.seat_id === seat?.seat_id);

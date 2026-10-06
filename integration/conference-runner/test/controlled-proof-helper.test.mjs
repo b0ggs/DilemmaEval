@@ -90,6 +90,7 @@ test('Game 17 shape durably represents one transport failure and nine late succe
   assert.ok(evidence.dispatches.every(row => Object.keys(row).every(key => [
     'started_at', 'finished_at', 'request_id', 'seat_id', 'operation', 'game_id', 'round',
     'status', 'transaction_hash', 'error_code', 'transport_code', 'diagnostic_code', 'has_team_message',
+    'dispatch_diagnostics',
   ].includes(key))));
   assert.equal(journal.getFailure()?.seat_id, 'oc-1');
   assert.equal(stopController.signal.aborted, true);
