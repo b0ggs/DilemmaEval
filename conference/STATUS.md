@@ -13,46 +13,42 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
   Historical full checkpoints: 625/625 and 631/631; debug fixtures passed.
 - Step 5: Games 21–23 completed with defaults; Telegram and terminal cleanup
   confirmed. Initial disabled-observer diagnostics passed on oc-1/hs-1.
-- Current: Game 25 is confirmed and running in debug-game-5-refresh-1. All ten
-  joins and round-1 discussions/commits/reveals completed successfully by
-  12:38 UTC. Round 1 resolved with zero defaults; five players survived.
-  Round-2 hs-2/hs-3 commits landed but chat was aborted by the coordinator's
-  phase_abort signal after about 51s of action, leaving unknown job completion
-  and two quarantines. Three healthy seats continue; no signing replay.
-  New diagnostics retain chat / AGENT_TIMEOUT / phase_abort as the first failure.
-  Cause established: phaseDispatch reuses the discussion watcher, whose
-  all-required-acted predicate aborts chat before late successful replies return.
-  Narrow coordinator correction now drains replies when all moves have landed;
-  actual deadline/game/round/phase changes still abort, and pre-submit guards
-  remain. Runner tests pass 33/33, including commit/reveal reply races and actual
-  deadline expiry; original new-test assertions corrected for acknowledged
-  records becoming chain-confirmed during refresh. Private verified log:
-  /private/tmp/dilemma-phase-completion-runner-verified-20261006.log.
-  Actual controlled-wrapper checks pass 4/4; focused guard/timer checks pass 4/4
-  after omitting a timer budget from phase-abort records (there is no elapsed
-  180s timer in that case). Logs: /private/tmp/dilemma-phase-completion-wrappers-20261006.log
-  and /private/tmp/dilemma-phase-abort-diagnostics-20261006.log.
-  Game 25 uses its original loaded code; the correction needs the next game.
-  Every join
-  confirmed sleep; live diagnostics separate second-wave queue/action/cleanup
-  times (oc-1: 54s/53s/7s). The user authorized this
-  game on October 6. Its first startup
-  stopped before creation: readEvents queried 1,000 blocks accumulated since
-  preparation, and the live RPC rejected it with HTTP 413 / -32614. No fuse was
-  used, game created, agent woken or transaction sent. Operator stopped.
-  Event reads now use verified 100-block pages; fixed reason RPC_REQUEST_TOO_LARGE
-  retains this cause. Targeted chain tests pass 27/27 (private log:
-  /private/tmp/dilemma-rpc-range-targeted-20261006.log); the real 1,094-block
-  backlog now reads successfully. Active 0 / awake 0 confirmed. Fix pushed as
-  50f62af. Fresh debug-game-5-refresh-1 preparation passed; operator/coordinator
-  restarted at 12:24 UTC, runtime initialization passed and creation guards are
-  running. Old startup and inputs remain preserved.
+- Current: requested Debug Game 25 complete and cleaned up. Four rounds,
+  44m04s on-chain (45m27s coordinator run), all_seats_acted=true, six defaults
+  (by round: 0, 2, 2, 2). All ten completed round 1. This is a degraded debug
+  result, not a passed proof. All 55 Telegram messages sent with DEBUG prefixes;
+  pending/inflight 0. Fresh terminal/active 0/awake 0/quarantine 0 confirmed;
+  hs-2/hs-3 jobs explicitly stopped and later inactive reads resolved reservations.
+  Coordinator/operator stopped; 121-record owner journal reconciled. No next
+  game is scheduled. Reports: debug-game-5-refresh-1/{proof-run,cleanup,completion}.json
+  and matching inputs in the v2 private root.
+- Game 25 established the cause of two interruptions: phaseDispatch reused the
+  discussion watcher's all-required-acted predicate, aborting hs-2/hs-3 chat after
+  about 51s when all commits had landed. New records retain chat / AGENT_TIMEOUT /
+  phase_abort; their six subsequent defaults came from quarantine. d75edbd fixes
+  this: drain bounded replies after moves land, retain actual deadline/game/round/
+  phase and pre-submit guards. Phase-abort metadata no longer claims an elapsed
+  180s timer. Coordinator-only; no reinstall. The running game kept its original
+  code, so the behavioral correction still needs a fresh live game.
+- Guard verification: 33/33 runner tests, 4/4 actual controlled-wrapper checks,
+  4/4 focused guard/timer checks. Initial new fixtures assumed acknowledged state;
+  corrected for refresh promoting accepted records to chain-confirmed. Logs:
+  /private/tmp/dilemma-phase-completion-runner-verified-20261006.log,
+  /private/tmp/dilemma-phase-completion-wrappers-20261006.log and
+  /private/tmp/dilemma-phase-abort-diagnostics-20261006.log.
+- Other live checks: queue/action/cleanup split confirmed (oc-1 join: 54s/53s/7s).
+  hs-1 round-3 malformed commit reply recovered its existing confirmed transaction
+  once, with job completion/sleep (167s action, 7s cleanup); no signing replay or
+  added quarantine. Earlier unsent startup hit readEvents HTTP 413 / -32614 on
+  1,000 blocks. 50f62af uses verified 100-block pages and RPC_REQUEST_TOO_LARGE;
+  27/27 chain regressions and the real 1,094-block backlog passed. Original
+  startup/unused fuse preserved in debug-game-5; it consumed no game/wake/gas.
 - October 5 shutdown checkpoint: Game 24 terminal; active game 0, account awake 0
   and quarantine 0 confirmed. Coordinator, tests and isolated operator stopped.
-- Next: monitor A5, verify coordinator corrections and logging, and confirm
-  terminal/active 0/awake 0 cleanup. Then continue
-  V2 step 6. Six fix_issue.MD corrections are implemented/deployed;
-  live verification and final proof remain. Deferred findings remain out of scope.
+- Next: fresh debug verification of d75edbd, then remaining V2 step 6: complete
+  current full suite, Game 20 claims, fresh proof diagnostics/continuity and
+  normal proof-run/proof-audit. Six fix_issue.MD corrections are implemented/
+  deployed; final proof remains. Deferred findings remain out of scope.
 - October 6 prelaunch checkpoint, 11:45 UTC: active game 0, account awake 0,
   quarantine 0, all 11 latest/pending nonces equal, all seats admitted/funded,
   owner journal resolved and Telegram room access verified. Owner balance
@@ -130,9 +126,9 @@ additional wakes 36/60 (all-ten reinstall complete), owner/operator gas
 Games 21–24 cleaned up. Counted-draft fix to Game 23 creation: about 60 minutes.
 October 6 logging work used zero creations, additional wakes or owner gas.
 October 6: creations 1/10 (total 5/30), Game 25 confirmed; the earlier stopped
-startup sent no creation. Additional wakes 2/60; owner gas was 0/0.07 ETH before
-Game 25 and will be reconciled from its receipts at cleanup. Both smoke wakes
-were counted before waking and cleaned up.
+startup sent no creation. Additional wakes 2/60; owner gas 0.000007681764/0.07 ETH,
+reconciled from all ten Game 25 canonical receipts. Both smoke wakes were counted
+before waking and cleaned up; terminal job stops added no wakes.
 
 ## Run map
 
@@ -168,4 +164,4 @@ A2 / Game 22: all ten joined; oc-4/5, hs-1/2/3 team-message invalid; 27 defaults
 A3 / Game 23: all ten acted; three defaults in round 4; hs-4 reveal HTTP 502, hs-5 commit/hs-3 reveal timeouts; 64/64 DEBUG messages sent; terminal/awake 0/active 0/quarantine 0 confirmed; operator stopped. No team-message failures. User requested stop for a new-session audit.
 A4 / Game 24: completed in five rounds / 68 minutes, nine chain defaults, all_seats_acted=false. All ten joined/discussed. Four MARITIME_TIMEOUT quarantines: oc-4 round-1 commit, oc-1 round-3 reveal, hs-4/5 round-4 reveal. The latter reveals landed but completion remained unknown; hs-1/2/3 continued. Telegram pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stop and later inactive reads; operator stopped. Uses the six-fix deployment; live wrapper timing/metadata corrections (ef01ced, pushed) and timeout-stage labels apply to the next attempt. User requested stop before internet loss; no new attempt.
 A5 / pre-creation startup stopped: user-authorized October 6; fresh launch preflight passed, operator/coordinator started 12:15 UTC. readEvents RPC_ERROR isolated to HTTP 413 on 1,000 blocks; 100 blocks succeeds. Fixed pagination and safe request-size cause; 27/27 chain regressions, no installed-source changes/reinstall. No game/fuse/wake/signing call; counters remain 0 today / 4 total. Old report and cleanup in debug-game-5; resume in a fresh directory. Prelaunch counter read also corrected for historical at/started_at date fields before launch.
-A5 / Game 25 running: debug-game-5-refresh-1 and matching inputs prepared; operator/coordinator started 12:24 UTC. All ten joins and round-1 discussions/commits/reveals succeeded; round 1 resolved with zero defaults. Round 2: hs-2/hs-3 commits landed, but all-committed watcher cancelled their unfinished chat and retained quarantine; two defaulted reveals. Three healthy seats continue in round 3, five players still alive on-chain. First live game with ef01ced wrappers / 03e30c8 diagnostics; exact phase_abort cause isolated and correction verified locally (33 runner + 4 wrapper + 4 timer tests). Original unsent RPC startup preserved in debug-game-5; its pagination fix is already live.
+A5 / Game 25 complete: four rounds / 44m04s on-chain, all ten acted, six defaults (0/2/2/2). Round-2 hs-2/hs-3 commits landed but all-committed watcher aborted late chat, retaining two quarantines; three healthy seats continued through round 4. hs-1 malformed round-3 reply recovered once without signing replay. 55/55 DEBUG messages sent, pending/inflight 0. Terminal/active 0/awake 0/quarantine 0 confirmed after explicit job stops and later inactive reads; coordinator/operator stopped, owner journal reconciled. Exact phase_abort cause corrected and pushed as d75edbd (33 runner + 4 wrapper + 4 timer checks); not loaded into this game, requires fresh verification. Reports in debug-game-5-refresh-1. Degraded debug result, not a passed proof.
