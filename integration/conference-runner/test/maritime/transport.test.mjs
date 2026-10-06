@@ -18,13 +18,26 @@ import { config, roster, inventory, poke, reply, discussion, discussionReply, js
 // Dedicated tests below exercise the unwrapped adapter and real staging code.
 function createMaritimeAdapter(options) {
   const originalFetch = options.fetchImpl;
+  const slept = new Set();
   return rawMaritimeAdapter({ ...options, fetchImpl: async (url, init) => {
+    const path = new URL(url).pathname;
+    const id = path.split('/')[3];
+    if (path.endsWith('/start') || path.endsWith('/reload-env')) slept.delete(id);
+    if (init.method === 'GET' && slept.has(id)) {
+      const seat = options.config.roster.find(row => row.agent_id === id);
+      return jsonResponse({ id, framework: seat.harness, status: 'sleeping' });
+    }
     const command = init?.body && JSON.parse(init.body).command;
     if (command?.[1] === '--input-type=module' && command[3]?.includes('stagePublicRequest')) {
       const spec = JSON.parse(command[4]);
       return jsonResponse({ exitCode: 0, stdout: JSON.stringify({ ready: true, sha256: spec.sha256 }), stderr: '' });
     }
-    return originalFetch(url, init);
+    const response = await originalFetch(url, init);
+    if (path.endsWith('/sleep') && response.ok) {
+      const value = await response.clone().json();
+      if (value.status === 'sleeping') slept.add(id);
+    }
+    return response;
   } });
 }
 
@@ -626,7 +639,7 @@ test('maxAwake retains a poisoned permit after ambiguous chat or rejected sleep'
     const second = adapter.dispatch({ seat: seats[1], request: poke('join', seats[1]),
       deadline_at_ms: Date.now() + 40 });
     if (failure === 'chat') await assert.rejects(first, error => error.code === 'MARITIME_TIMEOUT' && error.ambiguous);
-    else assert.deepEqual(await first, reply(poke('join', seats[0])));
+    else await assert.rejects(first, error => error.code === 'MARITIME_HTTP_400');
     await assert.rejects(second, error => error.code === 'MARITIME_DISPATCH_EXPIRED' && error.retryable);
     assert.equal(posts.filter(path => path.endsWith('/reload-env')).length, 1);
   }
@@ -740,7 +753,7 @@ test('discussion, network timeout, oversized and secret-bearing chat output neve
   const adapter = createMaritimeAdapter({ config, apiKey: 'test-credential', runtimeEvidence: runtimeEvidence(), timeoutMs: 5,
     fetchImpl: async url => { paths.push(new URL(url).pathname); return new Promise(() => {}); } });
   await assert.rejects(adapter.dispatch({ seat: roster[0], request: poke('join') }), /MARITIME_TIMEOUT/);
-  assert.deepEqual(paths.map(path => path.split('/').at(-1)), ['chat']);
+  assert.deepEqual(paths.map(path => path.split('/').at(-1)), ['chat', 'exec']);
 });
 
 test('CLI error wrapper preserves only its fixed diagnostic code and remains ambiguous', async () => {

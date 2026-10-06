@@ -5,7 +5,7 @@ import { Interface } from 'ethers';
 import { auditControlledProof } from '../src/proof-audit.mjs';
 import { GAME_ABI } from '../src/chain/abi.mjs';
 import { FROZEN_NETWORK } from '../../game-bridge/src/index.js';
-import { formatAgentMessages } from '../src/telegram/index.mjs';
+import { formatAgentMessages, formatDealerEvent } from '../src/telegram/index.mjs';
 
 const abi = new Interface([...GAME_ABI,
   'event Committed(uint256 indexed gameId,uint32 indexed round,address indexed wallet,bytes32 commitment)',
@@ -58,7 +58,15 @@ function fixture(roster = config.roster) {
   receipts.get(H(1110)).from = OWNER;
   const calls = [];
   const provider = {
-    async send(method, params) { assert.equal(method, 'eth_chainId'); assert.deepEqual(params, []); return '0x14a34'; },
+    async send(method, params) {
+      if (method === 'eth_chainId') { assert.deepEqual(params, []); return '0x14a34'; }
+      assert.equal(method, 'eth_call'); assert.equal(params[1], '0x6e');
+      const call = abi.decodeFunctionData('previewWinnerClaim', params[0].data);
+      assert.equal(String(call[0]), '9');
+      const index = roster.findIndex(seat => seat.wallet_address.toLowerCase() === call[1].toLowerCase());
+      assert.ok(index >= 0);
+      return abi.encodeFunctionResult('previewWinnerClaim', [BigInt(index + 1) * 100n, 0n, BigInt(index + 1) * 100n, true]);
+    },
     async getBlockNumber() { return 112; },
     async getBlock(number) { return { number, hash: H(number) }; },
     async getTransactionReceipt(tx) { return receipts.get(tx) ?? null; },
@@ -84,7 +92,9 @@ function fixture(roster = config.roster) {
       `${seat.seat_id} (${seat.team === 'hermes' ? 'Hermes' : 'OpenClaw'}) · Game 9 · Round 1\n${PRIVATE_TEXT}`, 20 + i)),
   };
   outbox.entries.push(sent(`event:openclaw:${H(1110)}:${roster.length + 1}`, 'openclaw',
-    `Dealer · Game 9 · Round 1\nGame completed\nhttps://sepolia.basescan.org/tx/${H(1110)}`, 20 + roster.length));
+    formatDealerEvent({ id: `${H(1110)}:${roster.length + 1}`, game_id: '9', round: 1, kind: 'completed',
+      transaction_hash: H(1110), data: { awards: roster.map((seat, index) => ({ wallet_address: seat.wallet_address,
+        award_wei: String((index + 1) * 100) })) } }, fixtureConfig), 20 + roster.length));
   return { config: fixtureConfig, gameId: '9', provider, report, outbox, logs, receipts, calls };
 }
 function replaceEvent(f, name, replacement) {
@@ -149,6 +159,22 @@ test('audits actual confirmed per-seat events and delivered discussion without e
   assert.ok(f.calls.every(call => call.fromBlock >= 100 && call.toBlock <= 111));
   assert.equal(JSON.stringify(audit).includes(PRIVATE_TEXT), false);
   assert.equal(JSON.stringify(audit).includes(H(9000)), false);
+});
+
+test('full award comparison rejects wrong, omitted or added awards even with a valid recomputed digest', async () => {
+  for (const defect of ['wrong', 'omitted', 'added']) {
+    const f = fixture(tenSeatRoster);
+    const entry = f.outbox.entries.at(-1);
+    if (defect === 'wrong') entry.text = entry.text.replace('0.0000000000000001 testnet ETH', '99 testnet ETH');
+    if (defect === 'omitted') entry.text = entry.text.split('\n').filter(line => !line.startsWith('hs-5 (')).join('\n');
+    if (defect === 'added') entry.text = entry.text.replace('Game completed\n', 'Game completed\noc-9: awarded 9 testnet ETH\n');
+    entry.digest = hash(entry.text);
+    const audit = await auditControlledProof(f);
+    assert.equal(audit.proof_complete, false);
+    assert.deepEqual(audit.issues, ['PROOF_RESULT_DELIVERY_UNVERIFIED']);
+  }
+  const valid = await auditControlledProof(fixture(tenSeatRoster));
+  assert.equal(valid.award_total_wei, '5500'); assert.equal(valid.seats.at(-1).award_wei, '1000');
 });
 
 test('audits a complete five-vs-five roster without weakening per-seat acceptance', async () => {

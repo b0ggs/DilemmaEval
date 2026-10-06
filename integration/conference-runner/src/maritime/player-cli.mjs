@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createPlayerRuntime } from './player-runtime.mjs';
 import { safePlayerErrorCode } from './diagnostics.mjs';
+import { PLAYER_INPUT_MAX_BYTES } from './protocol.mjs';
 
 function cliError(code) {
   return Object.assign(new Error(code), { code });
@@ -32,7 +33,7 @@ export async function main(args = process.argv.slice(2), env = process.env, {
   try {
     for await (const chunk of stdin) {
       text += chunk.toString();
-      if (Buffer.byteLength(text) > 131_072) throw cliError('PLAYER_INPUT_TOO_LARGE');
+      if (Buffer.byteLength(text) > PLAYER_INPUT_MAX_BYTES) throw cliError('PLAYER_INPUT_TOO_LARGE');
     }
   } catch (error) {
     if (error?.code === 'PLAYER_INPUT_TOO_LARGE') throw error;

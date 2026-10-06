@@ -148,7 +148,10 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
     let response;
     try { response = await adapter.dispatch(args); }
     catch (error) {
-      const status = rejectedBeforeSubmit(error)
+      const completedDiscussion = record.operation === 'discussion' && error?.cleanup_confirmed === true &&
+        error.completed_request_id === record.request_id;
+      const recovered = error?.recovered_response;
+      const status = completedDiscussion ? 'agent-error' : rejectedBeforeSubmit(error)
         ? 'rejected-before-submit'
         : stopController.signal.aborted && error?.ambiguous === true && failure !== null
           ? 'cancelled-after-submit'
@@ -156,7 +159,9 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
       const transportCode = safeMaritimeErrorCode(error?.transport_code, safeMaritimeErrorCode(error?.code));
       await finish(record, {
         status,
-        transaction_hash: null,
+        transaction_hash: TRANSACTION_HASH.test(recovered?.transaction_hash ?? '') ? recovered.transaction_hash.toLowerCase() : null,
+        ...(recovered ? { action_recovered: true, lifecycle_state: 'unknown' } : {}),
+        ...(completedDiscussion ? { completed_request_id: record.request_id, cleanup_confirmed: true } : {}),
         error_code: safeTransportCode(error),
         ...(transportCode ? { transport_code: transportCode } : {}),
         diagnostic_code: safeMaritimeDiagnosticCode(error?.diagnostic_code),
@@ -182,6 +187,7 @@ export function createProofDispatchJournal({ adapter, report, persist, stopContr
   }
 
   return {
+    capacityManaged: adapter.capacityManaged === true,
     dispatch,
     getFailure: () => failure === null ? null : structuredClone(failure),
     flush: () => writes,

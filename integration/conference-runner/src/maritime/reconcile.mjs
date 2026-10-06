@@ -85,6 +85,26 @@ async function deadlineRead(promise, deadlineAtMs) {
   } finally { clearTimeout(timer); }
 }
 
+/** Dialogue exemptions must identify transactions actually confirmed on Base Sepolia. */
+export async function verifyPublicTransactionReferences({ config, hashes, deadlineAtMs, provider }) {
+  const ownedProvider = !provider;
+  provider ??= makeProvider(config.rpc_url);
+  try {
+    if (config.chain_id !== 84532 || !Array.isArray(hashes) || !hashes.length || hashes.some(hash => !HASH.test(hash)) ||
+        BigInt(await deadlineRead(provider.send('eth_chainId', []), deadlineAtMs)) !== 84532n) return false;
+    const tip = await deadlineRead(provider.getBlockNumber(), deadlineAtMs);
+    for (const hash of new Set(hashes)) {
+      const receipt = await deadlineRead(provider.getTransactionReceipt(hash), deadlineAtMs);
+      if (!receipt || receipt.hash?.toLowerCase() !== hash.toLowerCase() ||
+          receipt.blockNumber > tip - (config.confirmations ?? 2) + 1 || !withinDeadline(deadlineAtMs)) return false;
+      const block = await deadlineRead(provider.getBlock(receipt.blockNumber), deadlineAtMs);
+      if (!block?.hash || block.hash.toLowerCase() !== receipt.blockHash?.toLowerCase()) return false;
+    }
+    return withinDeadline(deadlineAtMs);
+  } catch { return false; }
+  finally { if (ownedProvider) { try { provider.destroy(); } catch {} } }
+}
+
 /** Verify one recovered transaction against a confirmed, canonical receipt and its exact action event. */
 export async function verifyCompletedReceipt({ config, seat, request, response, deadlineAtMs,
   provider }) {

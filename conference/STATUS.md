@@ -8,7 +8,7 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Step 0: full working diff and all untracked files scanned with `gitleaks`; no leaks.
   OAuth targeted tests passed 46/46. Saved every existing modified/untracked file in commit `3fc2d2e`.
 - Step 1: AGENTS.md points here with persistent D1 authorization; D5 docs archived.
-- Complete: steps 0–5 (6/7). Step 6 deferred while the user reviews brittleness.
+- Complete: steps 0–5 (6/7). Step 6 follows the approved fix_issue.MD batch.
 - Steps 2–4: named receipt causes, `diagnose --seat`, coordinator debug admission,
   observer disable/restore and persistent seat quarantine implemented locally.
   Integration checkpoint 625/625; pre-proof full suite 631/631 (October 5).
@@ -20,7 +20,29 @@ The user approved `FAST-ITERATION-IMPLEMENTATION-v2.md`; its decisions are final
 - Initial live diagnostics passed on oc-1/hs-1 with observers disabled and awake 0.
 - Step 5: Games 21/23 completed; all ten acted; four/three defaults; Telegram correct.
 - Cleanup 21:06 UTC: active game 0, awake 0, quarantine empty, operator stopped.
-- Current: stopped at the user's request. No live runs or tests remain active.
+- Current: resumed at the user's request; implementing fix_issue.MD's six active
+  corrections before continuing V2. Targeted regression checks are in progress;
+  no new live game has started. Deferred audit findings remain out of scope.
+- Broad read-only audit completed; 74 targeted local tests passed and ten local
+  reproductions confirmed defects. At the user's request, findings and proposed
+  corrections are recorded in [fix_issue.MD](../fix_issue.MD). Three independent
+  sub-auditors verified the latest feedback against code, tests, saved games,
+  and local reproductions. Document shortened; deferred findings retain linked
+  evidence; #03 now reporting-only, #07 timing claims corrected, proof discussion
+  policy retained, and running-job quarantine verification explicit. Only
+  documentation changed; no code fixes or live operations performed.
+- Final document review: clarified deterministic discussion retry conversation IDs; retained the completed local reproduction evidence and proposed-fix status. No implementation or live operations.
+- Approved fix_issue.MD batch implemented locally: completed-discussion cleanup/
+  one re-ask/verified public hashes (#02), serialized UTF-8 context budget (#11),
+  action clock after admission and separate bounded cleanup (#07), read-only
+  lost-reply recovery with lifecycle uncertainty preserved (#10), definite-unsent
+  reporting without action retries (#03), and complete canonical award-text
+  comparison in the existing proof-audit (#05). Deferred findings remain deferred.
+- Fix verification: revised regressions 86/86, runner/award regressions 87/87,
+  integration checks 98/98. Logs: fix-verified-regressions.log,
+  fix-final-runner-tests.log and fix-integration-targeted.log in the v2 private root.
+  Fresh 00:40 UTC preflight: active game 0, awake 0, owner nonce 508; every seat
+  admitted/funded. Next: commit, batch reinstall all ten, authorized debug game.
 - User stopped broader investigation; provide a broad audit prompt for a new session.
 - Local policy: JSON retained, no character cap, ASD-STE100 guidance; long Telegram
   deliveries preserve text in labeled parts. Targeted tests 198/198; full suite predates this change.

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { GAME_ABI } from '../../src/chain/abi.mjs';
-import { buildCompletedJournalReadCommand, verifyCompletedReceipt } from '../../src/maritime/reconcile.mjs';
+import { buildCompletedJournalReadCommand, verifyCompletedReceipt, verifyPublicTransactionReferences } from '../../src/maritime/reconcile.mjs';
 import { config, poke, reply, roster } from './fixtures.mjs';
 
 const abi = new Interface([...GAME_ABI,
@@ -126,4 +126,16 @@ test('direct receipt verification is deadline-bounded without destroying an inje
     deadlineAtMs: started + 20, provider }), false);
   assert.ok(Date.now() - started < 200);
   assert.equal(destroyed, false);
+});
+
+test('public transaction exemptions require a matching confirmed receipt on the canonical Base Sepolia chain', async () => {
+  const input = { config, hashes: [H(1)], deadlineAtMs: Date.now() + 1000 };
+  assert.equal(await verifyPublicTransactionReferences({ ...input, provider: providerFor() }), true);
+  for (const provider of [providerFor({ canonicalHash: H(9) }),
+    { ...providerFor(), send: async () => '0x1' },
+    { ...providerFor(), getTransactionReceipt: async () => null },
+    { ...providerFor(), getBlockNumber: async () => 100 },
+    { ...providerFor(), getTransactionReceipt: async () => ({ hash: H(9), blockNumber: 100, blockHash: H(2) }) }]) {
+    assert.equal(await verifyPublicTransactionReferences({ ...input, provider }), false);
+  }
 });

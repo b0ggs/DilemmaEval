@@ -360,7 +360,8 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
         const journalPath = join(journals, `${action}.json`);
         const persistError = async (code, operation, stage = 'submitting') => {
           const response = errorResponse(request, safePlayerErrorCode(code, 'PLAYER_SUBMISSION_OUTCOME_UNKNOWN'));
-          await atomicJson(journalPath, { schema_version: 1, stage, request_id: request.request_id, operation, response });
+          await atomicJson(journalPath, { schema_version: 1, stage, request_id: request.request_id, operation, response,
+            ...(stage !== 'submitting' ? { submission_state: 'unsent' } : {}) });
           return response;
         };
         let journal = await readJson(journalPath);
@@ -388,8 +389,14 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
             if (!input.choice) throw new TypeError('PLAYER_CHOICE_REQUIRED');
             journal = { schema_version: 1, stage: 'preparing', request_id: request.request_id };
             await atomicJson(journalPath, journal);
-            await guard();
-            const prepared = await bridges.player.run('prepare_commit', { ...options, choice: input.choice, out: bundlePath });
+            let prepared;
+            try {
+              await guard();
+              prepared = await bridges.player.run('prepare_commit', { ...options, choice: input.choice, out: bundlePath });
+            } catch (error) {
+              return persistError(safePlayerErrorCode(error.code, safePlayerErrorCode(error.message, 'PLAYER_PREPARE_FAILED')),
+                'prepare_commit', 'preparing');
+            }
             if (prepared.error || prepared.exit_code !== 0) return persistError(
               classifyPlayerBridgeError(prepared, 'PLAYER_PREPARE_FAILED'), 'prepare_commit', 'preparing');
             bundle = await readJson(bundlePath);
@@ -409,7 +416,9 @@ export function createPlayerRuntime({ settings, env = process.env, bridgeFactory
           options.input = bundlePath;
         } else if (operation === 'join') options.causeId = String(seat.cause_id);
         await atomicJson(journalPath, { schema_version: 1, stage: 'submitting', request_id: request.request_id, operation });
-        await guard();
+        try { await guard(); }
+        catch (error) { return persistError(safePlayerErrorCode(error.code,
+          safePlayerErrorCode(error.message, 'PLAYER_EXECUTION_PERMIT_INVALID')), operation, 'unsent'); }
         let result;
         try { result = await bridges.player.run(operation, options); }
         catch { return persistError('PLAYER_SUBMISSION_OUTCOME_UNKNOWN', operation); }

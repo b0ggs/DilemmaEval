@@ -599,6 +599,25 @@ test('uncertain signed call persists intent and is never repeated after restart'
   assert.equal(again.error.code, first.error.code); assert.equal(f.calls.length, 1);
 });
 
+test('final permit guard rejection persists definite unsent status before any signing bridge call', async t => {
+  const f = await fixture(t);
+  const settings = { ...f.settings, execution_permit_required: true };
+  let guards = 0, signed = 0;
+  const make = () => createPlayerRuntime({ settings, env: {}, bridgeFactory: () => ({
+    player: { run: async () => { signed++; throw new Error('must not run'); } }
+  }), executionPermitVerifier: async ({ request }) => {
+    if (++guards === 2) throw new Error('PLAYER_EXECUTION_PERMIT_INVALID');
+    return { schema_version: 1, verified: true, request_id: request.request_id, permit_sha256: 'ab'.repeat(32) };
+  } });
+  const response = await make().execute({ request: poke('join') });
+  assert.equal(response.error.code, 'PLAYER_EXECUTION_PERMIT_INVALID');
+  const [file] = await readdir(join(settings.state_directory, 'requests'));
+  const journal = JSON.parse(await readFile(join(settings.state_directory, 'requests', file), 'utf8'));
+  assert.equal(journal.stage, 'unsent'); assert.equal(journal.submission_state, 'unsent'); assert.equal(signed, 0);
+  assert.deepEqual(await make().execute({ request: poke('join') }), response);
+  assert.equal(signed, 0, 'reporting correction does not introduce cached preparation retries');
+});
+
 test('bridge failures retain only allowlisted codes across restart without replay', async t => {
   for (const [code, expected] of [['REVISION_CHECK_FAILED', 'REVISION_CHECK_FAILED'],
     ['SECRET_PROVIDER_DETAIL', 'PLAYER_SUBMISSION_OUTCOME_UNKNOWN']]) {
@@ -644,7 +663,9 @@ test('fixed ethers failure codes survive prepare/submission journals and restart
       assert.equal(journal.response.error.code, expected);
       assert.equal(raw.includes(secret), false);
       assert.equal(JSON.stringify(result).includes(secret), false);
-      assert.deepEqual(Object.keys(journal).sort(), ['operation', 'request_id', 'response', 'schema_version', 'stage']);
+      assert.deepEqual(Object.keys(journal).sort(), ['operation', 'request_id', 'response', 'schema_version', 'stage',
+        ...(phase === 'commit' ? ['submission_state'] : [])]);
+      if (phase === 'commit') assert.equal(journal.submission_state, 'unsent');
     }
   }
 });

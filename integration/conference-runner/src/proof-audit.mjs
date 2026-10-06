@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { Interface, zeroPadValue, toBeHex } from 'ethers';
 import { GAME_ABI } from './chain/abi.mjs';
 import { FROZEN_NETWORK } from '../../game-bridge/src/index.js';
+import { formatDealerEvent } from './telegram/index.mjs';
 
 const ABI = new Interface([...GAME_ABI,
   'event Committed(uint256 indexed gameId,uint32 indexed round,address indexed wallet,bytes32 commitment)',
@@ -217,6 +218,27 @@ export async function auditControlledProof({ config, gameId, provider, report, o
     requireProof((await provider.getBlock(confirmed))?.hash?.toLowerCase() === head.hash.toLowerCase(), 'PROOF_CHAIN_REORG');
     audit.chain_verified = true;
 
+    // Read awards at the canonical ending block, before later claims change
+    // settlement state. Compare the actual complete delivery, including zero awards.
+    const awards = [];
+    for (const log of joined) {
+      const seat = roster.find(seat => seat.wallet_address.toLowerCase() === log.event.args.wallet.toLowerCase());
+      const raw = await provider.send('eth_call', [{ to: config.game_address,
+        data: ABI.encodeFunctionData('previewWinnerClaim', [gameId, seat.wallet_address]) }, toBeHex(ended[0].blockNumber)]);
+      const value = ABI.decodeFunctionResult('previewWinnerClaim', raw);
+      requireProof(value.netPrizeWei >= 0n && value.grossPrizeWei - value.causeCutWei === value.netPrizeWei,
+        'PROOF_AWARDS_UNVERIFIED');
+      awards.push({ wallet_address: seat.wallet_address, award_wei: String(value.netPrizeWei) });
+    }
+    await canonical(ended[0].blockNumber, ended[0].blockHash);
+    requireProof((await provider.getBlock(ended[0].blockNumber))?.hash?.toLowerCase() === ended[0].blockHash.toLowerCase(),
+      'PROOF_CHAIN_REORG');
+    audit.award_total_wei = String(awards.reduce((total, award) => total + BigInt(award.award_wei), 0n));
+    audit.seats.forEach((seat, index) => { seat.award_wei = awards.find(award =>
+      award.wallet_address.toLowerCase() === roster[index].wallet_address.toLowerCase()).award_wei; });
+    const expectedResultText = formatDealerEvent({ id: ended[0].id, game_id: gameId, round: endRound,
+      kind: 'completed', transaction_hash: resultHash, data: { awards } }, config);
+
     const teams = ['openclaw', 'hermes'];
     requireProof(outbox?.schema_version === 1 && outbox.run_id === config.run_id && Array.isArray(outbox.entries) &&
       teams.every(team => /^-\d+$/.test(String(config.telegram?.[team]?.chat_id ?? '')) &&
@@ -267,8 +289,7 @@ export async function auditControlledProof({ config, gameId, provider, report, o
     for (const team of resultTeams) {
       const key = `event:${team}:${ended[0].id}`;
       const entry = entries.find(item => item.key === key && item.team === team);
-      requireProof(entry?.text.startsWith(`Dealer · Game ${gameId} · Round ${endRound}\nGame completed\n`) &&
-        entry.text.endsWith(`https://sepolia.basescan.org/tx/${resultHash}`), 'PROOF_RESULT_DELIVERY_UNVERIFIED');
+      requireProof(entry?.text === expectedResultText, 'PROOF_RESULT_DELIVERY_UNVERIFIED');
       audit.result_message_ids.push({ team, message_id: entry.message_id });
     }
     audit.telegram_verified = audit.proof_complete = true;

@@ -44,7 +44,8 @@ const MESSAGE_KEYS = new Set([
   "sequence",
   "received_at",
   "request_id",
-  "message"
+  "message",
+  "public_transaction_hashes"
 ]);
 
 export function validatePoke(poke) {
@@ -125,9 +126,9 @@ export function serializePoke(poke) {
   return JSON.stringify(poke);
 }
 
-export function validateAgentResponse(response) {
+export function validateAgentResponse(response, publicHashes = publicTransactionHashes(response)) {
   assertPlainObject(response, "response");
-  assertNoSensitiveMaterial(response);
+  assertNoSensitiveMaterial(response, "input", publicHashes);
 
   const required = new Set([
     "schema_version",
@@ -176,7 +177,7 @@ export function validateAgentResponse(response) {
   return response;
 }
 
-export function parseAndValidateResponse(raw) {
+export function parseAndValidateResponse(raw, publicHashes) {
   let candidate = raw;
   if (typeof candidate === "string") {
     candidate = parseJson(candidate, "agent response");
@@ -193,12 +194,12 @@ export function parseAndValidateResponse(raw) {
         : candidate.response;
   }
 
-  return validateAgentResponse(candidate);
+  return validateAgentResponse(candidate, publicHashes);
 }
 
 export function assertResponseIdentity(poke, response) {
   validatePoke(poke);
-  validateAgentResponse(response);
+  validateAgentResponse(response, new Set([...publicTransactionHashes(poke), ...publicTransactionHashes(response)]));
   for (const field of ["request_id", "game_id", "round", "phase", "seat_id"]) {
     if (response[field] !== poke[field]) {
       throw new Error(
@@ -209,16 +210,35 @@ export function assertResponseIdentity(poke, response) {
   return true;
 }
 
-export function assertNoSensitiveMaterial(value, path = "input") {
+// Only explicit public transaction fields supply exemptions. Arbitrary 64-hex
+// prose, commitments, salts and credentials still fail closed.
+export function publicTransactionHashes(value) {
+  const hashes = new Set();
+  const visit = item => {
+    if (!item || typeof item !== "object") return;
+    for (const [key, child] of Object.entries(item)) {
+      if (key === "transaction_hash" && TRANSACTION_PATTERN.test(child ?? "")) hashes.add(child.toLowerCase());
+      else if (key === "public_transaction_hashes" && Array.isArray(child)) {
+        for (const hash of child) if (TRANSACTION_PATTERN.test(hash)) hashes.add(hash.toLowerCase());
+      } else visit(child);
+    }
+  };
+  visit(value);
+  return hashes;
+}
+
+export function assertNoSensitiveMaterial(value, path = "input", publicHashes = publicTransactionHashes(value)) {
   if (typeof value === "string") {
     const leaf = path.split(".").at(-1).toLowerCase().replaceAll(/[^a-z0-9]/g, "");
     const publicHashField =
       leaf.includes("hash") || leaf.includes("commitment");
     if (
+      /\bprivate[ _-]?key\b\s*[:=]/i.test(value) ||
       /(?:^|\s)Bearer\s+\S+/i.test(value) ||
       /\bmk_[A-Za-z0-9_-]{6,}/.test(value) ||
       /\b(?:sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}/i.test(value) ||
-      (!publicHashField && /\b(?:0x)?[0-9a-fA-F]{64}\b/.test(value))
+      (!publicHashField && [...value.matchAll(/\b(?:0x)?[0-9a-fA-F]{64}\b/g)].some(match =>
+        !publicHashes.has(match[0].toLowerCase())))
     ) {
       throw new Error(`SENSITIVE_MATERIAL_REJECTED: ${path}`);
     }
@@ -230,7 +250,7 @@ export function assertNoSensitiveMaterial(value, path = "input") {
     if (isSensitiveKey(key, path)) {
       throw new Error(`SENSITIVE_MATERIAL_REJECTED: ${path}.${key}`);
     }
-    assertNoSensitiveMaterial(child, `${path}.${key}`);
+    assertNoSensitiveMaterial(child, `${path}.${key}`, publicHashes);
   }
 }
 
@@ -276,7 +296,9 @@ function assertSeatMatchesTeam(seat, team, path) {
 
 function validateTeamMessage(message, path) {
   assertPlainObject(message, path);
-  assertExactKeys(message, MESSAGE_KEYS, MESSAGE_KEYS, path);
+  assertExactKeys(message, MESSAGE_KEYS, new Set([...MESSAGE_KEYS].filter(key => key !== "public_transaction_hashes")), path);
+  if (message.public_transaction_hashes !== undefined && (!Array.isArray(message.public_transaction_hashes) ||
+      message.public_transaction_hashes.some(hash => !TRANSACTION_PATTERN.test(hash)))) fail(path, "invalid public transaction references");
   if (message.schema_version !== 1) fail(`${path}.schema_version`, "must equal 1");
   nonEmptyString(message.game_id, `${path}.game_id`);
   nonNegativeInteger(message.round, `${path}.round`);

@@ -8,6 +8,8 @@ import { parseAndValidateResponse, assertResponseIdentity } from '../../../marit
 import { discussionToLogResponse } from '../maritime/index.mjs';
 import { safePlayerErrorCode } from '../maritime/diagnostics.mjs';
 import { safeMaritimeErrorCode, safeMaritimeDiagnosticCode } from '../maritime/transport.mjs';
+import { fitPlayerRequestContext } from '../maritime/protocol.mjs';
+import { publicTransactionHashes } from '../../../maritime-transport/src/validation.mjs';
 import { createDurableStore } from './store.mjs';
 import { acquireRunnerLock } from './lock.mjs';
 
@@ -30,26 +32,47 @@ function bounded(operation, milliseconds, code) {
   ]).finally(() => clearTimeout(timer));
 }
 
-function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal) {
+function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal, capacityManaged = false, now = Date.now) {
   const controller = new AbortController();
   const timeout = Object.assign(new Error('AGENT_TIMEOUT'), { code: 'AGENT_TIMEOUT', ambiguous: true });
   let timer;
   let fallback;
   let abort;
+  let admitted = false, cleaning = false;
+  const admit = () => {
+    if (controller.signal.aborted) throw Object.assign(new Error('MARITIME_DISPATCH_EXPIRED'), {
+      code: 'MARITIME_DISPATCH_EXPIRED', ambiguous: false, retryable: true
+    });
+    if (admitted) throw new Error('AGENT_ADMISSION_REPEATED');
+    admitted = true;
+    const deadline = now() + milliseconds;
+    timer = setTimeout(abort, milliseconds);
+    return deadline;
+  };
+  const cleanup = milliseconds => {
+    if (!capacityManaged || cleaning || !Number.isSafeInteger(milliseconds) || milliseconds < 1 || milliseconds > 30_000) return;
+    cleaning = true;
+    clearTimeout(timer); clearImmediate(fallback);
+    timer = setTimeout(() => { fallback = setImmediate(() => boundaryReject(timeout)); }, milliseconds);
+  };
+  let boundaryReject;
   const result = Promise.resolve().then(() => {
     if (controller.signal.aborted) throw Object.assign(new Error('MARITIME_DISPATCH_EXPIRED'), {
       code: 'MARITIME_DISPATCH_EXPIRED', ambiguous: false, retryable: true
     });
-    return operation({ deadline_at_ms: deadlineAtMs, signal: controller.signal });
+    return operation({ deadline_at_ms: capacityManaged ? undefined : deadlineAtMs, signal: controller.signal,
+      ...(capacityManaged ? { on_admitted: admit, on_cleanup: cleanup } : {}) });
   }).then(
     (value) => {
-      if (controller.signal.aborted) throw timeout;
+      if (controller.signal.aborted && !cleaning) throw timeout;
       return value;
     },
     (error) => { throw error; }
   );
   const boundary = new Promise((_, reject) => {
+    boundaryReject = reject;
     abort = () => {
+      if (cleaning) return;
       if (controller.signal.aborted) return;
       controller.abort();
       // An abort-aware adapter can now report whether work expired before any
@@ -57,7 +80,7 @@ function dispatchWithDeadline(operation, milliseconds, deadlineAtMs, phaseSignal
       // turn to settle, but never let an adapter that ignores abort hang a tick.
       fallback = setImmediate(() => reject(timeout));
     };
-    timer = setTimeout(abort, milliseconds);
+    if (!capacityManaged) timer = setTimeout(abort, milliseconds);
     if (phaseSignal?.aborted) abort();
     else phaseSignal?.addEventListener('abort', abort, { once: true });
   });
@@ -162,6 +185,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
   let release;
   let closed = false;
   let publishInFlight = null;
+  let phaseReadInFlight = null;
   const issues = new Map();
   const issueKey = (code, extra) => `${code}:${extra.seat_id ?? ''}:${extra.game_id ?? ''}`;
   function flag(code, extra = {}) { issues.set(issueKey(code, extra), { code, ...extra }); }
@@ -191,6 +215,17 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     },
     requestAdvance: (intent) => bounded(() => phaseExecutor.advance(intent), limits.adapter, 'PHASE_TIMEOUT')
   });
+
+  // Share only an ongoing authoritative phase read across simultaneous seats.
+  // A completed read is never cached for a later admission or signing check.
+  async function readPhaseSnapshot() {
+    if (!phaseReadInFlight) {
+      const pending = readSnapshot();
+      phaseReadInFlight = pending;
+      pending.finally(() => { if (phaseReadInFlight === pending) phaseReadInFlight = null; }).catch(() => {});
+    }
+    return phaseReadInFlight;
+  }
 
   async function persist() {
     state.health = [...issues.values()];
@@ -358,7 +393,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     }
     const log = await gameLog(snapshot.game_id);
     const teamChat = await log.buildSnapshot(seat);
-    const request = action === 'discussion' ? {
+    let request = action === 'discussion' ? {
       schema_version: 1, type: 'discussion', request_id: requestId, game_id: snapshot.game_id, round: snapshot.round,
       phase: 'commit', seat_id: seat.seat_id, team: seat.team, chain_state: snapshot, team_chat: teamChat
     } : {
@@ -382,10 +417,26 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       if (!reservation.inserted) return reservation.value.state;
     }
     try {
+      request = fitPlayerRequestContext(request);
+      const checkPhase = async () => {
+        if (action === 'claim') return;
+        const current = await readPhaseSnapshot();
+        if (current.game_id !== snapshot.game_id || current.round !== snapshot.round ||
+            current.phase !== snapshot.phase || evaluateChainSnapshot(coreSnapshot(current)).eligible) {
+          throw Object.assign(new Error('MARITIME_DISPATCH_EXPIRED'), {
+            code: 'MARITIME_DISPATCH_EXPIRED', ambiguous: false, retryable: true
+          });
+        }
+      };
       const deadlineAtMs = now() + limits.agent;
-      const raw = await dispatchWithDeadline(({ deadline_at_ms, signal }) => agents.dispatch({
-        seat: clone(seat), request: clone(request), deadline_at_ms, signal
-      }), limits.agent, deadlineAtMs, phaseSignal);
+      const raw = await dispatchWithDeadline(boundary => agents.dispatch({
+        seat: clone(seat), request: clone(request), ...boundary,
+        on_pre_submit: checkPhase,
+        ...(boundary.on_admitted ? { on_admitted: async () => {
+          await checkPhase();
+          return boundary.on_admitted();
+        } } : {})
+      }), limits.agent, deadlineAtMs, phaseSignal, agents.capacityManaged === true, now);
       let response;
       if (action === 'discussion') {
         response = discussionToLogResponse(raw, request);
@@ -394,7 +445,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
         }
       }
       else {
-        response = parseAndValidateResponse(raw);
+        response = parseAndValidateResponse(raw, new Set([...publicTransactionHashes(request), ...publicTransactionHashes(raw)]));
         assertResponseIdentity(request, response);
       }
       // Preserve agent words only through the validated TeamLogStore; arbitrary
@@ -421,6 +472,28 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       if (safe.status === 'error') flag('AGENT_REPORTED_ERROR', { seat_id: seat.seat_id, game_id: snapshot.game_id });
       return 'acknowledged';
     } catch (error) {
+      if (error?.cleanup_confirmed === true && error.completed_request_id === requestId) {
+        await store.set(key, { ...record, state: 'failed-completed', completed_request_id: requestId,
+          cleanup_confirmed: true, diagnostic_code: safeMaritimeDiagnosticCode(error.diagnostic_code),
+          transport_code: safeMaritimeErrorCode(error.code) });
+        flag('AGENT_REPORTED_ERROR', { seat_id: seat.seat_id, game_id: snapshot.game_id });
+        return 'failed-completed';
+      }
+      if (error?.code === 'PLAYER_INPUT_TOO_LARGE' && error.ambiguous === false) {
+        await store.set(key, { ...record, state: 'unsent', error_code: 'PLAYER_INPUT_TOO_LARGE' });
+        flag('AGENT_REPORTED_ERROR', { seat_id: seat.seat_id, game_id: snapshot.game_id });
+        return 'unsent';
+      }
+      if (error?.recovered_response) {
+        const recovered = parseAndValidateResponse(error.recovered_response);
+        assertResponseIdentity(request, recovered);
+        await core.recordResponse(recovered);
+        await store.set(key, { ...record, state: 'chain-confirmed', status: recovered.status,
+          transaction_hash: recovered.transaction_hash, lifecycle_state: 'unknown',
+          transport_code: safeMaritimeErrorCode(error.transport_code, safeMaritimeErrorCode(error.code)) });
+        flag('AGENT_ACTION_UNCERTAIN', { seat_id: seat.seat_id, game_id: snapshot.game_id });
+        return 'chain-confirmed';
+      }
       if (isRejectedBeforeSubmit(error)) {
         const code = ['MARITIME_DISPATCH_EXPIRED', 'MARITIME_ONE_AWAKE_RECONCILIATION_REQUIRED'].includes(error.code)
           ? error.code : 'MARITIME_DISPATCH_EXPIRED';
@@ -516,7 +589,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     let failure;
     const check = async () => {
       try {
-        const current = await readSnapshot();
+        const current = await readPhaseSnapshot();
         if (stopped) return;
         // Use the authoritative block clock, not an estimated seconds-per-block
         // deadline. One watcher covers every active or queued discussion seat.
@@ -543,7 +616,7 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
     if (['idle', 'terminal'].includes(snapshot.phase)) return;
     if (evaluateChainSnapshot(coreSnapshot(snapshot)).eligible) { await advance(); return; }
     if (snapshot.phase === 'join') {
-      await Promise.all(config.roster.filter((seat) => !playerFor(snapshot, seat)?.joined).map((seat) => dispatch(seat, snapshot, 'join')));
+      await phaseDispatch(snapshot, config.roster.filter((seat) => !playerFor(snapshot, seat)?.joined), 'join');
     } else if (snapshot.phase === 'commit') {
       const living = config.roster.filter((seat) => playerFor(snapshot, seat)?.alive);
       const phase = watchDiscussionPhase(snapshot);
@@ -559,16 +632,23 @@ export function createConferenceRunner({ config, runtimeDir, chain, agents, laun
       // Every living player must have a durably accepted strategy message before
       // committing. Unknown or rejected discussions must not silently disappear.
       if (!debug && discussionStates.some(status => status !== 'acknowledged')) return;
-      await Promise.all(config.roster.filter((seat) => {
+      await phaseDispatch(snapshot, config.roster.filter((seat) => {
         const player = playerFor(snapshot, seat); return player?.alive && !player.committed;
-      }).map((seat) => dispatch(seat, snapshot, 'commit')));
+      }), 'commit');
     } else if (snapshot.phase === 'reveal') {
-      await Promise.all(config.roster.filter((seat) => {
+      await phaseDispatch(snapshot, config.roster.filter((seat) => {
         const player = playerFor(snapshot, seat); return player?.alive && player.committed && !player.revealed;
-      }).map((seat) => dispatch(seat, snapshot, 'reveal')));
+      }), 'reveal');
     }
     await refresh();
     await advance();
+  }
+
+  async function phaseDispatch(snapshot, seats, action) {
+    const phase = watchDiscussionPhase(snapshot);
+    try { await Promise.all(seats.map(seat => dispatch(seat, snapshot, action, phase.signal))); }
+    finally { phase.stop(); }
+    if (phase.failure) throw phase.failure;
   }
 
   function isPayable(snapshot, player) {

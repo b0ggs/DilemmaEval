@@ -2,6 +2,7 @@ import path from "node:path";
 import * as defaultFs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { createHash } from "node:crypto";
+import { publicTransactionHashes } from "../../maritime-transport/src/validation.mjs";
 
 const TEAMS = new Set(["openclaw", "hermes"]);
 const PHASES = new Set(["join", "commit", "reveal", "claim"]);
@@ -131,7 +132,10 @@ export class TeamLogStore {
         });
       }
 
-      if (message !== undefined && message.length > 0 && likelyContainsSecret(message)) {
+      const publicHashes = new Set([...publicTransactionHashes(expected), ...publicTransactionHashes(response)]);
+      const references = typeof message === 'string' ? [...new Set([...message.matchAll(/\b0x[0-9a-fA-F]{64}\b/g)]
+        .map(match => match[0].toLowerCase()).filter(hash => publicHashes.has(hash)))] : [];
+      if (message !== undefined && message.length > 0 && likelyContainsSecret(message, references)) {
         return this.#reject({
           receivedAt,
           expected,
@@ -166,6 +170,7 @@ export class TeamLogStore {
           typeof acceptedMessage === "string"
             ? digestMessage(acceptedMessage)
             : null,
+        ...(references.length ? { public_transaction_hashes: references } : {}),
         message_length:
           typeof acceptedMessage === "string" ? acceptedMessage.length : 0
       });
@@ -471,7 +476,8 @@ export class TeamLogStore {
         sequence: this.#nextSequence.get(intent.team),
         received_at: intent.received_at,
         request_id: intent.request_id,
-        message: intent.message
+        message: intent.message,
+        ...(intent.public_transaction_hashes ? { public_transaction_hashes: intent.public_transaction_hashes } : {})
       });
       await this.#appendJson(this.paths[intent.team], record);
       this.#messageRecords.set(key, record);
@@ -730,6 +736,7 @@ function intentLedgerRecord(intent, messageSequence) {
     seat_id: intent.seat_id,
     team: intent.team,
     message: intent.message,
+    ...(intent.public_transaction_hashes ? { public_transaction_hashes: intent.public_transaction_hashes } : {}),
     message_digest: intent.message_digest,
     message_length: intent.message_length,
     accepted: true,
@@ -769,6 +776,7 @@ function intentFromStoredRecord(record) {
     seat_id: record.seat_id,
     request_id: record.request_id,
     message: record.message,
+    ...(record.public_transaction_hashes ? { public_transaction_hashes: record.public_transaction_hashes } : {}),
     message_digest: digestMessage(record.message),
     message_length: record.message.length
   });
@@ -792,6 +800,7 @@ function intentFromLedgerEntry(entry) {
     seat_id: entry.seat_id,
     request_id: entry.request_id,
     message,
+    ...(entry.public_transaction_hashes ? { public_transaction_hashes: entry.public_transaction_hashes } : {}),
     message_digest: message === null ? null : digestMessage(message),
     message_length: message === null ? 0 : message.length
   });
@@ -828,8 +837,9 @@ function validateIntent(intent, gameId, seats, file) {
     !intent ||
     typeof intent !== "object" ||
     Array.isArray(intent) ||
-    Object.keys(intent).length !== exactKeys.size ||
-    Object.keys(intent).some((key) => !exactKeys.has(key)) ||
+    Object.keys(intent).filter(key => key !== 'public_transaction_hashes').length !== exactKeys.size ||
+    Object.keys(intent).some((key) => !exactKeys.has(key) && key !== 'public_transaction_hashes') ||
+    !validReferences(intent.public_transaction_hashes) ||
     intent.schema_version !== 1 ||
     intent.kind !== "acceptance_intent" ||
     intent.game_id !== gameId ||
@@ -849,7 +859,7 @@ function validateIntent(intent, gameId, seats, file) {
         intent.message_length !== intent.message.length) ||
     (typeof intent.message === "string" &&
       intent.message.length > 0 &&
-      likelyContainsSecret(intent.message))
+      likelyContainsSecret(intent.message, intent.public_transaction_hashes))
   ) {
     throw new TeamLogCorruptionError("invalid acceptance journal intent", file);
   }
@@ -886,7 +896,8 @@ function validateLedgerEntry(entry, gameId) {
       (entry.team === "openclaw" && !entry.seat_id.startsWith("oc-")) ||
       (entry.team === "hermes" && !entry.seat_id.startsWith("hs-")) ||
       (entry.message !== null && typeof entry.message !== "string") ||
-      (typeof entry.message === "string" && likelyContainsSecret(entry.message)) ||
+      !validReferences(entry.public_transaction_hashes) ||
+      (typeof entry.message === "string" && likelyContainsSecret(entry.message, entry.public_transaction_hashes)) ||
       (entry.message_digest !== undefined &&
         entry.message_digest !==
           (entry.message === null ? null : digestMessage(entry.message))) ||
@@ -923,6 +934,7 @@ function acceptedLedgerMatchesIntent(entry, intent, record) {
     entry.seat_id === intent.seat_id &&
     entry.request_id === intent.request_id &&
     entry.message === intent.message &&
+    JSON.stringify(entry.public_transaction_hashes ?? []) === JSON.stringify(intent.public_transaction_hashes ?? []) &&
     (entry.message_digest === undefined ||
       entry.message_digest === intent.message_digest) &&
     (entry.message_length === undefined ||
@@ -936,7 +948,13 @@ function digestMessage(message) {
   return createHash("sha256").update(message, "utf8").digest("hex");
 }
 
-function likelyContainsSecret(message) {
+function validReferences(hashes) {
+  return hashes === undefined || Array.isArray(hashes) && hashes.every(hash => typeof hash === 'string' && TX_PATTERN.test(hash));
+}
+
+function likelyContainsSecret(message, hashes = []) {
+  const allowed = new Set(hashes.map(hash => hash.toLowerCase()));
+  message = message.replace(/\b0x[0-9a-fA-F]{64}\b/g, hash => allowed.has(hash.toLowerCase()) ? '[public transaction]' : hash);
   const patterns = [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
     /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/i,
@@ -965,7 +983,9 @@ function validateStoredMessage(record) {
     !record ||
     typeof record !== "object" ||
     Array.isArray(record) ||
-    Object.keys(record).length !== keys.length ||
+    Object.keys(record).filter(key => key !== 'public_transaction_hashes').length !== keys.length ||
+    Object.keys(record).some(key => !keys.includes(key) && key !== 'public_transaction_hashes') ||
+    !validReferences(record.public_transaction_hashes) ||
     keys.some((key) => !(key in record)) ||
     record.schema_version !== 1 ||
     typeof record.game_id !== "string" ||
@@ -980,7 +1000,7 @@ function validateStoredMessage(record) {
     typeof record.request_id !== "string" ||
     record.request_id.length === 0 ||
     typeof record.message !== "string" ||
-    likelyContainsSecret(record.message)
+    likelyContainsSecret(record.message, record.public_transaction_hashes)
   ) {
     throw new TeamLogCorruptionError("invalid stored team message");
   }

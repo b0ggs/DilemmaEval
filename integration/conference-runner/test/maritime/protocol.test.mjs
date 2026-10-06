@@ -4,6 +4,38 @@ import { validateDiscussionRequest, validateDiscussionResponse, validateGameplay
   validateRuntimeDiagnosticRequest, validateRuntimeDiagnosticInput,
   validateRuntimeDiagnosticResponse } from '../../src/maritime/index.mjs';
 import { config, roster, discussion, discussionReply, poke, reply } from './fixtures.mjs';
+import { fitPlayerRequestContext, PLAYER_INPUT_MAX_BYTES } from '../../src/maritime/protocol.mjs';
+
+test('CLI context selects whole recent Unicode messages by serialized UTF-8 bytes', () => {
+  const request = poke();
+  request.team_chat = { through_sequence: 20, messages: Array.from({ length: 20 }, (_, index) => ({
+    schema_version: 1, game_id: '7', round: 1, phase: 'commit', team: 'openclaw', seat_id: 'oc-1',
+    sequence: index + 1, received_at: '2026-10-05T12:00:00Z', request_id: `prior:${index}`, message: '🦀'.repeat(3000)
+  })) };
+  const original = structuredClone(request);
+  const selected = fitPlayerRequestContext(request);
+  assert.ok(Buffer.byteLength(JSON.stringify({ request: selected, choice: 'catch' })) <= PLAYER_INPUT_MAX_BYTES);
+  assert.ok(selected.team_chat.messages.length > 0 && selected.team_chat.messages.length < 20);
+  assert.equal(selected.team_chat.through_sequence, 20);
+  assert.deepEqual(selected.team_chat.messages, request.team_chat.messages.slice(-selected.team_chat.messages.length));
+  assert.deepEqual(request, original);
+  request.team_chat.messages.at(-1).message = '🦀'.repeat(40000);
+  const omitted = fitPlayerRequestContext(request);
+  assert.equal(omitted.team_chat.through_sequence, 19);
+  assert.equal(omitted.team_chat.messages.some(message => message.sequence === 20), false);
+  request.chain_state.public_description = '🦀'.repeat(40000);
+  assert.throws(() => fitPlayerRequestContext(request), error => error.code === 'PLAYER_INPUT_TOO_LARGE' && error.ambiguous === false);
+});
+
+test('public transaction references require matching explicit public fields; unknown hashes and secrets remain rejected', () => {
+  const hash = `0x${'a'.repeat(64)}`;
+  const request = discussion();
+  request.chain_state.transaction_hash = hash;
+  assert.equal(validateDiscussionResponse(discussionReply(request, { team_message: `Read transaction ${hash}.` }), request).status, 'observed');
+  for (const message of [`Unknown 0x${'b'.repeat(64)}`, `salt=${hash}`, 'Bearer fixture-private-value', 'mk_fixture_private_key']) {
+    assert.throws(() => validateDiscussionResponse(discussionReply(request, { team_message: message }), request));
+  }
+});
 
 const diagnostic = (mode = 'gameplay-input') => ({ schema_version: 1, type: 'runtime-diagnostic',
   request_id: `diagnostic:${mode}`, seat_id: roster[0].seat_id, team: roster[0].team, mode,

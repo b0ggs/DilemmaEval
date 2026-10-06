@@ -1,5 +1,5 @@
 import {
-  assertNoSensitiveMaterial, assertResponseIdentity, validateAgentResponse, validatePoke
+  assertNoSensitiveMaterial, assertResponseIdentity, validateAgentResponse, validatePoke, publicTransactionHashes
 } from '../../../maritime-transport/src/validation.mjs';
 
 const REQUEST_KEYS = ['schema_version', 'type', 'request_id', 'game_id', 'round', 'phase', 'seat_id', 'team', 'chain_state', 'team_chat'];
@@ -13,6 +13,26 @@ const DIAGNOSTIC_MODES = ['gameplay-input', 'commit-input'];
 const SEAT = /^(?:oc|hs)-(?:[1-9]|10)$/;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
+export const PLAYER_INPUT_MAX_BYTES = 131_072;
+
+/** Inference-only selection. Accepted words and delivery history stay intact. */
+export function fitPlayerRequestContext(request) {
+  const selected = structuredClone(request);
+  selected.team_chat = { through_sequence: 0, messages: [] };
+  // Reserve the longest legal choice even before the player makes it.
+  const bytes = () => Buffer.byteLength(JSON.stringify({ request: selected, choice: 'catch' }), 'utf8');
+  if (bytes() > PLAYER_INPUT_MAX_BYTES) throw Object.assign(new Error('PLAYER_INPUT_TOO_LARGE'), {
+    code: 'PLAYER_INPUT_TOO_LARGE', ambiguous: false, retryable: false
+  });
+  for (const message of [...request.team_chat.messages].reverse()) {
+    const previous = selected.team_chat;
+    const messages = [structuredClone(message), ...previous.messages];
+    selected.team_chat = { through_sequence: messages.at(-1).sequence, messages };
+    if (bytes() > PLAYER_INPUT_MAX_BYTES) selected.team_chat = previous;
+  }
+  selected.type === 'discussion' ? validateDiscussionRequest(selected) : assertPublicGameplayRequest(selected);
+  return selected;
+}
 
 function exact(value, required, optional = []) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -25,7 +45,7 @@ function exact(value, required, optional = []) {
 export function assertPublicGameplayRequest(request) {
   validatePoke(request);
   rejectDecisionMaterial(request.chain_state);
-  for (const message of request.team_chat.messages) assertMessage(message.message);
+  for (const message of request.team_chat.messages) assertMessage(message.message, publicTransactionHashes(request));
   return request;
 }
 
@@ -92,12 +112,12 @@ function rejectDecisionMaterial(value) {
   }
 }
 
-function assertMessage(message) {
+function assertMessage(message, publicHashes) {
   if (typeof message !== 'string' ||
       /\b(?:reveal[ _-]?)?salt\b\s*[:=]/i.test(message)) {
     throw new TypeError('TEAM_MESSAGE_INVALID');
   }
-  assertNoSensitiveMaterial({ team_message: message });
+  assertNoSensitiveMaterial({ team_message: message }, 'response', publicHashes);
 }
 
 function discussionPoke(request) {
@@ -129,9 +149,10 @@ export function validateDiscussionResponse(response, request) {
     throw new TypeError('DISCUSSION_RESPONSE_INVALID');
   }
   const mapped = legacyResponse(response);
-  validateAgentResponse(mapped);
-  assertNoSensitiveMaterial(response);
-  if (Object.hasOwn(response, 'team_message')) assertMessage(response.team_message);
+  const hashes = publicTransactionHashes(request);
+  validateAgentResponse(mapped, hashes);
+  assertNoSensitiveMaterial(response, 'response', hashes);
+  if (Object.hasOwn(response, 'team_message')) assertMessage(response.team_message, hashes);
   if (response.status !== 'observed' && response.team_message) {
     throw new TypeError('DISCUSSION_MESSAGE_REQUIRES_OBSERVED');
   }
@@ -159,7 +180,8 @@ export function discussionToLogResponse(response, request) {
 
 export function validateGameplayResponse(response, request) {
   assertResponseIdentity(request, response);
-  if (Object.hasOwn(response, 'team_message')) assertMessage(response.team_message);
+  if (Object.hasOwn(response, 'team_message')) assertMessage(response.team_message,
+    new Set([...publicTransactionHashes(request), ...publicTransactionHashes(response)]));
   if (response.status === 'submitted' && !response.transaction_hash) {
     throw new TypeError('SUBMITTED_RESPONSE_REQUIRES_HASH');
   }
